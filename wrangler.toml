@@ -1,0 +1,10 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "nkgta"
+compatibility_date = "2026-10-10"
+
+[[routes]]
+pattern = "nkgta.0sk.ar"
+custom_domain = true
+
+[assets]
+directory = "./dist"
