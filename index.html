@@ -54,6 +54,13 @@
 				text-align: center;
 				font-size: 1.5rem;
 			}
+			#loading {
+				top: 45%;
+				left: 0;
+				right: 0;
+				text-align: center;
+				font-size: 1.5rem;
+			}
 			#help {
 				bottom: 1rem;
 				left: 1rem;
@@ -65,11 +72,15 @@
 	</head>
 	<body>
 		<canvas></canvas>
+		<div class="hud" id="loading">Lade Karte…</div>
 		<div class="hud" id="street"></div>
 		<div class="hud" id="money"></div>
 		<div class="hud" id="bag"></div>
 		<div class="hud" id="place"></div>
-		<div class="hud" id="help">Pfeiltasten: laufen · Leertaste: Fahrrad · Flaschen zum Späti bringen</div>
+		<div class="hud" id="help">
+			Pfeiltasten oder WASD: laufen · E: Fahrrad · Leertaste: Turbo · +/− oder Mausrad: Zoom · N: Straßennamen · M: Gegend wählen · Flaschen
+			zum Späti bringen
+		</div>
 		<script type="module" src="/src/main.js"></script>
 	</body>
 </html>
