@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>NK GTA</title>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				overflow: hidden;
+				background: #222;
+				font-family: system-ui, sans-serif;
+				color: #fff;
+			}
+			canvas {
+				display: block;
+				width: 100vw;
+				height: 100vh;
+			}
+			.hud {
+				position: fixed;
+				pointer-events: none;
+				text-shadow:
+					0 2px 0 #000,
+					0 0 6px #000;
+				font-weight: 800;
+			}
+			#street {
+				top: 1rem;
+				left: 0;
+				right: 0;
+				text-align: center;
+				font-size: 2rem;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+			}
+			#money {
+				top: 1rem;
+				right: 1.5rem;
+				font-size: 2rem;
+				color: #9be86a;
+			}
+			#bag {
+				top: 3.5rem;
+				right: 1.5rem;
+				font-size: 1.4rem;
+			}
+			#place {
+				bottom: 1.5rem;
+				left: 0;
+				right: 0;
+				text-align: center;
+				font-size: 1.5rem;
+			}
+			#help {
+				bottom: 1rem;
+				left: 1rem;
+				font-size: 0.8rem;
+				font-weight: 400;
+				opacity: 0.6;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas></canvas>
+		<div class="hud" id="street"></div>
+		<div class="hud" id="money"></div>
+		<div class="hud" id="bag"></div>
+		<div class="hud" id="place"></div>
+		<div class="hud" id="help">Pfeiltasten: laufen · Leertaste: Fahrrad · Flaschen zum Späti bringen</div>
+		<script type="module" src="/src/main.js"></script>
+	</body>
+</html>
