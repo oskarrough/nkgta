@@ -105,6 +105,9 @@ export function renderRoofImage(world) {
 	g.lineJoin = 'round'
 
 	buildings.forEach((b, n) => {
+		// No outline means an endless bounding box below, so skip it. Maps
+		// built before build-map.js dropped these still have a few.
+		if (!b.rings.length) return
 		const roof = b.h <= 5 ? SHED_ROOF : ROOFS[Math.floor(roofHash(n) * ROOFS.length)]
 		const path = new Path2D()
 		let minX = Infinity

@@ -161,7 +161,9 @@ export function buildMap(osm, bbox, tileM) {
 	for (const a of areas) {
 		if (!a.tags.building || underground(a.tags)) continue
 		fillRings(a.rings, T.BUILDING)
-		buildings.push({ h: buildingHeight(a.tags), rings: cutPassages(a.rings, corridors).map(flat) })
+		const rings = cutPassages(a.rings, corridors)
+		// A small building can sit entirely inside a passage and be cut away.
+		if (rings.length) buildings.push({ h: buildingHeight(a.tags), rings: rings.map(flat) })
 	}
 
 	// 5. Roads, widest first so junctions look right.
