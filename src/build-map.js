@@ -27,10 +27,18 @@ export function buildMap(osm, bbox, tileM) {
 
 	const tiles = new Uint8Array(W * H).fill(T.GROUND)
 	const streetOf = new Uint16Array(W * H)
+	const heights = new Uint8Array(W * H) // metres, buildings only
+	const buildingOf = new Uint8Array(W * H) // which building, mod 255, so neighbours can differ
 	const streets = ['']
+	// The same areas and lines as drawn shapes, for a smooth ground texture.
+	// The tiles stay the truth for walking; these are just for looking at.
+	const shapes = []
+	const flat = (pts) => pts.flatMap((p) => [round(p.x), round(p.y)])
 
 	// Even-odd scanline fill, so inner rings (courtyards) stay holes.
-	function fillRings(rings, type, onlyOn) {
+	function fillRings(rings, type, onlyOn, building) {
+		// Buildings stand on top as boxes; their footprints needn't be drawn.
+		if (!building) shapes.push({ t: type, layer: LAYER[type], rings: rings.map(flat) })
 		let minY = Infinity
 		let maxY = -Infinity
 		for (const pts of rings) {
@@ -53,13 +61,19 @@ export function buildMap(osm, bbox, tileM) {
 			for (let k = 0; k + 1 < xs.length; k += 2) {
 				for (let x = Math.max(0, Math.round(xs[k])); x < Math.min(W, Math.round(xs[k + 1])); x++) {
 					const i = y * W + x
-					if (!onlyOn || onlyOn.includes(tiles[i])) tiles[i] = type
+					if (onlyOn && !onlyOn.includes(tiles[i])) continue
+					tiles[i] = type
+					if (building) {
+						heights[i] = building.height
+						buildingOf[i] = building.id
+					}
 				}
 			}
 		}
 	}
 
-	function strokeLine(pts, widthM, type, { onlyOn, street } = {}) {
+	function strokeLine(pts, widthM, type, { onlyOn, street, layer = LAYER[type], drawM = widthM } = {}) {
+		shapes.push({ t: type, layer, w: round(drawM / tileM), line: flat(pts) })
 		const r = widthM / tileM / 2
 		for (let s = 0; s + 1 < pts.length; s++) {
 			const a = pts[s]
@@ -89,7 +103,10 @@ export function buildMap(osm, bbox, tileM) {
 	}
 
 	const geom = (g) => g.map(toTile)
-	const underground = (t) => t.tunnel === 'yes' || Number(t.layer) < 0 || t.indoor
+	const isPassage = (t) => t.tunnel === 'building_passage'
+	const isPrivate = (t) => ['private', 'no', 'customers'].includes(t.access)
+	// A passage at layer -1 is a ramp down into one, still at street level here.
+	const underground = (t) => t.tunnel === 'yes' || (Number(t.layer) < 0 && !isPassage(t) && !t.covered) || t.indoor
 
 	// Every closed way and multipolygon relation becomes { tags, rings }.
 	const areas = []
@@ -115,21 +132,29 @@ export function buildMap(osm, bbox, tileM) {
 	for (const a of areas) if (a.tags.leisure === 'playground') fillRings(a.rings, T.PLAYGROUND)
 	for (const w of ways) if (w.tags.waterway === 'canal' || w.tags.waterway === 'river') strokeLine(geom(w.geometry), 20, T.WATER)
 
-	// 2. Sidewalks: every road gets a 4 m pavement each side.
+	// 2. Sidewalks: up to 10 m each side of every road, as far as the façades,
+	// which come later and stand on top. Into parks only 4 m.
 	// Driveways and parking aisles are mostly Hinterhof clutter at this scale.
 	const roadWays = ways.filter(
 		(w) =>
 			ROADS[roadClass(w.tags.highway)] && !underground(w.tags) && !w.tags.area && !['driveway', 'parking_aisle'].includes(w.tags.service),
 	)
 	for (const w of roadWays) {
-		strokeLine(geom(w.geometry), ROADS[roadClass(w.tags.highway)] + 8, T.SIDEWALK, { onlyOn: [T.GROUND, T.GRASS] })
+		const pts = geom(w.geometry)
+		const road = ROADS[roadClass(w.tags.highway)]
+		strokeLine(pts, road + 20, T.SIDEWALK, { onlyOn: [T.GROUND], layer: -1 })
+		strokeLine(pts, road + 8, T.SIDEWALK, { onlyOn: [T.GROUND, T.GRASS] })
 	}
 
 	// 3. Pedestrian squares.
 	for (const a of areas) if (a.tags.highway === 'pedestrian' && a.tags.area === 'yes') fillRings(a.rings, T.SIDEWALK)
 
 	// 4. Buildings.
-	for (const a of areas) if (a.tags.building && !underground(a.tags)) fillRings(a.rings, T.BUILDING)
+	let nBuildings = 0
+	for (const a of areas) {
+		if (!a.tags.building || underground(a.tags)) continue
+		fillRings(a.rings, T.BUILDING, null, { height: buildingHeight(a.tags), id: (nBuildings++ % 255) + 1 })
+	}
 
 	// 5. Roads, widest first so junctions look right.
 	roadWays.sort((a, b) => ROADS[roadClass(a.tags.highway)] - ROADS[roadClass(b.tags.highway)])
@@ -140,15 +165,30 @@ export function buildMap(osm, bbox, tileM) {
 			street = streets.indexOf(name)
 			if (street < 0) street = streets.push(name) - 1
 		}
-		strokeLine(geom(w.geometry), ROADS[roadClass(w.tags.highway)], T.ROAD, { street })
+		const pts = geom(w.geometry)
+		strokeLine(pts, ROADS[roadClass(w.tags.highway)], T.ROAD, { street })
+		// Dashed centre line on the bigger two-way roads. Split carriageways
+		// come as two one-way roads and get none.
+		if (ROADS[roadClass(w.tags.highway)] >= 12 && w.tags.oneway !== 'yes') shapes.push({ t: 'mark', layer: 9, w: 0.1, line: flat(pts) })
 	}
 
-	// 6. Paths and cycleways, never through buildings or over roads.
+	// 6. Paths and cycleways, never over roads, and through buildings only
+	// where a passage runs under them, like the Kino-Passage off
+	// Karl-Marx-Straße or a Tordurchfahrt into a Hof. Private ones are
+	// walkable too, just marked as such.
 	for (const w of ways) {
-		const h = w.tags.highway
-		if (!PATHS.includes(h) || underground(w.tags) || w.tags.area) continue
-		const type = h === 'cycleway' ? T.CYCLEWAY : T.SIDEWALK
-		strokeLine(geom(w.geometry), h === 'cycleway' ? 2.5 : 2, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND] })
+		const t = w.tags
+		const h = t.highway
+		const passage = isPassage(t)
+		if (!(PATHS.includes(h) || (passage && h === 'service')) || underground(t) || t.area) continue
+		const type = isPrivate(t) ? T.PRIVATE : h === 'cycleway' ? T.CYCLEWAY : T.SIDEWALK
+		if (passage) {
+			// At least 1.5 tiles wide, so diagonal passages don't come out as a
+			// chain of corner-touching tiles you can't walk along.
+			strokeLine(geom(w.geometry), 4.5, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND, T.BUILDING], layer: 8, drawM: 3 })
+			continue
+		}
+		strokeLine(geom(w.geometry), h === 'cycleway' ? 2.5 : 2, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND], layer: 5 })
 	}
 
 	// Street name labels: one per long segment, at least 60 m from the last
@@ -182,10 +222,76 @@ export function buildMap(osm, bbox, tileM) {
 		pois.push({ kind, name: e.tags.name ?? '', x: round(x), y: round(y) })
 	}
 
-	return { w: W, h: H, tileM, bbox, tiles, streetOf, streets, labels, pois }
+	// U-Bahn entrances and bus stops. Entrances rarely carry a name, so they
+	// borrow the nearest station's.
+	const stations = osm.elements.filter((e) => e.type === 'node' && e.tags?.railway === 'station' && e.tags.station === 'subway')
+	// Line numbers per stop name, from the route relations through its stops.
+	const nodeName = new Map(osm.elements.filter((e) => e.type === 'node' && e.tags?.name).map((e) => [e.id, e.tags.name]))
+	const linesAt = {}
+	for (const e of osm.elements) {
+		if (e.type !== 'relation' || !['bus', 'subway'].includes(e.tags?.route) || !e.tags.ref) continue
+		for (const m of e.members) {
+			const name = m.type === 'node' && nodeName.get(m.ref)
+			if (name) (linesAt[`${e.tags.route}:${name}`] ??= new Set()).add(e.tags.ref)
+		}
+	}
+	const transit = []
+	const seen = new Set()
+	for (const e of osm.elements) {
+		// Poles that are also stop positions come back twice.
+		if (e.type !== 'node' || !e.tags || seen.has(e.id)) continue
+		seen.add(e.id)
+		const t = e.tags
+		let kind
+		if (t.railway === 'subway_entrance') kind = 'ubahn'
+		else if (t.highway === 'bus_stop') kind = 'bus'
+		else continue
+		const { x, y } = toTile(e)
+		if (x < 0 || y < 0 || x >= W || y >= H) continue
+		let name = t.name ?? ''
+		if (kind === 'ubahn' && !name) {
+			const s = nearest(stations, e)
+			if (s && Math.hypot(s.lat - e.lat, s.lon - e.lon) < 0.003) name = s.tags.name
+		}
+		const lines = [...(linesAt[`${kind === 'ubahn' ? 'subway' : 'bus'}:${name}`] ?? [])].sort((a, b) =>
+			a.localeCompare(b, 'de', { numeric: true }),
+		)
+		transit.push({ kind, name, lines, x: round(x), y: round(y) })
+	}
+
+	shapes.sort((a, b) => a.layer - b.layer)
+	return { w: W, h: H, tileM, bbox, shapes, tiles, streetOf, heights, buildingOf, streets, labels, pois, transit }
 }
 
 const round = (n) => Math.round(n * 10) / 10
+
+// Drawing order of the smooth ground: paths under buildings, roads over
+// pavements, passages over everything.
+const LAYER = {
+	[T.GRASS]: 0,
+	[T.PITCH]: 0,
+	[T.WATER]: 1,
+	[T.PLAYGROUND]: 2,
+	[T.SIDEWALK]: 3,
+	[T.CYCLEWAY]: 5,
+	[T.PRIVATE]: 5,
+	[T.ROAD]: 7,
+}
+const nearest = (nodes, p) =>
+	nodes.reduce(
+		(best, n) => (!best || Math.hypot(n.lat - p.lat, n.lon - p.lon) < Math.hypot(best.lat - p.lat, best.lon - p.lon) ? n : best),
+		null,
+	)
+
+// Metres tall. Most of Neukölln is five-storey Altbau, so that's the guess
+// when OSM doesn't say; sheds and garages get one storey.
+const LOW = ['garage', 'garages', 'shed', 'hut', 'kiosk', 'roof', 'carport', 'container', 'toilets']
+function buildingHeight(t) {
+	const h = parseFloat(t.height)
+	if (h > 0) return Math.min(255, Math.round(h))
+	const levels = parseFloat(t['building:levels']) || (LOW.includes(t.building) ? 1 : 5)
+	return Math.min(255, Math.round(levels * 3.2 + (parseFloat(t['roof:levels']) || 0) * 2.5 + 1))
+}
 
 // Places worth walking to.
 function poiKind(t) {

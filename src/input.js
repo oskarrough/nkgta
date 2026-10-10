@@ -13,6 +13,7 @@ export function createInput(actions) {
 		if (key === '+' || key === '=') actions.zoom(1.25)
 		if (key === '-') actions.zoom(0.8)
 		if (key === 'n') actions.toggleStreetNames()
+		if (key === 't') actions.toggleTransit()
 		if (key === 'm') actions.pickArea()
 	})
 	addEventListener('keyup', (e) => keys.delete(norm(e.key)))

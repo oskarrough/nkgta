@@ -23,8 +23,16 @@ export function overpassQuery({ south, west, north, east }) {
   node["shop"](${b});
   node["amenity"](${b});
   node["leisure"="playground"](${b});
+  node["railway"~"station|subway_entrance"](${b});
+  node["highway"="bus_stop"](${b});
 );
-out geom;`
+out geom;
+// Which lines stop where: route relations through the stops, members by id only.
+node["public_transport"="stop_position"](${b})->.stops;
+node["highway"="bus_stop"](${b})->.poles;
+(rel(bn.stops)["route"~"bus|subway"]; rel(bn.poles)["route"="bus"];);
+out body;
+.stops out;`
 }
 
 export async function fetchOsm(bbox, { onStatus = () => {}, headers = {} } = {}) {

@@ -9,6 +9,7 @@ export const T = {
 	PLAYGROUND: 6,
 	PITCH: 7,
 	CYCLEWAY: 8,
+	PRIVATE: 9, // paths and passages you're not really meant to use
 }
 
 export const COLORS = {
@@ -21,6 +22,7 @@ export const COLORS = {
 	[T.PLAYGROUND]: '#d9b45a',
 	[T.PITCH]: '#4f8a52',
 	[T.CYCLEWAY]: '#b4615a',
+	[T.PRIVATE]: '#a89f90',
 }
 
 export const SOLID = new Set([T.BUILDING, T.WATER])

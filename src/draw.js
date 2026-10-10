@@ -1,11 +1,11 @@
-// Everything that ends up on the canvas, once per frame.
-import { PX, renderMapImage } from './map-image.js'
-import { iconSprites, labelSprites, LABEL_PX } from './sprites.js'
+// The flat layer over the 3D city, once per frame: Pfand, places, stops,
+// street names and the player.
+import { iconSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 
 export function createRenderer(canvas, world) {
-	const ctx = canvas.getContext('2d', { alpha: false })
-	const mips = renderMapImage(world)
+	const ctx = canvas.getContext('2d')
 	const icons = iconSprites()
+	const signs = transitSprites()
 	const labels = labelSprites(world.labels.map((l) => l.name))
 
 	function resize() {
@@ -15,21 +15,12 @@ export function createRenderer(canvas, world) {
 	addEventListener('resize', resize)
 	resize()
 
-	return function draw({ cam, player, bottles, showStreetNames }) {
+	return function draw({ cam, player, bottles, showStreetNames, showTransit }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
 
-		ctx.fillStyle = '#222'
-		ctx.fillRect(0, 0, canvas.width, canvas.height)
-		let level = 0
-		while (level + 1 < mips.length && PX / 2 ** (level + 1) >= scale) level++
-		// Below 8 px a tile, crisp pixels snap to the screen grid and the map
-		// stutters past in whole-pixel steps. Smoothing lets it glide.
-		ctx.imageSmoothingEnabled = scale < 8
-		ctx.imageSmoothingQuality = 'high'
-		ctx.drawImage(mips[level], -cam.x, -cam.y, world.W * scale, world.H * scale)
-		ctx.imageSmoothingEnabled = true
+		ctx.clearRect(0, 0, canvas.width, canvas.height)
 
 		for (const b of bottles) {
 			const [sx, sy] = toScreen(b.x, b.y)
@@ -42,6 +33,14 @@ export function createRenderer(canvas, world) {
 		for (const p of world.pois) {
 			const [sx, sy] = toScreen(p.x, p.y)
 			if (onScreen(sx, sy, icon)) ctx.drawImage(icons[p.kind], sx - icon / 2, sy - icon / 2, icon, icon)
+		}
+
+		if (showTransit) {
+			const sign = Math.max(14 * devicePixelRatio, scale * 1.6)
+			for (const t of world.transit ?? []) {
+				const [sx, sy] = toScreen(t.x, t.y)
+				if (onScreen(sx, sy, sign)) ctx.drawImage(signs[t.kind], sx - sign / 2, sy - sign / 2, sign, sign)
+			}
 		}
 
 		if (showStreetNames) {

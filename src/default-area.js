@@ -1,6 +1,5 @@
-// The default play area: Maybachufer down to Kranoldplatz, Tempelhofer Feld
-// across to Richardplatz.
-export const BBOX = { south: 52.4655, west: 13.4055, north: 52.4947, east: 13.452 }
+// The default play area: the blocks around U Karl-Marx-Straße.
+export const BBOX = { south: 52.471, west: 13.4343, north: 52.4795, east: 13.4487 }
 
 // Metres per tile. GTA 1 felt like about this.
 export const TILE_M = 3

@@ -15,6 +15,8 @@
 				color: #fff;
 			}
 			canvas {
+				position: fixed;
+				inset: 0;
 				display: block;
 				width: 100vw;
 				height: 100vh;
@@ -71,7 +73,8 @@
 		</style>
 	</head>
 	<body>
-		<canvas></canvas>
+		<canvas id="city"></canvas>
+		<canvas id="overlay"></canvas>
 		<div class="hud" id="loading">Lade Karte…</div>
 		<div class="hud" id="street"></div>
 		<div class="hud" id="money"></div>
