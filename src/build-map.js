@@ -1,4 +1,5 @@
 // Rasterise raw Overpass JSON onto a tile grid. Runs in Bun and the browser.
+import polygonClipping from 'polygon-clipping'
 import { T } from './tiles.js'
 
 // Road widths in metres, kerb to kerb.
@@ -11,6 +12,9 @@ const ROADS = {
 	living_street: 7,
 	service: 4,
 }
+// Passages are at least 1.5 tiles wide, so diagonal ones don't come out as a
+// chain of corner-touching tiles you can't walk along.
+const PASSAGE_M = 4.5
 const PATHS = ['footway', 'path', 'pedestrian', 'cycleway', 'steps', 'track', 'bridleway']
 const roadClass = (h) => h?.replace('_link', '')
 
@@ -66,8 +70,8 @@ export function buildMap(osm, bbox, tileM) {
 		}
 	}
 
-	function strokeLine(pts, widthM, type, { onlyOn, street, layer = LAYER[type], drawM = widthM } = {}) {
-		shapes.push({ t: type, layer, w: round(drawM / tileM), line: flat(pts) })
+	function strokeLine(pts, widthM, type, { onlyOn, street, layer = LAYER[type] } = {}) {
+		shapes.push({ t: type, layer, w: round(widthM / tileM), line: flat(pts) })
 		const r = widthM / tileM / 2
 		for (let s = 0; s + 1 < pts.length; s++) {
 			const a = pts[s]
@@ -143,13 +147,21 @@ export function buildMap(osm, bbox, tileM) {
 	// 3. Pedestrian squares.
 	for (const a of areas) if (a.tags.highway === 'pedestrian' && a.tags.area === 'yes') fillRings(a.rings, T.SIDEWALK)
 
+	// Passages through buildings: paths, and driveways into a Hof.
+	const passages = ways.filter((w) => {
+		const t = w.tags
+		return isPassage(t) && (PATHS.includes(t.highway) || t.highway === 'service') && !underground(t) && !t.area
+	})
+	const corridors = passages.map((w) => corridor(geom(w.geometry), PASSAGE_M / tileM / 2))
+
 	// 4. Buildings, onto the tiles for walking into, and as outlines with a
-	// height in metres for the 3D city.
+	// height in metres for the 3D city. Passages are cut out of the outlines,
+	// so from above you see the gap you can walk through.
 	const buildings = []
 	for (const a of areas) {
 		if (!a.tags.building || underground(a.tags)) continue
 		fillRings(a.rings, T.BUILDING)
-		buildings.push({ h: buildingHeight(a.tags), rings: a.rings.map(flat) })
+		buildings.push({ h: buildingHeight(a.tags), rings: cutPassages(a.rings, corridors).map(flat) })
 	}
 
 	// 5. Roads, widest first so junctions look right.
@@ -172,18 +184,17 @@ export function buildMap(osm, bbox, tileM) {
 	// where a passage runs under them, like the Kino-Passage off
 	// Karl-Marx-Straße or a Tordurchfahrt into a Hof. Private ones are
 	// walkable too, just marked as such.
+	for (const w of passages) {
+		strokeLine(geom(w.geometry), PASSAGE_M, isPrivate(w.tags) ? T.PRIVATE : T.SIDEWALK, {
+			onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND, T.BUILDING],
+			layer: 8,
+		})
+	}
 	for (const w of ways) {
 		const t = w.tags
 		const h = t.highway
-		const passage = isPassage(t)
-		if (!(PATHS.includes(h) || (passage && h === 'service')) || underground(t) || t.area) continue
+		if (!PATHS.includes(h) || isPassage(t) || underground(t) || t.area) continue
 		const type = isPrivate(t) ? T.PRIVATE : h === 'cycleway' ? T.CYCLEWAY : T.SIDEWALK
-		if (passage) {
-			// At least 1.5 tiles wide, so diagonal passages don't come out as a
-			// chain of corner-touching tiles you can't walk along.
-			strokeLine(geom(w.geometry), 4.5, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND, T.BUILDING], layer: 8, drawM: 3 })
-			continue
-		}
 		strokeLine(geom(w.geometry), h === 'cycleway' ? 2.5 : 2, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND], layer: 5 })
 	}
 
@@ -260,6 +271,49 @@ export function buildMap(osm, bbox, tileM) {
 }
 
 const round = (n) => Math.round(n * 10) / 10
+
+// A path widened to radius r: a box along each segment and an octagon at
+// each bend, as polygons for clipping.
+function corridor(pts, r) {
+	const polys = []
+	for (let i = 0; i + 1 < pts.length; i++) {
+		const a = pts[i]
+		const b = pts[i + 1]
+		const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
+		const nx = (-(b.y - a.y) / len) * r
+		const ny = ((b.x - a.x) / len) * r
+		polys.push([
+			[
+				[a.x + nx, a.y + ny],
+				[b.x + nx, b.y + ny],
+				[b.x - nx, b.y - ny],
+				[a.x - nx, a.y - ny],
+				[a.x + nx, a.y + ny],
+			],
+		])
+	}
+	for (const p of pts) {
+		const ring = []
+		for (let k = 0; k <= 8; k++) ring.push([p.x + r * Math.cos((k * Math.PI) / 4), p.y + r * Math.sin((k * Math.PI) / 4)])
+		polys.push([ring])
+	}
+	const xs = pts.map((p) => p.x)
+	const ys = pts.map((p) => p.y)
+	return { polys, box: [Math.min(...xs) - r, Math.min(...ys) - r, Math.max(...xs) + r, Math.max(...ys) + r] }
+}
+
+// Building rings minus any corridors crossing them. Rings are even-odd, so
+// courtyards stay holes.
+function cutPassages(rings, corridors) {
+	const xs = rings.flat().map((p) => p.x)
+	const ys = rings.flat().map((p) => p.y)
+	const [x0, y0, x1, y1] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+	const hits = corridors.filter(({ box }) => box[0] < x1 && box[2] > x0 && box[1] < y1 && box[3] > y0)
+	if (!hits.length) return rings
+	const area = polygonClipping.xor(...rings.map((r) => [r.map((p) => [p.x, p.y])]))
+	const cut = polygonClipping.difference(area, ...hits.flatMap((c) => c.polys))
+	return cut.flat().map((ring) => ring.map(([x, y]) => ({ x, y })))
+}
 
 // Drawing order of the smooth ground: paths under buildings, roads over
 // pavements, passages over everything.
