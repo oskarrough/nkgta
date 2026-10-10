@@ -5,8 +5,6 @@ export function encodeMap(map) {
 		...map,
 		tiles: toBase64(map.tiles),
 		streetOf: toBase64(new Uint8Array(map.streetOf.buffer)),
-		heights: toBase64(map.heights),
-		buildingOf: toBase64(map.buildingOf),
 	}
 }
 
@@ -15,8 +13,6 @@ export function decodeMap(json) {
 		...json,
 		tiles: fromBase64(json.tiles),
 		streetOf: new Uint16Array(fromBase64(json.streetOf).buffer),
-		heights: fromBase64(json.heights),
-		buildingOf: fromBase64(json.buildingOf),
 	}
 }
 

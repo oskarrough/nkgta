@@ -27,8 +27,6 @@ export function buildMap(osm, bbox, tileM) {
 
 	const tiles = new Uint8Array(W * H).fill(T.GROUND)
 	const streetOf = new Uint16Array(W * H)
-	const heights = new Uint8Array(W * H) // metres, buildings only
-	const buildingOf = new Uint8Array(W * H) // which building, mod 255, so neighbours can differ
 	const streets = ['']
 	// The same areas and lines as drawn shapes, for a smooth ground texture.
 	// The tiles stay the truth for walking; these are just for looking at.
@@ -36,9 +34,9 @@ export function buildMap(osm, bbox, tileM) {
 	const flat = (pts) => pts.flatMap((p) => [round(p.x), round(p.y)])
 
 	// Even-odd scanline fill, so inner rings (courtyards) stay holes.
-	function fillRings(rings, type, onlyOn, building) {
-		// Buildings stand on top as boxes; their footprints needn't be drawn.
-		if (!building) shapes.push({ t: type, layer: LAYER[type], rings: rings.map(flat) })
+	function fillRings(rings, type, onlyOn) {
+		// Buildings stand on top in 3D; their footprints needn't be drawn.
+		if (type !== T.BUILDING) shapes.push({ t: type, layer: LAYER[type], rings: rings.map(flat) })
 		let minY = Infinity
 		let maxY = -Infinity
 		for (const pts of rings) {
@@ -63,10 +61,6 @@ export function buildMap(osm, bbox, tileM) {
 					const i = y * W + x
 					if (onlyOn && !onlyOn.includes(tiles[i])) continue
 					tiles[i] = type
-					if (building) {
-						heights[i] = building.height
-						buildingOf[i] = building.id
-					}
 				}
 			}
 		}
@@ -149,11 +143,13 @@ export function buildMap(osm, bbox, tileM) {
 	// 3. Pedestrian squares.
 	for (const a of areas) if (a.tags.highway === 'pedestrian' && a.tags.area === 'yes') fillRings(a.rings, T.SIDEWALK)
 
-	// 4. Buildings.
-	let nBuildings = 0
+	// 4. Buildings, onto the tiles for walking into, and as outlines with a
+	// height in metres for the 3D city.
+	const buildings = []
 	for (const a of areas) {
 		if (!a.tags.building || underground(a.tags)) continue
-		fillRings(a.rings, T.BUILDING, null, { height: buildingHeight(a.tags), id: (nBuildings++ % 255) + 1 })
+		fillRings(a.rings, T.BUILDING)
+		buildings.push({ h: buildingHeight(a.tags), rings: a.rings.map(flat) })
 	}
 
 	// 5. Roads, widest first so junctions look right.
@@ -260,7 +256,7 @@ export function buildMap(osm, bbox, tileM) {
 	}
 
 	shapes.sort((a, b) => a.layer - b.layer)
-	return { w: W, h: H, tileM, bbox, shapes, tiles, streetOf, heights, buildingOf, streets, labels, pois, transit }
+	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit }
 }
 
 const round = (n) => Math.round(n * 10) / 10

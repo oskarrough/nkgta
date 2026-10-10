@@ -78,9 +78,10 @@ export function renderMapImage(world) {
 	return canvas
 }
 
-// Roofs, prerendered the same way and laid over the tops of the building
-// boxes. Each building picks a roof (red tiles, brown tiles or grey tar) and
-// gets a parapet rim where it ends, plus the odd chimney or skylight.
+// Roofs, painted from the building outlines and laid over the tops of the
+// 3D buildings. Each building picks a roof (red tiles, brown tiles or grey
+// tar) and gets a parapet rim along its edge, plus the odd chimney or
+// skylight. Tile rows run along the building's longest wall.
 const ROOFS = [
 	{ base: '#b05a40', lines: true },
 	{ base: '#a4533e', lines: true },
@@ -90,68 +91,88 @@ const ROOFS = [
 ]
 const SHED_ROOF = { base: '#8f8a84', lines: false }
 
+export const roofHash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
+
 export function renderRoofImage(world) {
-	const { W, H, tiles, heights, buildingOf } = world
+	const { W, H, buildings } = world
 	// Finer than the ground, but within what every GPU takes as one texture.
 	const RPX = Math.max(2, Math.min(8, Math.floor(8192 / Math.max(W, H))))
 	const canvas = document.createElement('canvas')
 	canvas.width = W * RPX
 	canvas.height = H * RPX
 	const g = canvas.getContext('2d')
-	const img = g.createImageData(canvas.width, canvas.height)
-	const px = img.data
-	const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
-	const roofs = ROOFS.map((r) => ({ ...r, rgb: rgb(r.base) }))
-	const shed = { ...SHED_ROOF, rgb: rgb(SHED_ROOF.base) }
-	const hash = (n) => ((Math.imul(n, 2654435761) >>> 0) % 10007) / 10007
-	const same = (i, x, y) => {
-		if (x < 0 || y < 0 || x >= W || y >= H) return false
-		const j = y * W + x
-		return tiles[j] === T.BUILDING && buildingOf[j] === buildingOf[i] && heights[j] === heights[i]
-	}
+	g.scale(RPX, RPX)
+	g.lineJoin = 'round'
 
-	for (let y = 0; y < H; y++) {
-		for (let x = 0; x < W; x++) {
-			const i = y * W + x
-			if (tiles[i] !== T.BUILDING) continue
-			const low = heights[i] <= 5
-			const roof = low ? shed : roofs[Math.floor(hash(buildingOf[i] + 1) * roofs.length)]
-			const n = !same(i, x, y - 1)
-			const s = !same(i, x, y + 1)
-			const w = !same(i, x - 1, y)
-			const e = !same(i, x + 1, y)
-			const inner = !(n || s || w || e)
-			const r = hash(x * 7919 + y * 104729)
-			const chimney = inner && !low && r < 0.1
-			const skylight = inner && !roof.lines && r > 0.95
-			for (let dy = 0; dy < RPX; dy++) {
-				for (let dx = 0; dx < RPX; dx++) {
-					const gx = x * RPX + dx
-					const gy = y * RPX + dy
-					let k = 0.92 + (hash(gx * 31 + gy * 977) - 0.5) * 0.1
-					if (roof.lines && gy % 3 === 0) k *= 0.85
-					// Parapet: dark outer edge, a lit band just inside it.
-					const d = Math.min(n ? dy : RPX, s ? RPX - 1 - dy : RPX, w ? dx : RPX, e ? RPX - 1 - dx : RPX)
-					if (d === 0) k = 0.55
-					else if (d === 1 && RPX > 3) k = 1.12
-					let c = roof.rgb
-					const m = Math.floor(RPX / 4)
-					if (chimney && dx >= m && dx < RPX - m && dy >= m && dy < RPX - m) {
-						c = [92, 74, 66]
-						k = dx === m || dy === m ? 1.25 : 1
-					} else if (skylight && dx >= m && dx < RPX - m && dy >= m + 1 && dy < RPX - m - 1) {
-						c = [150, 170, 185]
-						k = 1
-					}
-					const o = (gy * canvas.width + gx) * 4
-					px[o] = Math.min(255, c[0] * k)
-					px[o + 1] = Math.min(255, c[1] * k)
-					px[o + 2] = Math.min(255, c[2] * k)
-					px[o + 3] = 255
-				}
+	buildings.forEach((b, n) => {
+		const roof = b.h <= 5 ? SHED_ROOF : ROOFS[Math.floor(roofHash(n) * ROOFS.length)]
+		const path = new Path2D()
+		let minX = Infinity
+		let minY = Infinity
+		let maxX = -Infinity
+		let maxY = -Infinity
+		let longest = 0
+		let angle = 0
+		for (const r of b.rings) {
+			path.moveTo(r[0], r[1])
+			for (let i = 2; i < r.length; i += 2) {
+				path.lineTo(r[i], r[i + 1])
+				const len = Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1])
+				if (len > longest) [longest, angle] = [len, Math.atan2(r[i + 1] - r[i - 1], r[i] - r[i - 2])]
+			}
+			path.closePath()
+			for (let i = 0; i < r.length; i += 2) {
+				minX = Math.min(minX, r[i])
+				maxX = Math.max(maxX, r[i])
+				minY = Math.min(minY, r[i + 1])
+				maxY = Math.max(maxY, r[i + 1])
 			}
 		}
-	}
-	g.putImageData(img, 0, 0)
+
+		g.save()
+		g.clip(path, 'evenodd')
+		g.fillStyle = roof.base
+		g.fill(path, 'evenodd')
+
+		if (roof.lines) {
+			const cx = (minX + maxX) / 2
+			const cy = (minY + maxY) / 2
+			const reach = Math.hypot(maxX - minX, maxY - minY) / 2 + 1
+			g.save()
+			g.translate(cx, cy)
+			g.rotate(angle)
+			g.fillStyle = 'rgba(0, 0, 0, 0.14)'
+			for (let y = -reach; y < reach; y += 0.5) g.fillRect(-reach, y, reach * 2, 0.2)
+			g.restore()
+		}
+
+		// Chimneys and skylights, at spots fixed per building.
+		let seed = n * 7919
+		const rand = () => roofHash((seed += 104729))
+		const tries = ((maxX - minX) * (maxY - minY)) / 12
+		for (let k = 0; k < tries; k++) {
+			const x = minX + rand() * (maxX - minX)
+			const y = minY + rand() * (maxY - minY)
+			if (!g.isPointInPath(path, x * RPX, y * RPX, 'evenodd')) continue
+			if (b.h > 5 && rand() < 0.5) {
+				g.fillStyle = '#5c4a42'
+				g.fillRect(x - 0.3, y - 0.3, 0.6, 0.6)
+				g.fillStyle = 'rgba(255, 255, 255, 0.25)'
+				g.fillRect(x - 0.3, y - 0.3, 0.6, 0.12)
+			} else if (!roof.lines && rand() < 0.3) {
+				g.fillStyle = '#96aab9'
+				g.fillRect(x - 0.35, y - 0.25, 0.7, 0.5)
+			}
+		}
+
+		// Parapet: a lit band just inside the edge, then a dark outer line.
+		g.strokeStyle = 'rgba(255, 255, 255, 0.2)'
+		g.lineWidth = 0.7
+		g.stroke(path)
+		g.strokeStyle = 'rgba(0, 0, 0, 0.45)'
+		g.lineWidth = 0.3
+		g.stroke(path)
+		g.restore()
+	})
 	return canvas
 }
