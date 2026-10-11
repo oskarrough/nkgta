@@ -200,6 +200,30 @@ export function buildMap(osm, bbox, tileM) {
 		strokeLine(geom(w.geometry), h === 'cycleway' ? 2.5 : 2, type, { onlyOn: [T.GROUND, T.GRASS, T.PLAYGROUND], layer: 5 })
 	}
 
+	// The network traffic drives on: every road's nodes, shared where roads
+	// meet. Service roads lead into Höfe and car parks, so traffic stays out.
+	const roadNodes = []
+	const nodeIndex = new Map()
+	const roads = []
+	for (const w of roadWays) {
+		const t = w.tags
+		if (roadClass(t.highway) === 'service' || isPrivate(t) || !w.nodes) continue
+		const nodes = w.nodes.map((id, i) => {
+			if (!nodeIndex.has(id)) {
+				const p = toTile(w.geometry[i])
+				nodeIndex.set(id, roadNodes.push(round(p.x), round(p.y)) / 2 - 1)
+			}
+			return nodeIndex.get(id)
+		})
+		const oneway = ['yes', 'true', '1'].includes(t.oneway) || t.junction === 'roundabout' ? 1 : t.oneway === '-1' ? -1 : 0
+		roads.push({ w: round(ROADS[roadClass(t.highway)] / tileM), oneway, nodes })
+	}
+
+	// Traffic lights, as points: OSM puts them at the junction or at each stop line.
+	const signals = osm.elements
+		.filter((e) => e.type === 'node' && e.tags?.highway === 'traffic_signals')
+		.flatMap((e) => Object.values(toTile(e)).map(round))
+
 	// Street name labels: one per long segment, at least 60 m from the last
 	// label of the same name.
 	const labels = []
@@ -269,7 +293,7 @@ export function buildMap(osm, bbox, tileM) {
 	}
 
 	shapes.sort((a, b) => a.layer - b.layer)
-	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit }
+	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, roadNodes, roads, signals }
 }
 
 const round = (n) => Math.round(n * 10) / 10

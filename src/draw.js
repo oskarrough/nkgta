@@ -1,6 +1,8 @@
 // The flat layer over the 3D city, once per frame: Pfand, places, stops,
-// street names and the player.
+// traffic lights, street names, the player and anyone fleeing their car.
 import { iconSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
+
+const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
 export function createRenderer(canvas, world) {
 	const ctx = canvas.getContext('2d')
@@ -15,7 +17,7 @@ export function createRenderer(canvas, world) {
 	addEventListener('resize', resize)
 	resize()
 
-	return function draw({ cam, player, bottles, showStreetNames, showTransit }) {
+	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
@@ -27,6 +29,19 @@ export function createRenderer(canvas, world) {
 			if (!onScreen(sx, sy, 20)) continue
 			ctx.fillStyle = b.can ? '#c0c4c8' : '#3d7a3a'
 			ctx.fillRect(sx - scale * 0.12, sy - scale * 0.3, scale * 0.24, scale * 0.6)
+		}
+
+		// Traffic lights: a dark box with the one lamp that's lit.
+		const lamp = Math.max(4 * devicePixelRatio, scale * 0.3)
+		for (const l of lights) {
+			const [sx, sy] = toScreen(l.x, l.y)
+			if (!onScreen(sx, sy, lamp * 2)) continue
+			ctx.fillStyle = '#16181a'
+			ctx.fillRect(sx - lamp, sy - lamp, lamp * 2, lamp * 2)
+			ctx.fillStyle = LAMPS[l.state]
+			ctx.beginPath()
+			ctx.arc(sx, sy, lamp * 0.7, 0, Math.PI * 2)
+			ctx.fill()
 		}
 
 		const icon = Math.max(10 * devicePixelRatio, scale * 1.4)
@@ -59,7 +74,9 @@ export function createRenderer(canvas, world) {
 
 		if (player.onBike) drawBike(...toScreen(player.x, player.y), player.dir)
 		else drawBike(...toScreen(player.bike.x, player.bike.y), 0)
-		drawPerson(...toScreen(player.x, player.y), player.dir)
+		for (const p of peds) drawPerson(...toScreen(p.x, p.y), p.dir, '#5b8fd6')
+		if (player.down) drawDown(...toScreen(player.x, player.y), player.dir)
+		else if (!player.car) drawPerson(...toScreen(player.x, player.y), player.dir, '#f2d24b')
 
 		function drawBike(sx, sy, dir) {
 			ctx.save()
@@ -73,8 +90,31 @@ export function createRenderer(canvas, world) {
 			ctx.restore()
 		}
 
-		function drawPerson(sx, sy, dir) {
+		// Flat on the tarmac, arms out.
+		function drawDown(sx, sy, dir) {
+			ctx.save()
+			ctx.translate(sx, sy)
+			ctx.rotate(dir)
+			ctx.fillStyle = '#7a1414'
+			ctx.beginPath()
+			ctx.ellipse(0, 0, scale * 0.75, scale * 0.6, 0, 0, Math.PI * 2)
+			ctx.globalAlpha = 0.5
+			ctx.fill()
+			ctx.globalAlpha = 1
 			ctx.fillStyle = '#f2d24b'
+			ctx.strokeStyle = '#222'
+			ctx.lineWidth = scale * 0.08
+			ctx.fillRect(-scale * 0.45, -scale * 0.1, scale * 0.9, scale * 0.2)
+			ctx.fillRect(-scale * 0.1, -scale * 0.45, scale * 0.2, scale * 0.9)
+			ctx.beginPath()
+			ctx.arc(scale * 0.5, 0, scale * 0.16, 0, Math.PI * 2)
+			ctx.fill()
+			ctx.stroke()
+			ctx.restore()
+		}
+
+		function drawPerson(sx, sy, dir, shirt) {
+			ctx.fillStyle = shirt
 			ctx.strokeStyle = '#222'
 			ctx.lineWidth = scale * 0.08
 			ctx.beginPath()

@@ -24,16 +24,18 @@ export function createHud(world) {
 	return {
 		say: (text) => (toast = { text, t: 3 }),
 
-		update({ player, bag, showTransit }, dt) {
+		update({ player, car, bag, showTransit, wasted }, dt) {
 			street = world.streetAt(player.x, player.y) || street
 			if (toast && (toast.t -= dt) < 0) toast = null
 			const p = nearestPlace(world.pois, player.x, player.y, 2.5)
 			const stop = showTransit && nearestPlace(world.transit ?? [], player.x, player.y, 2.5)
 			set('street', street)
 			set('money', euro(bag.cents))
+			set('wasted', wasted ? 'WASTED' : '')
 			set('bag', bag.bottles ? `🍾 ${bag.bottles}` : '')
 			const here = p ? `${ICONS[p.kind]} ${placeName(p)}` : world.tileAt(player.x, player.y) === T.PRIVATE ? '🔒 Privatweg' : ''
-			set('place', toast?.text ?? (nearBike(player) ? 'E: aufs Fahrrad' : stop ? stopName(stop) : here))
+			const hint = nearBike(player) ? 'E: aufs Fahrrad' : car ? (car.ai ? 'E: Auto klauen' : 'E: einsteigen') : null
+			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
 		},
 	}
 }

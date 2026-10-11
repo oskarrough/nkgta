@@ -25,6 +25,7 @@ export function overpassQuery({ south, west, north, east }) {
   node["leisure"="playground"](${b});
   node["railway"~"station|subway_entrance"](${b});
   node["highway"="bus_stop"](${b});
+  node["highway"="traffic_signals"](${b});
 );
 out geom;
 // Which lines stop where: route relations through the stops, members by id only.

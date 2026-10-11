@@ -45,5 +45,16 @@ export function createPfand(world) {
 		}
 	}
 
-	return { bottles, bag, update }
+	// Knocked over: the bag splits and the bottles roll about.
+	function spill(x, y) {
+		for (let i = 0; i < bag.bottles; i++) {
+			const a = Math.random() * Math.PI * 2
+			const r = 0.4 + Math.random() * 1.2
+			bottles.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, can: Math.random() < 0.25 })
+		}
+		bag.bottles = 0
+		bag.pending = 0
+	}
+
+	return { bottles, bag, update, spill }
 }

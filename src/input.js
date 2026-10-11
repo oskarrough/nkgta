@@ -9,7 +9,7 @@ export function createInput(actions) {
 		const key = norm(e.key)
 		keys.add(key)
 		if (e.repeat) return
-		if (key === 'e' || key === 'Enter') actions.toggleBike()
+		if (key === 'e' || key === 'Enter') actions.use()
 		if (key === '+' || key === '=') actions.zoom(1.25)
 		if (key === '-') actions.zoom(0.8)
 		if (key === 'n') actions.toggleStreetNames()

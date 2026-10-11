@@ -13,7 +13,7 @@ export function createCamera() {
 		update(target, canvas, dt) {
 			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
 			cruise += (target.speed - cruise) * Math.min(1, dt * 1.5)
-			const want = userZoom * Math.max(0.3, 1 - cruise * 0.09)
+			const want = userZoom * Math.max(0.4, 1 - cruise * 0.09)
 			zoom += (want - zoom) * Math.min(1, dt * 3)
 			const scale = PX * zoom * devicePixelRatio
 			return {

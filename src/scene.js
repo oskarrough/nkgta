@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { renderMapImage, renderRoofImage, roofHash } from './map-image.js'
+import { LENGTH, WIDTH } from './car.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -28,6 +29,9 @@ export function createScene(canvas, world) {
 
 	const houses = world.buildings.map((b) => ({ h: b.h / world.tileM, parts: footprint(b.rings) }))
 	scene.add(walls(houses, world.tileM), roofs(houses, world, renderer))
+	const cars = carMeshes()
+	const skids = skidMarks()
+	scene.add(...cars.meshes, skids.mesh)
 	scene.add(new THREE.AmbientLight('#fff', 1.6))
 	// Sun from the south-west, so south and west walls catch the light.
 	const sun = new THREE.DirectionalLight('#fff', 1.6)
@@ -44,7 +48,12 @@ export function createScene(canvas, world) {
 
 	// Same view as the 2D overlay: `scale` device pixels per tile at street
 	// level, top-left corner at (cam.x, cam.y) in those pixels.
-	return function render(cam) {
+	return function render(cam, carList) {
+		cars.update(carList)
+		for (const c of carList) {
+			for (const m of c.marks) skids.add(...m)
+			c.marks.length = 0
+		}
 		const h = innerHeight * devicePixelRatio
 		const w = innerWidth * devicePixelRatio
 		camera.position.set(
@@ -53,6 +62,92 @@ export function createScene(canvas, world) {
 			h / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)),
 		)
 		renderer.render(scene, camera)
+	}
+}
+
+// Cars from above, GTA 1 style: a painted body, dark glass all round the
+// cabin, the roof in the body colour on top, and brake lights. Heights in tiles.
+const MAX_CARS = 256
+function carMeshes() {
+	const box = (l, w, h, x, z) => new THREE.BoxGeometry(l, w, h).translate(x, 0, z + h / 2)
+	const parts = [
+		{ geo: box(LENGTH, WIDTH, 0.25, 0, 0.06), paint: true },
+		{ geo: box(LENGTH * 0.55, WIDTH * 0.9, 0.17, -0.05, 0.31), color: '#1b232b' },
+		{ geo: box(LENGTH * 0.36, WIDTH * 0.84, 0.02, -0.1, 0.48), paint: true },
+		{ geo: mergeGeometries([-1, 1].map((s) => box(0.04, 0.12, 0.06, -LENGTH / 2, 0.22).translate(0, (s * WIDTH) / 3, 0))), lights: true },
+	]
+	const meshes = parts.map(({ geo, color }) => {
+		const material = color ? new THREE.MeshLambertMaterial({ color }) : new THREE.MeshLambertMaterial()
+		const mesh = new THREE.InstancedMesh(geo, material, MAX_CARS)
+		mesh.count = 0
+		mesh.frustumCulled = false
+		return mesh
+	})
+	const m = new THREE.Matrix4()
+	const q = new THREE.Quaternion()
+	const z = new THREE.Vector3(0, 0, 1)
+	const one = new THREE.Vector3(1, 1, 1)
+	const c = new THREE.Color()
+	const lit = new THREE.Color('#ff2a1a')
+	const dim = new THREE.Color('#5a0d0a')
+	return {
+		meshes,
+		update(cars) {
+			const n = Math.min(cars.length, MAX_CARS)
+			for (let i = 0; i < n; i++) {
+				const car = cars[i]
+				m.compose(new THREE.Vector3(car.x, -car.y, 0), q.setFromAxisAngle(z, -car.angle), one)
+				c.set(car.color)
+				parts.forEach((part, k) => {
+					meshes[k].setMatrixAt(i, m)
+					if (part.paint) meshes[k].setColorAt(i, c)
+					if (part.lights) meshes[k].setColorAt(i, car.braking ? lit : dim)
+				})
+			}
+			for (const mesh of meshes) {
+				mesh.count = n
+				mesh.instanceMatrix.needsUpdate = true
+				if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+			}
+		},
+	}
+}
+
+// Rubber on the road: a ring of thin quads, the oldest painted over first.
+const MAX_SKIDS = 4000
+function skidMarks() {
+	const pos = new Float32Array(MAX_SKIDS * 6 * 3)
+	const geo = new THREE.BufferGeometry()
+	geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+	const material = new THREE.MeshBasicMaterial({
+		color: '#111',
+		transparent: true,
+		opacity: 0.45,
+		depthWrite: false,
+		side: THREE.DoubleSide,
+	})
+	const mesh = new THREE.Mesh(geo, material)
+	mesh.frustumCulled = false
+	let next = 0
+	return {
+		mesh,
+		add(x0, y0, x1, y1) {
+			const len = Math.hypot(x1 - x0, y1 - y0)
+			if (len < 0.01 || len > 2) return
+			const nx = (-(y1 - y0) / len) * 0.07
+			const ny = ((x1 - x0) / len) * 0.07
+			const corners = [
+				[x0 + nx, y0 + ny],
+				[x1 + nx, y1 + ny],
+				[x1 - nx, y1 - ny],
+				[x0 + nx, y0 + ny],
+				[x1 - nx, y1 - ny],
+				[x0 - nx, y0 - ny],
+			]
+			corners.forEach(([x, y], k) => pos.set([x, -y, 0.03], (next * 6 + k) * 3))
+			next = (next + 1) % MAX_SKIDS
+			geo.attributes.position.needsUpdate = true
+		},
 	}
 }
 
