@@ -2,8 +2,8 @@
 import { PX } from './map-image.js'
 
 export function createCamera() {
-	let zoom = 6
-	let userZoom = 6.5
+	let zoom = 8
+	let userZoom = 8
 	let cruise = 0
 
 	return {
@@ -13,7 +13,8 @@ export function createCamera() {
 		update(target, canvas, dt) {
 			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
 			cruise += (target.speed - cruise) * Math.min(1, dt * 1.5)
-			const want = userZoom * Math.max(0.4, 1 - cruise * 0.09)
+			// Only a touch: flat out you see about a fifth further than on foot.
+			const want = userZoom * Math.max(0.8, 1 - cruise * 0.02)
 			zoom += (want - zoom) * Math.min(1, dt * 3)
 			const scale = PX * zoom * devicePixelRatio
 			return {
