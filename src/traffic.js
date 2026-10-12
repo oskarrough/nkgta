@@ -1,16 +1,16 @@
 // Traffic: cars driving the road network on the right, parked cars along the
 // kerbs, both popping in out of sight around the player, GTA 1 style.
-import { createCar, driveCar, collideCars, shoveOut, forwardSpeed, speedOf, toWorld, distanceTo, LENGTH, WIDTH } from './car.js'
+import { createCar, driveCar, collideCars, shoveOut, forwardSpeed, speedOf, toWorld, distanceTo, LENGTH } from './car.js'
+import { MODELS, pickModel } from './models.js'
 import { SOLID } from './tiles.js'
 import { roadGraph, pointAt, project } from './roads.js'
 import { createJunctions } from './junctions.js'
 
-// Silver, black, white, grey, dark blue, red, dark green, Berlin taxi ivory.
-const COLORS = ['#b8bcc2', '#1d1f22', '#e8e8e4', '#6b6f75', '#23365c', '#a3231f', '#2f4a3a', '#ede6c8']
-const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s
+const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
 const PER_CAR = 15 // tiles of lane per moving car
 const PER_PARKED = 12 // tiles of kerb per parked car
-const SHOUTS = ['Ey! Mein Auto!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein Auto! Spinnst du?', 'Na toll.']
+const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
+const BIG_ROAD = 4 // tiles wide: buses keep to these
 
 export function createTraffic(world) {
 	const edges = roadGraph(world)
@@ -18,6 +18,8 @@ export function createTraffic(world) {
 	for (let i = 0; i < (world.signals?.length ?? 0); i += 2) signals.push({ x: world.signals[i], y: world.signals[i + 1] })
 	const junctions = createJunctions(edges, signals)
 	const cars = []
+	const busStops = (world.transit ?? []).filter((t) => t.kind === 'bus')
+	const busLines = [...new Set(busStops.flatMap((t) => t.lines))]
 	const peds = [] // drivers thrown out of their cars, running off
 	let started = false
 
@@ -27,8 +29,8 @@ export function createTraffic(world) {
 		return list.at(-1)
 	}
 
-	function fits(x, y, angle) {
-		if (cars.some((c) => Math.hypot(c.x - x, c.y - y) < LENGTH * 1.3)) return false
+	function fits(x, y, angle, model) {
+		if (cars.some((c) => Math.hypot(c.x - x, c.y - y) < (c.model.length + model.length) / 2 + 0.4)) return false
 		const probe = { x, y, angle }
 		for (const [u, v] of [
 			[1, 1],
@@ -36,7 +38,7 @@ export function createTraffic(world) {
 			[-1, 1],
 			[-1, -1],
 		]) {
-			const [px, py] = toWorld(probe, (u * LENGTH) / 2, (v * WIDTH) / 2)
+			const [px, py] = toWorld(probe, (u * model.length) / 2, (v * model.width) / 2)
 			if (SOLID.has(world.tileAt(px, py))) return false
 		}
 		return true
@@ -50,10 +52,12 @@ export function createTraffic(world) {
 			const p = pointAt(parked ? edge.kerb : edge.lane, s)
 			const d = Math.hypot(p.x - ring.x, p.y - ring.y)
 			if (d > ring.max || d < 3 || (started && inView(view, p.x, p.y, 2))) continue
-			if (!fits(p.x, p.y, p.dir)) continue
-			const color = COLORS[Math.floor(Math.random() * COLORS.length)]
-			const car = createCar({ x: p.x, y: p.y, angle: p.dir, color, speed: parked ? 0 : edge.speed * 0.8 })
-			if (!parked) car.ai = { edge, next: nextEdge(edge), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0 }
+			if (parked && junctions.near(p.x, p.y, 2)) continue
+			const model = pickModel(!parked && edge.w >= BIG_ROAD)
+			if (!fits(p.x, p.y, p.dir, model)) continue
+			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: parked ? 0 : edge.speed * 0.8 })
+			if (model === MODELS.bus && busLines.length) car.line = busLines[Math.floor(Math.random() * busLines.length)]
+			if (!parked) car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0 }
 			cars.push(car)
 			return
 		}
@@ -65,7 +69,7 @@ export function createTraffic(world) {
 		if (ai.s > ai.edge.len - 0.3) {
 			if (!ai.next) return null
 			ai.edge = ai.next
-			ai.next = nextEdge(ai.edge)
+			ai.next = nextEdge(ai.edge, c.model)
 			ai.s = project(ai.edge.lane, c.x, c.y)
 		}
 		const fwd = forwardSpeed(c)
@@ -74,20 +78,23 @@ export function createTraffic(world) {
 		const local = (x, y) => [(x - c.x) * cos + (y - c.y) * sin, -(x - c.x) * sin + (y - c.y) * cos]
 
 		// Steer for a point a little way up the lane.
-		const target = along(ai, LOOKAHEAD + Math.max(0, fwd) * 0.5)
+		const m = c.model
+		const target = along(ai, LOOKAHEAD + Math.max(0, fwd) * 0.5 + (m.length - LENGTH) * 0.6)
 		const [tx, ty] = local(target.x, target.y)
 		const aim = Math.atan2(ty, tx)
 
 		// Slow for bends ahead, and for anything in the way.
 		const bend = along(ai, 3 + fwd)
 		const turnAhead = Math.abs(Math.atan2(Math.sin(bend.dir - c.angle), Math.cos(bend.dir - c.angle)))
-		let want = ai.edge.speed * Math.max(0.35, 1 - turnAhead / 1.6)
+		let want = ai.edge.speed * m.pace * Math.max(0.35, 1 - turnAhead / 1.6)
 		if (Math.abs(aim) > 1) want = Math.min(want, 1.2)
 
 		// Red lights and right of way, at this lane's stop line or the next one's.
+		// Stop lines are drawn for an ordinary car; anything longer stops sooner.
+		const longer = (m.length - LENGTH) / 2
 		for (const [e, gap] of [
-			[ai.edge, ai.edge.stop - ai.s],
-			[ai.next, ai.edge.len - ai.s + (ai.next?.stop ?? 0)],
+			[ai.edge, ai.edge.stop - ai.s - longer],
+			[ai.next, ai.edge.len - ai.s + (ai.next?.stop ?? 0) - longer],
 		]) {
 			if (e?.stop === undefined || !junctions.wait(c, e, gap)) continue
 			want = Math.min(want, gap > 0.1 ? Math.sqrt(4 * (gap - 0.1)) : 0)
@@ -95,17 +102,28 @@ export function createTraffic(world) {
 
 		ai.ignore = Math.max(0, ai.ignore - dt)
 		let blocked = false
+		let standoff = false // blocked by someone crossing, coming the other way, or not driving at all
 		if (!ai.ignore) {
 			const others = [...cars.filter((o) => o !== c), player.car ? null : player].filter(Boolean)
 			for (const o of others) {
 				const [ox, oy] = local(o.x, o.y)
-				if (ox <= 0 || ox > LENGTH + 2 + fwd * 1.2 || Math.abs(oy) > WIDTH * 1.3) continue
-				want = Math.min(want, Math.max(0, (ox - LENGTH - 0.3) * 1.2))
+				// The other one's size seen along our heading and across it.
+				const turned = (o.angle ?? o.dir) - c.angle
+				const ol = (o.model?.length ?? 0.6) / 2
+				const ow = (o.model?.width ?? 0.6) / 2
+				const deep = Math.abs(Math.cos(turned)) * ol + Math.abs(Math.sin(turned)) * ow
+				const wide = Math.abs(Math.sin(turned)) * ol + Math.abs(Math.cos(turned)) * ow
+				const clear = ox - m.length / 2 - deep
+				if (ox <= 0 || clear > 2 + fwd * 1.2 || Math.abs(oy) > m.width / 2 + wide + 0.1) continue
+				want = Math.min(want, Math.max(0, (clear - 0.3) * 1.2))
 				blocked = true
+				if (Math.cos(turned) < 0.7 || (o.model && !o.ai && o !== player.car)) standoff = true
 			}
 		}
-		// Two cars waiting on each other: after a while one just goes.
-		ai.blocked = blocked && fwd < 0.2 ? ai.blocked + dt : 0
+		if (m === MODELS.bus) want = Math.min(want, busStop(c, local, dt))
+		// Two cars waiting on each other: after a while one just goes. A queue
+		// is not a standoff; that just waits.
+		ai.blocked = standoff && fwd < 0.2 ? ai.blocked + dt : 0
 		if (ai.blocked > 3 + Math.random()) ai.ignore = 1.5
 
 		// Wedged against something: back up a little.
@@ -123,11 +141,35 @@ export function createTraffic(world) {
 		}
 	}
 
-	// Lanes running into the edge of the map lead nowhere.
-	function nextEdge(edge) {
+	// Buses pull in at each stop on their side of the road, open up for a
+	// few seconds, and go on.
+	function busStop(c, local, dt) {
+		const ai = c.ai
+		if (ai.dwell > 0) {
+			ai.dwell -= dt
+			return 0
+		}
+		for (const stop of busStops) {
+			if (stop === ai.served || Math.abs(stop.x - c.x) > 6 || Math.abs(stop.y - c.y) > 6) continue
+			const [ox, oy] = local(stop.x, stop.y)
+			if (ox < -0.5 || ox > 6 || oy < 0 || oy > 3.5) continue
+			if (ox < 0.6 && speedOf(c) < 0.3) {
+				ai.dwell = 4
+				ai.served = stop
+			}
+			return ox > 0.3 ? Math.sqrt(3 * (ox - 0.3)) : 0
+		}
+		return Infinity
+	}
+
+	// Lanes running into the edge of the map lead nowhere, and buses keep to
+	// the big roads where they can.
+	function nextEdge(edge, model) {
 		const out = edge.to.out.filter((e) => e !== edge.twin)
 		const onMap = out.filter((e) => !e.to.off)
-		const choices = onMap.length ? onMap : out
+		let choices = onMap.length ? onMap : out
+		const big = choices.filter((e) => e.w >= BIG_ROAD)
+		if (model === MODELS.bus && big.length) choices = big
 		return choices.length ? choices[Math.floor(Math.random() * choices.length)] : edge.twin
 	}
 
@@ -205,11 +247,11 @@ export function createTraffic(world) {
 	// Into the driver's seat. Whoever was driving gets out and legs it.
 	function steal(c, say) {
 		if (c.ai) {
-			const [x, y] = toWorld(c, 0, -WIDTH / 2 - 0.35)
+			const [x, y] = toWorld(c, 0, -c.model.width / 2 - 0.35)
 			peds.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4 })
-			say(SHOUTS[Math.floor(Math.random() * SHOUTS.length)])
+			say(SHOUTS[Math.floor(Math.random() * SHOUTS.length)].replace('{}', c.model.noun))
 			c.ai = null
-		}
+		} else say(c.line ? `${c.model.name} ${c.line}` : c.model.name)
 		c.kept = true
 	}
 

@@ -4,43 +4,50 @@
 // alone makes a car steer, drift and spin. Lengths are tiles, forces are per
 // unit of mass.
 import { SOLID, T } from './tiles.js'
+import { MODELS } from './models.js'
 
-export const LENGTH = 1.5 // 4.5 m
-export const WIDTH = 0.66
-const INERTIA = (LENGTH ** 2 + WIDTH ** 2) / 12 // a uniform box, per unit of mass
-const ENGINE = 3.4 // tiles/s², about 1 g
+export const { length: LENGTH, width: WIDTH } = MODELS.car // an ordinary car, for spacing traffic
 const REVERSE = 0.5
-const ROLLING = 0.08 // per tyre, per second: top speed ENGINE / (4 × ROLLING), about 100 km/h
-const LATERAL = 1.2
-const STEER = 0.55 // radians at full lock, standing still
-const STEER_FADE = 0.25 // per tile/s above 2
 const HANDBRAKE_GRIP = 0.35 // rear sideways grip left with the handbrake on
 const HANDBRAKE_ROLLING = 6
 const OFF_ROAD = 3 // rolling resistance on grass and earth
 const STEP = 1 / 120
 
-const TYRES = [
-	[0.5, -0.23, true],
-	[0.5, 0.23, true],
-	[-0.5, -0.23, false],
-	[-0.5, 0.23, false],
-]
-// Where the body is checked against walls: corners and the middle of each side.
-const HULL = [
-	[1, 1],
-	[1, -1],
-	[-1, 1],
-	[-1, -1],
-	[1, 0],
-	[-1, 0],
-	[0, 1],
-	[0, -1],
-].map(([u, v]) => [(u * LENGTH) / 2, (v * WIDTH) / 2])
-// For bumping into other cars and people: three overlapping circles.
-const DISCS = [-0.42, 0, 0.42]
-const DISC_R = WIDTH / 2
+// Everything about a model's shape the physics needs, worked out once.
+const shapes = new Map()
+function shapeOf(m) {
+	if (shapes.has(m)) return shapes.get(m)
+	const hl = m.length / 2
+	const hw = m.width / 2
+	const axle = hl * 0.66
+	// Checked against walls: corners and points along each side, no further
+	// apart than half a tile, so no building corner slips between them.
+	const hull = []
+	const n = Math.ceil(m.length / 0.5)
+	for (let i = 0; i <= n; i++) hull.push([-hl + (i * m.length) / n, hw], [-hl + (i * m.length) / n, -hw])
+	hull.push([hl, 0], [-hl, 0])
+	// For bumping into other cars and people: a row of overlapping circles.
+	const r = hw
+	const k = Math.max(2, Math.ceil((m.length - 2 * r) / (r * 1.2)) + 1)
+	const discs = Array.from({ length: k }, (_, i) => -hl + r + (i * (m.length - 2 * r)) / (k - 1))
+	const shape = {
+		tyres: [
+			[axle, -hw * 0.7, true],
+			[axle, hw * 0.7, true],
+			[-axle, -hw * 0.7, false],
+			[-axle, hw * 0.7, false],
+		],
+		hull,
+		discs,
+		r,
+		inertia: (m.length ** 2 + m.width ** 2) / 12, // a uniform box, per unit of mass
+	}
+	shapes.set(m, shape)
+	return shape
+}
 
-export function createCar({ x, y, angle = 0, color = '#888', speed = 0 }) {
+export function createCar({ x, y, angle = 0, color, speed = 0, model = MODELS.car }) {
+	const shape = shapeOf(model)
 	return {
 		x,
 		y,
@@ -49,9 +56,11 @@ export function createCar({ x, y, angle = 0, color = '#888', speed = 0 }) {
 		vy: Math.sin(angle) * speed,
 		spin: 0,
 		steer: 0,
-		color,
+		model,
+		shape,
+		color: color ?? model.colors[Math.floor(Math.random() * model.colors.length)],
 		braking: false,
-		tyres: TYRES.map(([lx, ly, front]) => ({ lx, ly, front, skid: false, mark: null })),
+		tyres: shape.tyres.map(([lx, ly, front]) => ({ lx, ly, front, skid: false, mark: null })),
 		marks: [], // skid mark segments [x0, y0, x1, y1] waiting to be painted
 	}
 }
@@ -65,10 +74,11 @@ const pointVelocity = (c, px, py) => [c.vx - c.spin * (py - c.y), c.vy + c.spin 
 export const forwardSpeed = (c) => c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle)
 export const speedOf = (c) => Math.hypot(c.vx, c.vy)
 
+// An impulse per unit of this car's mass.
 function push(c, ix, iy, px, py) {
 	c.vx += ix
 	c.vy += iy
-	c.spin += ((px - c.x) * iy - (py - c.y) * ix) / INERTIA
+	c.spin += ((px - c.x) * iy - (py - c.y) * ix) / c.shape.inertia
 }
 
 // controls: throttle −1…1 (negative brakes, then reverses), turn −1…1, handbrake,
@@ -89,15 +99,18 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	const cos = Math.cos(c.angle)
 	const sin = Math.sin(c.angle)
 	const forward = c.vx * cos + c.vy * sin
-	// Brakes at full force until the car stops, then reverses gently.
+	const m = c.model
+	// Brakes until the car stops, then reverses gently.
 	c.braking = (throttle < 0 && forward > 0.1) || hold
-	const engine = throttle * ENGINE * (throttle < 0 && !c.braking ? REVERSE : 1)
-	let fx = cos * engine
-	let fy = sin * engine
+	const engine = throttle * (c.braking ? m.brake : throttle < 0 ? m.engine * REVERSE : m.engine)
+	// Air resistance, against the direction of travel.
+	const speed = Math.hypot(c.vx, c.vy)
+	let fx = cos * engine - m.drag * speed * c.vx
+	let fy = sin * engine - m.drag * speed * c.vy
 	let torque = 0
 
 	// Less lock the faster you go, or the front tyres scrub off all your speed.
-	const lock = STEER / (1 + Math.max(0, forward - 2) * STEER_FADE)
+	const lock = m.steer / (1 + Math.max(0, forward - 2) * m.steerFade)
 	c.steer += (turn * lock - c.steer) * Math.min(1, dt * 12)
 	const ground = world.tileAt(c.x, c.y)
 	const rough = ground === T.GROUND || ground === T.GRASS ? OFF_ROAD : 1
@@ -110,8 +123,8 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 		const rolling = vx * rx + vy * ry
 		const lateral = vx * -ry + vy * rx
 		const hand = handbrake && !t.front
-		const kr = ROLLING * rough * (hand ? HANDBRAKE_ROLLING : 1)
-		const kl = LATERAL * (hand ? HANDBRAKE_GRIP : 1)
+		const kr = m.rolling * rough * (hand ? HANDBRAKE_ROLLING : 1)
+		const kl = m.lateral * (hand ? HANDBRAKE_GRIP : 1)
 		// Hysteresis, so marks don't flicker on and off at the threshold.
 		t.skid = !t.front && Math.abs(lateral) > (t.skid ? 0.5 : 0.9)
 		const tx = -kr * rolling * rx + kl * lateral * ry
@@ -124,7 +137,7 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	// Semi-implicit Euler: velocity first, then position.
 	c.vx += fx * dt
 	c.vy += fy * dt
-	c.spin += (torque / INERTIA) * dt
+	c.spin += (torque / c.shape.inertia) * dt
 	c.x += c.vx * dt
 	c.y += c.vy * dt
 	c.angle += c.spin * dt
@@ -137,7 +150,7 @@ function hitWalls(c, world) {
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
 	for (let pass = 0; pass < 3; pass++) {
 		let hit = false
-		for (const [lx, ly] of HULL) {
+		for (const [lx, ly] of c.shape.hull) {
 			const [px, py] = toWorld(c, lx, ly)
 			if (!solid(px, py)) continue
 			hit = true
@@ -171,39 +184,43 @@ function impulse(c, px, py, nx, ny, bounce, friction) {
 	const vn = vx * nx + vy * ny
 	if (vn >= 0) return
 	const arm = (px - c.x) * ny - (py - c.y) * nx
-	const j = (-(1 + bounce) * vn) / (1 + (arm * arm) / INERTIA)
+	const j = (-(1 + bounce) * vn) / (1 + (arm * arm) / c.shape.inertia)
 	push(c, nx * j, ny * j, px, py)
 	// Scraping along the wall slows you down.
 	const tx = -ny
 	const ty = nx
 	const vt = vx * tx + vy * ty
 	const armT = (px - c.x) * ty - (py - c.y) * tx
-	const jt = Math.max(-friction * j, Math.min(friction * j, -vt / (1 + (armT * armT) / INERTIA)))
+	const jt = Math.max(-friction * j, Math.min(friction * j, -vt / (1 + (armT * armT) / c.shape.inertia)))
 	push(c, tx * jt, ty * jt, px, py)
 }
 
-const discs = (c) => DISCS.map((d) => toWorld(c, d, 0))
+const discs = (c) => c.shape.discs.map((d) => toWorld(c, d, 0))
 
-// Cars bumping into each other, all the same mass.
+// Cars bumping into each other. A bus shoves a Kleinwagen aside; the other
+// way round, not so much.
 export function collideCars(cars) {
 	for (let i = 0; i < cars.length; i++) {
 		const a = cars[i]
 		for (let j = i + 1; j < cars.length; j++) {
 			const b = cars[j]
-			if (Math.abs(a.x - b.x) > LENGTH || Math.abs(a.y - b.y) > LENGTH) continue
+			const reach = (a.model.length + b.model.length) / 2
+			if (Math.abs(a.x - b.x) > reach || Math.abs(a.y - b.y) > reach) continue
 			for (const [ax, ay] of discs(a)) {
 				for (const [bx, by] of discs(b)) {
 					const dx = ax - bx
 					const dy = ay - by
 					const d = Math.hypot(dx, dy)
-					if (d >= DISC_R * 2 || d === 0) continue
+					const touch = a.shape.r + b.shape.r
+					if (d >= touch || d === 0) continue
 					const nx = dx / d
 					const ny = dy / d
-					const overlap = (DISC_R * 2 - d) / 2
-					a.x += nx * overlap
-					a.y += ny * overlap
-					b.x -= nx * overlap
-					b.y -= ny * overlap
+					// Each gives way in proportion to the other's mass.
+					const share = b.model.mass / (a.model.mass + b.model.mass)
+					a.x += nx * (touch - d) * share
+					a.y += ny * (touch - d) * share
+					b.x -= nx * (touch - d) * (1 - share)
+					b.y -= ny * (touch - d) * (1 - share)
 					const px = (ax + bx) / 2
 					const py = (ay + by) / 2
 					const [avx, avy] = pointVelocity(a, px, py)
@@ -212,9 +229,11 @@ export function collideCars(cars) {
 					if (vn >= 0) continue
 					const armA = (px - a.x) * ny - (py - a.y) * nx
 					const armB = (px - b.x) * ny - (py - b.y) * nx
-					const k = (-(1 + 0.3) * vn) / (2 + (armA * armA + armB * armB) / INERTIA)
-					push(a, nx * k, ny * k, px, py)
-					push(b, -nx * k, -ny * k, px, py)
+					const ma = a.model.mass
+					const mb = b.model.mass
+					const k = (-(1 + 0.3) * vn) / (1 / ma + 1 / mb + (armA * armA) / (ma * a.shape.inertia) + (armB * armB) / (mb * b.shape.inertia))
+					push(a, (nx * k) / ma, (ny * k) / ma, px, py)
+					push(b, (-nx * k) / mb, (-ny * k) / mb, px, py)
 				}
 			}
 		}
@@ -229,11 +248,12 @@ export function shoveOut(c, p, r) {
 		const dx = p.x - cx
 		const dy = p.y - cy
 		const d = Math.hypot(dx, dy)
-		if (d >= DISC_R + r || d === 0) continue
+		const touch = c.shape.r + r
+		if (d >= touch || d === 0) continue
 		const [vx, vy] = pointVelocity(c, cx, cy)
 		impact = Math.max(impact, (vx * dx + vy * dy) / d, 0.001)
-		p.x += (dx / d) * (DISC_R + r - d)
-		p.y += (dy / d) * (DISC_R + r - d)
+		p.x += (dx / d) * (touch - d)
+		p.y += (dy / d) * (touch - d)
 	}
 	return impact
 }
@@ -242,7 +262,7 @@ export function shoveOut(c, p, r) {
 export function distanceTo(c, x, y) {
 	const dx = x - c.x
 	const dy = y - c.y
-	const u = Math.abs(dx * Math.cos(c.angle) + dy * Math.sin(c.angle)) - LENGTH / 2
-	const v = Math.abs(-dx * Math.sin(c.angle) + dy * Math.cos(c.angle)) - WIDTH / 2
+	const u = Math.abs(dx * Math.cos(c.angle) + dy * Math.sin(c.angle)) - c.model.length / 2
+	const v = Math.abs(-dx * Math.sin(c.angle) + dy * Math.cos(c.angle)) - c.model.width / 2
 	return Math.hypot(Math.max(0, u), Math.max(0, v))
 }

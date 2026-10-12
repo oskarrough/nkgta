@@ -1,6 +1,6 @@
 // Walking, cycling, driving and bumping into things.
 import { T, SOLID } from './tiles.js'
-import { driveCar, speedOf, toWorld, WIDTH } from './car.js'
+import { driveCar, speedOf, toWorld } from './car.js'
 
 const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
@@ -33,7 +33,7 @@ export function toggleBike(p) {
 export function leaveCar(p, world) {
 	const c = p.car
 	for (const side of [-1, 1]) {
-		const [x, y] = toWorld(c, 0, side * (WIDTH / 2 + 0.4))
+		const [x, y] = toWorld(c, 0, side * (c.model.width / 2 + 0.4))
 		if (SOLID.has(world.tileAt(x, y))) continue
 		p.x = x
 		p.y = y

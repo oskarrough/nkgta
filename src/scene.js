@@ -4,7 +4,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { renderMapImage, renderRoofImage, roofHash } from './map-image.js'
-import { LENGTH, WIDTH } from './car.js'
+import { MODELS } from './models.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -65,23 +65,24 @@ export function createScene(canvas, world) {
 	}
 }
 
-// Cars from above, GTA 1 style: a painted body, dark glass all round the
-// cabin, the roof in the body colour on top, and brake lights. Heights in tiles.
+// Vehicles from above, GTA 1 style: each model built from its own boxes
+// (see models.js), one instanced mesh per box, plus brake lights.
 const MAX_CARS = 256
+const FIXED = { glass: '#1b232b', roofbox: '#9a9a96' }
 function carMeshes() {
 	const box = (l, w, h, x, z) => new THREE.BoxGeometry(l, w, h).translate(x, 0, z + h / 2)
-	const parts = [
-		{ geo: box(LENGTH, WIDTH, 0.25, 0, 0.06), paint: true },
-		{ geo: box(LENGTH * 0.55, WIDTH * 0.9, 0.17, -0.05, 0.31), color: '#1b232b' },
-		{ geo: box(LENGTH * 0.36, WIDTH * 0.84, 0.02, -0.1, 0.48), paint: true },
-		{ geo: mergeGeometries([-1, 1].map((s) => box(0.04, 0.12, 0.06, -LENGTH / 2, 0.22).translate(0, (s * WIDTH) / 3, 0))), lights: true },
-	]
-	const meshes = parts.map(({ geo, color }) => {
-		const material = color ? new THREE.MeshLambertMaterial({ color }) : new THREE.MeshLambertMaterial()
-		const mesh = new THREE.InstancedMesh(geo, material, MAX_CARS)
-		mesh.count = 0
-		mesh.frustumCulled = false
-		return mesh
+	const kinds = Object.values(MODELS).map((m) => {
+		const parts = m.look.map(([kind, l, w, h, x, z]) => ({ kind, geo: box(l * m.length, w * m.width, h, x * m.length, z) }))
+		const [, , , h, , z] = m.look[0]
+		const lamp = (s) => box(0.04, 0.12, 0.06, -m.length / 2, z + h * 0.55).translate(0, (s * m.width) / 3, 0)
+		parts.push({ kind: 'lights', geo: mergeGeometries([lamp(-1), lamp(1)]) })
+		for (const part of parts) {
+			const color = FIXED[part.kind]
+			part.mesh = new THREE.InstancedMesh(part.geo, new THREE.MeshLambertMaterial(color ? { color } : {}), MAX_CARS)
+			part.mesh.count = 0
+			part.mesh.frustumCulled = false
+		}
+		return { model: m, parts }
 	})
 	const m = new THREE.Matrix4()
 	const q = new THREE.Quaternion()
@@ -91,23 +92,26 @@ function carMeshes() {
 	const lit = new THREE.Color('#ff2a1a')
 	const dim = new THREE.Color('#5a0d0a')
 	return {
-		meshes,
+		meshes: kinds.flatMap((k) => k.parts.map((p) => p.mesh)),
 		update(cars) {
-			const n = Math.min(cars.length, MAX_CARS)
-			for (let i = 0; i < n; i++) {
-				const car = cars[i]
-				m.compose(new THREE.Vector3(car.x, -car.y, 0), q.setFromAxisAngle(z, -car.angle), one)
-				c.set(car.color)
-				parts.forEach((part, k) => {
-					meshes[k].setMatrixAt(i, m)
-					if (part.paint) meshes[k].setColorAt(i, c)
-					if (part.lights) meshes[k].setColorAt(i, car.braking ? lit : dim)
-				})
-			}
-			for (const mesh of meshes) {
-				mesh.count = n
-				mesh.instanceMatrix.needsUpdate = true
-				if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+			for (const { model, parts } of kinds) {
+				let n = 0
+				for (const car of cars) {
+					if (car.model !== model || n >= MAX_CARS) continue
+					m.compose(new THREE.Vector3(car.x, -car.y, 0), q.setFromAxisAngle(z, -car.angle), one)
+					c.set(car.color)
+					for (const { kind, mesh } of parts) {
+						mesh.setMatrixAt(n, m)
+						if (kind === 'paint') mesh.setColorAt(n, c)
+						if (kind === 'lights') mesh.setColorAt(n, car.braking ? lit : dim)
+					}
+					n++
+				}
+				for (const { mesh } of parts) {
+					mesh.count = n
+					mesh.instanceMatrix.needsUpdate = true
+					if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+				}
 			}
 		},
 	}

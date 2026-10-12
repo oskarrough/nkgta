@@ -91,7 +91,10 @@ export function createJunctions(edges, signals = []) {
 		return out
 	}
 
-	return { update, wait, lights }
+	// Somewhere in or right next to a junction, where nobody should park.
+	const near = (x, y, pad) => junctions.some((j) => dist({ x, y }, j) < j.r + pad)
+
+	return { update, wait, lights, near }
 }
 
 // Bigger road first. Between equals, whoever comes from the right: their
