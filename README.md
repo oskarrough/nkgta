@@ -15,6 +15,8 @@ Traffic drives on the right along the real road network, one-way streets include
 
 Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched from Overpass in the browser, built there, and cached with TinyJoin in OPFS. OPFS needs https or localhost; over plain http the cache is skipped.
 
+`/?perf` times each load step and each render pass; read them from `perf` in the console.
+
 ## Code
 
 - `src/overpass.js`, `src/build-map.js`: OSM data in; tile grid, ground shapes, building outlines, road network, places and stops out. Shared by the scripts and the browser.

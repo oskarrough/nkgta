@@ -9,6 +9,7 @@ import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
+import { phase, timePasses } from './perf.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -86,10 +87,14 @@ export function createScene(canvas, world) {
 	renderer.shadowMap.type = THREE.PCFShadowMap
 
 	// Tile (x, y) sits at (x, -y), so north stays up and z is height in tiles.
+	phase('scene setup')
 	const ground = new THREE.CanvasTexture(renderMapImage(world))
+	phase('renderMapImage')
 	ground.colorSpace = THREE.SRGBColorSpace
 	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
+	phase('houses (footprints, roof shapes)')
 	const roofImage = renderRoofImage(world, (n) => houses[n].roof)
+	phase('renderRoofImage')
 	const roofTex = new THREE.CanvasTexture(roofImage.canvas)
 	roofTex.colorSpace = THREE.SRGBColorSpace
 	// Crisp texels only on the pixel grid; the smooth looks keep their
@@ -153,6 +158,7 @@ export function createScene(canvas, world) {
 	}
 
 	const ink = createInk(renderer, [skids.mesh])
+	timePasses(renderer, ['color', 'normal', 'ink', 'blit'])
 
 	// Three looks, cycled with P: flat comic, palette only, and the full pixel
 	// grid. The render path owns the knobs; this only picks the frame size.
@@ -214,6 +220,8 @@ export function createScene(canvas, world) {
 
 	return {
 		render,
+		renderer,
+		scene,
 		aim,
 		renderer,
 		gradient,

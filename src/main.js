@@ -9,6 +9,7 @@ import { createCamera } from './camera.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useHint } from './hud.js'
+import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { findShops } from './shops.js'
 import { createSigns } from './signs.js'
 import { createVisit } from './visit.js'
@@ -25,13 +26,16 @@ const map = await loadMap((text) => (loading.textContent = text)).catch((err) =>
 loading.remove()
 
 const world = createWorld(map)
+phase('createWorld')
 const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
 const camera = createCamera()
 const canvas = document.getElementById('overlay')
 const city3d = createScene(document.getElementById('city'), world)
+phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
+phase('overlay, hud, traffic')
 const shops = findShops(world)
 const draw = createRenderer(canvas, world, shops)
 city3d.add(createSigns(shops, city3d.gradient))
@@ -41,6 +45,7 @@ const wasted = createWasted({
 	onDown: () => pfand.spill(player.x, player.y),
 	respawn: () => Object.assign(player, createPlayer(world.startPoint(START))),
 })
+if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
@@ -82,9 +87,10 @@ const viewOf = (cam, dx = 0, dy = 0) => ({
 })
 
 let last = performance.now()
+let first = true
 function frame(now) {
+	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
-	last = now
 	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
 	visit.update(dt, input.axis())
 	wasted.update(dt)
@@ -116,6 +122,10 @@ function frame(now) {
 	input.setUse(door?.startsWith('E: ') ? door.slice(3) : door ? null : useHint(player, car))
 	input.setDriving(!!player.car)
 	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door }, dt)
+	frameEnd({ x: player.x, y: player.y, interval: now - last })
+	last = now
+	if (first) phase('first frame')
+	first = false
 	requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)

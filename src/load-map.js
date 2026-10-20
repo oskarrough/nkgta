@@ -5,6 +5,7 @@ import { decodeMap } from './map-codec.js'
 import { getArea, putArea } from './area-cache.js'
 import { areaFromUrl } from './area-url.js'
 import { TILE_M } from './default-area.js'
+import { phase } from './perf.js'
 
 // Bump when build-map.js changes, so cached areas get rebuilt.
 const BUILD_VERSION = 7
@@ -13,7 +14,13 @@ export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
 	if (!bbox) {
 		onStatus('Lade Karte…')
-		return decodeMap(await (await fetch('/map.json')).json())
+		const text = await (await fetch('/map.json')).text()
+		phase('fetch')
+		const json = JSON.parse(text)
+		phase('parse')
+		const map = decodeMap(json)
+		phase('decode')
+		return map
 	}
 
 	const key = `${BUILD_VERSION}:${Object.values(bbox).join(',')}`
