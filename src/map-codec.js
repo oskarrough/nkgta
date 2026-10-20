@@ -23,4 +23,10 @@ export function toBase64(bytes) {
 	return btoa(s)
 }
 
-export const fromBase64 = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+export function fromBase64(b64) {
+	if (Uint8Array.fromBase64) return Uint8Array.fromBase64(b64)
+	const s = atob(b64)
+	const bytes = new Uint8Array(s.length)
+	for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i)
+	return bytes
+}
