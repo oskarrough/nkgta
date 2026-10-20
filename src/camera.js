@@ -11,11 +11,12 @@ export function createCamera() {
 		zoomBy: (f) => (userZoom = Math.max(0.5, Math.min(24, userZoom * f))),
 
 		// Screen pixels per tile, and the top-left corner, centred on `target`.
-		update(target, canvas, dt, pixelGrid) {
+		// `closer` zooms in on top of the player's zoom, as inside a shop.
+		update(target, canvas, dt, pixelGrid, closer = 1) {
 			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
 			cruise += (Math.abs(target.speed) - cruise) * Math.min(1, dt * 1.5)
 			// Only a touch: flat out you see about a fifth further than on foot.
-			const out = Math.min(1, Math.max(0.8, 1 - cruise * 0.02))
+			const out = Math.min(1, Math.max(0.8, 1 - cruise * 0.02)) * closer
 			if (pixelGrid) {
 				// On the pixel grid every in-between zoom redraws every pixel, so
 				// zoom jumps straight there, and speed zooms out in two steps.

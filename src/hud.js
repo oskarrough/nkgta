@@ -24,17 +24,24 @@ export function createHud(world) {
 	return {
 		say: (text) => (toast = { text, t: 3 }),
 
-		update({ player, car, bag, showTransit, wasted }, dt) {
-			street = world.streetAt(player.x, player.y) || street
+		// `inside` is the shop you're in; `door` is what E does at a shop door.
+		update({ player, car, bag, showTransit, wasted, inside, door }, dt) {
 			if (toast && (toast.t -= dt) < 0) toast = null
+			set('money', euro(bag.cents))
+			set('bag', bag.bottles ? `🍾 ${bag.bottles}` : '')
+			if (inside) {
+				set('street', '')
+				set('wasted', '')
+				set('place', toast?.text ?? door ?? '')
+				return
+			}
+			street = world.streetAt(player.x, player.y) || street
 			const p = nearestPlace(world.pois, player.x, player.y, 2.5)
 			const stop = showTransit && nearestPlace(world.transit ?? [], player.x, player.y, 2.5)
 			set('street', street)
-			set('money', euro(bag.cents))
 			set('wasted', wasted ? 'WASTED' : '')
-			set('bag', bag.bottles ? `🍾 ${bag.bottles}` : '')
 			const here = p ? `${ICONS[p.kind]} ${placeName(p)}` : world.tileAt(player.x, player.y) === T.PRIVATE ? '🔒 Privatweg' : ''
-			const hint = nearBike(player) ? 'E: aufs Fahrrad' : car ? (car.ai ? 'E: Auto klauen' : 'E: einsteigen') : null
+			const hint = door ?? (nearBike(player) ? 'E: aufs Fahrrad' : car ? (car.ai ? 'E: Auto klauen' : 'E: einsteigen') : null)
 			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
 		},
 	}

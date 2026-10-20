@@ -187,7 +187,8 @@ export function createInk(renderer, hidden = []) {
 			blit.quad.scale.set(this.frame.width / width, this.frame.height / height, 1)
 			blit.quad.position.set(blit.quad.scale.x - 1, 1 - blit.quad.scale.y, 0)
 		},
-		render(scene, camera) {
+		// Into `target` instead of the screen, for a view through the portal.
+		render(scene, camera, target = null) {
 			ink.quad.material.uniforms.camNear.value = camera.near
 			ink.quad.material.uniforms.camFar.value = camera.far
 			renderer.shadowMap.needsUpdate = true
@@ -204,7 +205,7 @@ export function createInk(renderer, hidden = []) {
 			renderer.setRenderTarget(pixels)
 			renderer.render(ink.scene, screenCamera)
 
-			renderer.setRenderTarget(null)
+			renderer.setRenderTarget(target)
 			renderer.render(blit.scene, screenCamera)
 		},
 	}

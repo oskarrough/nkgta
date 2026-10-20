@@ -188,27 +188,38 @@ export function createScene(canvas, world) {
 
 	// Same view as the 2D overlay: `scale` device pixels per tile at street
 	// level, top-left corner at (cam.x, cam.y) in those pixels.
-	function render(cam, carList) {
-		cars.update(carList)
-		for (const c of carList) {
-			for (const m of c.marks) skids.add(...m)
-			c.marks.length = 0
-		}
+	function aim(cam) {
 		fit(cam.scale)
 		const { width, height } = ink.frame
 		const cx = (cam.x + width / 2) / cam.scale
 		const cy = -(cam.y + height / 2) / cam.scale
 		camera.position.set(cx, cy, height / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)))
-		focusSun(cx, cy, Math.hypot(width, height) / cam.scale / 2)
-		clouds.follow(camera)
+		return camera
+	}
+
+	// `view` and `target` draw the city from another camera into a texture,
+	// for the street seen through a shop's portal.
+	function render(cam, carList, { view = aim(cam), target = null } = {}) {
+		cars.update(carList)
+		for (const c of carList) {
+			for (const m of c.marks) skids.add(...m)
+			c.marks.length = 0
+		}
+		const { width, height } = ink.frame
+		focusSun(view.position.x, view.position.y, Math.hypot(width, height) / cam.scale / 2)
+		clouds.follow(view)
 		plane.material.uniforms.time.value = performance.now() / 1000
-		ink.render(scene, camera)
+		ink.render(scene, view, target)
 	}
 
 	return {
 		render,
+		aim,
+		renderer,
 		gradient,
 		add: (...objects) => scene.add(...objects),
+		// Another scene, such as a shop inside, in the same look.
+		draw: (other, view, target = null) => ink.render(other, view, target),
 		// Only the pixel grid needs the camera on whole game pixels.
 		pixelGrid: () => look === 'pixel',
 		// P: comic, palette, pixel, and round again.

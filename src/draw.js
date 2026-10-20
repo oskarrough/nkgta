@@ -18,7 +18,9 @@ export function createRenderer(canvas, world) {
 	addEventListener('resize', resize)
 	resize()
 
-	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit, showWalls }) {
+	// `inside` a shop, only the player: the map's places, stops, names, walls
+	// and the parked bike are all out on the street.
+	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit, showWalls, inside }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
@@ -62,12 +64,12 @@ export function createRenderer(canvas, world) {
 		}
 
 		const icon = Math.max(10 * devicePixelRatio, scale * 1.4)
-		for (const p of world.pois) {
+		for (const p of inside ? [] : world.pois) {
 			const [sx, sy] = toScreen(p.x, p.y)
 			if (onScreen(sx, sy, icon)) ctx.drawImage(icons[p.kind], sx - icon / 2, sy - icon / 2, icon, icon)
 		}
 
-		if (showTransit) {
+		if (showTransit && !inside) {
 			const sign = Math.max(14 * devicePixelRatio, scale * 1.6)
 			for (const t of world.transit ?? []) {
 				const [sx, sy] = toScreen(t.x, t.y)
@@ -75,7 +77,7 @@ export function createRenderer(canvas, world) {
 			}
 		}
 
-		if (showStreetNames) {
+		if (showStreetNames && !inside) {
 			const k = (13 / LABEL_PX) * devicePixelRatio
 			for (const l of world.labels) {
 				const [sx, sy] = toScreen(l.x, l.y)
@@ -90,7 +92,7 @@ export function createRenderer(canvas, world) {
 		}
 
 		if (player.onBike) drawBike(...toScreen(player.x, player.y), player.dir)
-		else drawBike(...toScreen(player.bike.x, player.bike.y), 0)
+		else if (!inside) drawBike(...toScreen(player.bike.x, player.bike.y), 0)
 		for (const p of peds) drawPerson(...toScreen(p.x, p.y), p.dir, '#5b8fd6')
 		if (player.down) drawDown(...toScreen(player.x, player.y), player.dir)
 		else if (!player.car) drawPerson(...toScreen(player.x, player.y), player.dir, '#f2d24b')

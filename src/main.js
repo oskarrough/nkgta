@@ -11,6 +11,7 @@ import { createScene } from './scene.js'
 import { createHud } from './hud.js'
 import { findShops } from './shops.js'
 import { createSigns } from './signs.js'
+import { createVisit } from './visit.js'
 
 import { sound } from './sound.js'
 
@@ -32,7 +33,9 @@ const city3d = createScene(document.getElementById('city'), world)
 const draw = createRenderer(canvas, world)
 const hud = createHud(world)
 const traffic = createTraffic(world)
-city3d.add(createSigns(findShops(world), city3d.gradient))
+const shops = findShops(world)
+city3d.add(createSigns(shops, city3d.gradient))
+const visit = createVisit({ city3d, shops, player })
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
@@ -53,9 +56,10 @@ const input = createInput({
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 })
 
-// E: out of the car, off the bike, or onto whichever is closer, bike or car.
+// E: in or out of a shop, out of the car, off the bike, or onto whichever is
+// closer, bike or car.
 function use() {
-	if (wasted.active()) return
+	if (wasted.active() || visit.use()) return
 	if (player.car) {
 		leaveCar(player, world)
 		sound.door()
@@ -69,29 +73,49 @@ function use() {
 	} else toggleBike(player)
 }
 
-// The part of the map on screen, in tiles.
-const viewOf = (cam) => ({
-	x0: cam.x / cam.scale,
-	y0: cam.y / cam.scale,
-	x1: (cam.x + canvas.width) / cam.scale,
-	y1: (cam.y + canvas.height) / cam.scale,
+// The part of the map on screen, in tiles, shifted by (dx, dy) tiles.
+const viewOf = (cam, dx = 0, dy = 0) => ({
+	x0: cam.x / cam.scale + dx,
+	y0: cam.y / cam.scale + dy,
+	x1: (cam.x + canvas.width) / cam.scale + dx,
+	y1: (cam.y + canvas.height) / cam.scale + dy,
 })
 
 let last = performance.now()
 function frame(now) {
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	last = now
-	if (!wasted.active()) updatePlayer(player, input.axis(), input.turbo(), world, dt)
+	if (!wasted.active() && !visit.warping()) updatePlayer(player, input.axis(), input.turbo(), visit.world(world), dt)
+	visit.update(dt, input.axis())
 	wasted.update(dt)
-	const cam = camera.update(player, canvas, dt, city3d.pixelGrid())
-	wasted.hit(traffic.update(dt, player, viewOf(cam)))
-	if (!player.car && !wasted.active()) pfand.update(player, hud.say)
+	const inside = visit.inside()
+	const indoors = visit.indoors()
+	const cam = camera.update(player, canvas, dt, city3d.pixelGrid(), visit.closer())
+	// Inside a shop, the street carries on round its door.
+	const street = visit.street()
+	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
+	const hit = traffic.update(dt, street, streetView)
+	if (!inside && !visit.warping()) wasted.hit(hit)
+	if (!inside && !player.car && !wasted.active()) pfand.update(player, hud.say)
 	sound.engine(player.car)
-	sound.street(traffic.cars, player, viewOf(cam), dt)
-	city3d.render(cam, traffic.cars)
-	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit, showWalls })
-	const car = !player.car && !player.onBike && traffic.enterable(player.x, player.y)
-	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active() }, dt)
+	sound.street(traffic.cars, street, streetView, dt)
+	visit.render(cam, traffic.cars, dt)
+	draw({
+		cam,
+		player,
+		peds: indoors ? [] : traffic.peds,
+		lights: indoors ? [] : traffic.lights(),
+		bottles: indoors ? [] : pfand.bottles,
+		showStreetNames,
+		showTransit,
+		showWalls: showWalls && !indoors,
+		inside: indoors,
+	})
+	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
+	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door: visit.hint() }, dt)
 	requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
+
+// For poking at the game from the console while developing.
+if (import.meta.env.DEV) window.nkgta = { player, shops, visit, pfand, camera }
