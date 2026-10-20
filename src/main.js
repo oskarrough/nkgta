@@ -90,7 +90,7 @@ function frame(now) {
 	wasted.update(dt)
 	const inside = visit.inside()
 	const indoors = visit.indoors()
-	const cam = camera.update(player, canvas, dt, city3d.pixelGrid(), visit.closer())
+	const cam = camera.update(visit.focus(dt), canvas, dt, city3d.pixelGrid(), visit.closer())
 	// Inside a shop, the street carries on round its door.
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)

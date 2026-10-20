@@ -26,6 +26,7 @@ const BOARDS = { spaeti: '#C8302A', doener: '#B5603F', imbiss: '#E8C21A', cafe: 
 const DOOR_Y = D - WALL
 export const DOOR = { x: W / 2, y: DOOR_Y - 0.35, nx: 0, ny: -1, out: 0.35 }
 export const ENTRY = { x: W / 2, y: DOOR_Y - 1.1 }
+export const MIDDLE = { x: W / 2, y: D / 2 - 0.3 } // where the camera settles inside
 
 // Solid things as [x0, y0, x1, y1, height, colour].
 const COUNTER = [2.6, 2.3, 8.6, 3.1, 0.42, '#8F4C35']

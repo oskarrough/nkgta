@@ -5,13 +5,14 @@
 // press E, and you're on the street where you left it.
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
-import { createInterior, DOOR, ENTRY } from './interior.js'
+import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
 import { shopAt } from './shops.js'
 
 const RADIUS = 1.25 // half-height of the open tear, tiles
 const TILT = (60 * Math.PI) / 180 // leaning back against the wall, from upright, so the camera sees it
 const WARP = 0.8 // seconds to swell and step through
-const CLOSER = 1.6 // the camera comes in this much closer inside
+const CLOSER = 1.25 // the camera comes in this much closer inside
+const SETTLE = 0.8 // and drifts most of the way to the room's middle, over this many seconds
 const WANDER = 2.5 // walk this far from an open tear and it closes, tiles
 
 const Z = new THREE.Vector3(0, 0, 1)
@@ -38,6 +39,8 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 	let inside = false
 	let warp = null // { t, from: { x, y } } while stepping through
 	let armed = false // inside, the way out waits until you've let go of the keys
+	let settle = 0 // how far the camera has drifted to the room's middle
+	const focus = { x: 0, y: 0, speed: 0 }
 	// Traffic keeps running round the shop door while you're in, for the
 	// street seen through the tear; this stands in for you there.
 	const standIn = { x: 0, y: 0, speed: 0, car: null }
@@ -114,6 +117,19 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 		// Where traffic should centre on: you, or your stand-in at the shop door.
 		street: () => (inside ? standIn : player),
 		closer: () => (inside ? CLOSER : 1),
+		// What the camera follows: you, but inside drawn towards the middle of
+		// the room so the board stays in view. Back to just you before you step
+		// out, so the street lines up with the view through the tear.
+		focus(dt) {
+			const want = inside && !warp ? 0.7 : 0
+			settle += Math.sign(want - settle) * Math.min(Math.abs(want - settle), dt / SETTLE)
+			if (warp && inside) settle *= 1 - Math.min(1, warp.t * 2)
+			if (!settle) return player
+			focus.x = player.x + (MIDDLE.x - player.x) * settle
+			focus.y = player.y + (MIDDLE.y - player.y) * settle
+			focus.speed = player.speed
+			return focus
+		},
 
 		// E: in or out, open or close. True if it was for us.
 		use() {
