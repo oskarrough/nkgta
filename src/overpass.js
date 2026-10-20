@@ -44,7 +44,7 @@ export async function fetchOsm(bbox, { onStatus = () => {}, headers = {} } = {})
 		const url = SERVERS[attempt % SERVERS.length]
 		try {
 			onStatus(`Lade Karte von ${new URL(url).host}…`)
-			const res = await fetch(url, { method: 'POST', headers, body })
+			const res = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(240_000) })
 			const text = await res.text()
 			const json = JSON.parse(text)
 			if (!json.elements) throw new Error('no elements')
