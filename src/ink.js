@@ -162,6 +162,24 @@ export function createInk(renderer, hidden = []) {
 	)
 	const screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
+	// The target's scissor, in screen pixels from the bottom, as game pixels
+	// on the passes. The edges reach a little further in, for the ink's
+	// neighbours and the blit's rounding.
+	let size = { upscale: 1, overflow: 0 }
+	function clip(rect) {
+		for (const [t, pad] of [
+			[color, 4],
+			[normals, 4],
+			[pixels, 2],
+		]) {
+			t.scissorTest = !!rect
+			if (!rect) continue
+			const x = Math.floor(rect.x / size.upscale) - pad
+			const y = Math.floor((rect.y + size.overflow) / size.upscale) - pad
+			t.scissor.set(Math.max(0, x), Math.max(0, y), Math.ceil(rect.z / size.upscale) + pad * 2, Math.ceil(rect.w / size.upscale) + pad * 2)
+		}
+	}
+
 	// Shadows only need drawing for the colour pass, and once per frame.
 	renderer.shadowMap.autoUpdate = false
 
@@ -186,9 +204,12 @@ export function createInk(renderer, hidden = []) {
 			this.frame.height = h * upscale
 			blit.quad.scale.set(this.frame.width / width, this.frame.height / height, 1)
 			blit.quad.position.set(blit.quad.scale.x - 1, 1 - blit.quad.scale.y, 0)
+			size = { upscale, overflow: h * upscale - height }
 		},
 		// Into `target` instead of the screen, for a view through the portal.
+		// A scissored target only gets its patch drawn, in every pass.
 		render(scene, camera, target = null) {
+			clip(target?.scissorTest ? target.scissor : null)
 			ink.quad.material.uniforms.camNear.value = camera.near
 			ink.quad.material.uniforms.camFar.value = camera.far
 			renderer.shadowMap.needsUpdate = true

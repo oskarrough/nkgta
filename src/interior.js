@@ -124,6 +124,9 @@ export function createInterior(gradient) {
 	lamp.target.position.set(W / 2, -D / 2, 0)
 	lamp.position.copy(lamp.target.position).addScaledVector(dir, -20)
 	lamp.castShadow = true
+	// Nothing in here moves, so its shadows are drawn once.
+	lamp.shadow.autoUpdate = false
+	lamp.shadow.needsUpdate = true
 	lamp.shadow.mapSize.set(1024, 1024)
 	lamp.shadow.bias = -0.0005
 	Object.assign(lamp.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 })
