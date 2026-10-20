@@ -11,6 +11,28 @@ const STEP = 0.3 // tiles between the points tested along a line
 const REACH = 0.4 // how far a parapet runs on past the water, tiles
 const PARAPET = { width: 0.28, height: 0.36, color: '#b5b0a4' }
 
+// A water area's edges sorted into bands of rows, so a point only checks
+// the edges at its own height. Worked out once per shape.
+const BAND = 4
+const bands = new WeakMap()
+function bandsOf(s) {
+	let out = bands.get(s)
+	if (out) return out
+	out = new Map()
+	for (const r of s.rings) {
+		for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+			const edge = [r[i], r[i + 1], r[j], r[j + 1]]
+			const top = Math.floor(Math.max(edge[1], edge[3]) / BAND)
+			for (let b = Math.floor(Math.min(edge[1], edge[3]) / BAND); b <= top; b++) {
+				if (!out.has(b)) out.set(b, [])
+				out.get(b).push(edge)
+			}
+		}
+	}
+	bands.set(s, out)
+	return out
+}
+
 // Is (x, y) on the water: inside a water area, or within a canal's stroke.
 function wetTest(waters) {
 	const rings = waters.filter((s) => s.rings)
@@ -18,11 +40,8 @@ function wetTest(waters) {
 	return (x, y) => {
 		for (const s of rings) {
 			let hit = false
-			for (const r of s.rings) {
-				for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
-					const [xi, yi, xj, yj] = [r[i], r[i + 1], r[j], r[j + 1]]
-					if (yi > y !== yj > y && x < xi + ((y - yi) / (yj - yi)) * (xj - xi)) hit = !hit
-				}
+			for (const [xi, yi, xj, yj] of bandsOf(s).get(Math.floor(y / BAND)) ?? []) {
+				if (yi > y !== yj > y && x < xi + ((y - yi) / (yj - yi)) * (xj - xi)) hit = !hit
 			}
 			if (hit) return true
 		}
@@ -39,15 +58,34 @@ function wetTest(waters) {
 	}
 }
 
-const boxOf = (pts) => {
-	const box = [Infinity, Infinity, -Infinity, -Infinity]
-	for (let i = 0; i < pts.length; i += 2) {
-		box[0] = Math.min(box[0], pts[i])
-		box[1] = Math.min(box[1], pts[i + 1])
-		box[2] = Math.max(box[2], pts[i])
-		box[3] = Math.max(box[3], pts[i + 1])
+// A shape's bounding box, worked out once.
+const boxes = new WeakMap()
+function boxOf(s) {
+	let box = boxes.get(s)
+	if (box) return box
+	box = [Infinity, Infinity, -Infinity, -Infinity]
+	for (const pts of s.rings ?? [s.line]) {
+		for (let i = 0; i < pts.length; i += 2) {
+			box[0] = Math.min(box[0], pts[i])
+			box[1] = Math.min(box[1], pts[i + 1])
+			box[2] = Math.max(box[2], pts[i])
+			box[3] = Math.max(box[3], pts[i + 1])
+		}
 	}
+	const pad = (s.w ?? 0) / 2
+	box = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad]
+	boxes.set(s, box)
 	return box
+}
+// The water shapes and deck lines of a map, picked out once.
+const sorted = new WeakMap()
+function sort(shapes) {
+	let out = sorted.get(shapes)
+	if (!out) {
+		out = { waters: shapes.filter((s) => s.t === T.WATER), decks: shapes.filter(isDeck) }
+		sorted.set(shapes, out)
+	}
+	return out
 }
 const overlaps = (a, b, pad = 0) => a[0] - pad < b[2] && a[2] + pad > b[0] && a[1] - pad < b[3] && a[3] + pad > b[1]
 
@@ -55,17 +93,14 @@ const overlaps = (a, b, pad = 0) => a[0] - pad < b[2] && a[2] + pad > b[0] && a[
 // tiles), as one mesh, or null if there are none.
 export function createBridges(world, area, gradient) {
 	const box = [area.x, area.y, area.x + area.w, area.y + area.h]
-	const waters = world.shapes.filter((s) => s.t === T.WATER && overlaps(boxOf(s.rings?.flat() ?? s.line), box, 10))
+	const all = sort(world.shapes)
+	const waters = all.waters.filter((s) => overlaps(boxOf(s), box, 10))
 	if (!waters.length) return null
-	const boxes = waters.map((s) => {
-		const [x0, y0, x1, y1] = boxOf(s.rings?.flat() ?? s.line)
-		const pad = (s.w ?? 0) / 2
-		return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
-	})
+	const wbox = waters.map(boxOf)
 	// Every stretch of deck: a segment of a line over water, and its half width.
 	const spans = []
-	for (const s of world.shapes) {
-		if (!isDeck(s) || !overlaps(boxOf(s.line), box, 8)) continue
+	for (const s of all.decks) {
+		if (!overlaps(boxOf(s), box, 8) || !wbox.some((w) => overlaps(w, boxOf(s)))) continue
 		const half = deckWidth(s) / 2
 		const l = s.line
 		for (let i = 0; i + 3 < l.length; i += 2) {
@@ -73,7 +108,7 @@ export function createBridges(world, area, gradient) {
 			const len = Math.hypot(bx - ax, by - ay)
 			const seg = [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)]
 			// Only the waters this segment could cross are tested.
-			const near = waters.filter((_, k) => overlaps(boxes[k], seg))
+			const near = waters.filter((_, k) => overlaps(wbox[k], seg))
 			if (len < 1e-3 || !near.length) continue
 			const wet = wetTest(near)
 			const ex = (bx - ax) / len
