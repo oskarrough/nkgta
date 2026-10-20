@@ -39,6 +39,14 @@ const CHIMNEY_SHARE = 0.55
 const SKYLIGHT_SHARE = 0.1
 const CHIMNEY_SOOT = 'rgba(30, 26, 24, 0.25)'
 const SKYLIGHT_COLOR = '#8fa3ae'
+const PITCH_INSET = 1 // touchline distance from the pitch's edge, tiles
+const PITCH_LINE = 0.25
+const PITCH_CIRCLE = 3 // at most, and a quarter of the pitch's width
+const PITCH_SMALL = 6 // narrower than this, no halfway line
+const FOOTPATH = 1.5 // pavement lines this narrow are footpaths, tiles
+const GRAVEL = '#d2c4a0'
+const GRAVEL_EDGE = '#8f8a68'
+const GRAVEL_EDGE_WIDTH = 0.3
 const HATCH_INK = '#877e70'
 const HATCH_WIDTH = 2
 
@@ -64,6 +72,53 @@ const ringPath = (rings) => {
 		path.closePath()
 	}
 	return path
+}
+
+// Pitch markings: a touchline just inside the edge, a halfway line across
+// the long side, and a centre circle. Drawn on the pitch's own axis.
+function pitchLines(g, ring, path) {
+	let longest = 0
+	let angle = 0
+	let cx = 0
+	let cy = 0
+	const n = ring.length / 2
+	for (let i = 0; i < ring.length; i += 2) {
+		cx += ring[i] / n
+		cy += ring[i + 1] / n
+		if (i === 0) continue
+		const len = Math.hypot(ring[i] - ring[i - 2], ring[i + 1] - ring[i - 1])
+		if (len > longest) [longest, angle] = [len, Math.atan2(ring[i + 1] - ring[i - 1], ring[i] - ring[i - 2])]
+	}
+	g.save()
+	g.clip(path, 'evenodd')
+	g.strokeStyle = MARK
+	g.lineWidth = (PITCH_INSET + PITCH_LINE) * 2
+	g.stroke(path)
+	g.strokeStyle = COLORS[T.PITCH]
+	g.lineWidth = PITCH_INSET * 2
+	g.stroke(path)
+	g.strokeStyle = MARK
+	g.lineWidth = PITCH_LINE
+	// Width across the long side; small courts only get the touchline.
+	let v0 = Infinity
+	let v1 = -Infinity
+	for (let i = 0; i < ring.length; i += 2) {
+		const v = -(ring[i] - cx) * Math.sin(angle) + (ring[i + 1] - cy) * Math.cos(angle)
+		v0 = Math.min(v0, v)
+		v1 = Math.max(v1, v)
+	}
+	const circle = Math.min(PITCH_CIRCLE, (v1 - v0) * 0.25)
+	if (v1 - v0 > PITCH_SMALL) {
+		g.translate(cx, cy)
+		g.rotate(angle)
+		g.beginPath()
+		g.moveTo(0, -longest)
+		g.lineTo(0, longest)
+		g.moveTo(circle, 0)
+		g.arc(0, 0, circle, 0, Math.PI * 2)
+		g.stroke()
+	}
+	g.restore()
 }
 
 export function renderMapImage(world) {
@@ -105,6 +160,14 @@ export function renderMapImage(world) {
 		g.stroke()
 	}
 
+	// Footpaths through parks are gravel, not paving.
+	const parks = new Path2D()
+	for (const s of shapes) if (s.rings && s.t === T.GRASS) parks.addPath(ringPath(s.rings))
+	const inPark = (line) => {
+		const i = Math.floor(line.length / 4) * 2
+		return g.isPointInPath(parks, line[i] * GPX, line[i + 1] * GPX, 'evenodd')
+	}
+
 	for (let k = 0; k < shapes.length; k++) {
 		const s = shapes[k]
 		if (s.rings) {
@@ -123,6 +186,7 @@ export function renderMapImage(world) {
 				g.fill(path, 'evenodd')
 				g.restore()
 			}
+			if (s.t === T.PITCH) pitchLines(g, s.rings[0], path)
 			// Ink around the shape, clipped so it stays inside the fill.
 			if (OUTLINED.has(s.t)) {
 				g.save()
@@ -147,7 +211,10 @@ export function renderMapImage(world) {
 			for (let j = k; j < end; j++) stroke(shapes[j], COLORS[T.ROAD], shapes[j].w)
 			k = end - 1
 		} else {
-			stroke(s, paint(s.t), s.w)
+			if (s.t === T.SIDEWALK && s.w <= FOOTPATH && inPark(s.line)) {
+				stroke(s, GRAVEL_EDGE, s.w + GRAVEL_EDGE_WIDTH)
+				stroke(s, GRAVEL, s.w)
+			} else stroke(s, paint(s.t), s.w)
 		}
 	}
 
