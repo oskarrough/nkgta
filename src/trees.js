@@ -52,7 +52,7 @@ export function createTrees(world, gradient, pick = (world.trees ?? []).keys(), 
 		const bottom = BOTTOM / tileM
 		const top = Math.max(bottom + 1.5, t.top / tileM)
 		const half = ((top - bottom) / 2) * SQUASH
-		const cz = (top + bottom) / 2
+		const cz = (top + bottom) / 2 + world.heightAt(t.x, t.y)
 		const base = Math.floor(hash(i * 5 + 1) * CROWNS.length)
 		const tone = TREE_TONE_MIN + hash(i * 3 + 7) * (TREE_TONE_MAX - TREE_TONE_MIN)
 		if (simple) {

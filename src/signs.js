@@ -15,7 +15,7 @@ const CELL = 96 // atlas pixels across the awning's depth
 const TYPE = 54 // type size in those pixels
 const ATLAS_W = 2048
 
-export function createSigns(shops, gradient, pick = shops.keys()) {
+export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0) {
 	const list = [...pick]
 	if (!list.length) return new THREE.Group()
 	// Lay the names out in rows, then paint them.
@@ -64,7 +64,7 @@ export function createSigns(shops, gradient, pick = shops.keys()) {
 		const door = [shop.x + shop.ex * ((lo + hi) / 2), -(shop.y + shop.ey * ((lo + hi) / 2))]
 		const centre = [door[0] + (n[0] * DEPTH) / 2, door[1] + (n[1] * DEPTH) / 2]
 		// A hair apart, so neighbouring awnings don't flicker where they overlap.
-		const lift = (i % 7) * 0.004
+		const lift = (i % 7) * 0.004 + heightAt(shop.x, shop.y)
 		const corner = (s, out) => [
 			door[0] + e[0] * s * (width / 2) + n[0] * out * DEPTH,
 			door[1] + e[1] * s * (width / 2) + n[1] * out * DEPTH,

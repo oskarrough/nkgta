@@ -1,7 +1,7 @@
 // Street-level counterparts of the overhead drawings. Units are 3 m tiles.
 import * as THREE from 'three'
 
-export function createActors(scene, gradientMap) {
+export function createActors(scene, gradientMap, heightAt = () => 0) {
 	const root = new THREE.Group()
 	scene.add(root)
 	const box = new THREE.BoxGeometry(1, 1, 1)
@@ -64,7 +64,7 @@ export function createActors(scene, gradientMap) {
 	let stride = 0
 
 	function pose(model, p, phase, riding = false) {
-		model.group.position.set(p.x, -p.y, riding ? 0.15 : 0)
+		model.group.position.set(p.x, -p.y, heightAt(p.x, p.y) + (riding ? 0.15 : 0))
 		model.group.rotation.set(0, p.down ? Math.PI / 2 : 0, -p.dir)
 		for (let i = 0; i < 2; i++) {
 			const swing = Math.sin(phase + i * Math.PI) * 0.55
@@ -79,12 +79,12 @@ export function createActors(scene, gradientMap) {
 			if (!cam.third) return
 			stride += player.speed * dt * 7
 			// At a wall the camera can come inside the character's head.
-			const eyeDistance = Math.hypot(cam.third.x - player.x, cam.third.y - player.y, cam.third.z - 0.55)
+			const eyeDistance = Math.hypot(cam.third.x - player.x, cam.third.y - player.y, cam.third.z - heightAt(player.x, player.y) - 0.55)
 			playerModel.group.visible = (!player.car || !!player.down) && eyeDistance > 0.65
 			pose(playerModel, player, player.speed > 0.01 && !player.down ? stride : 0, player.onBike)
 			bike.visible = !player.down || !player.onBike
 			const at = player.onBike ? player : player.bike
-			bike.position.set(at.x, -at.y, 0)
+			bike.position.set(at.x, -at.y, heightAt(at.x, at.y))
 			bike.rotation.z = player.onBike ? -player.dir : 0
 			for (let i = 0; i < Math.max(peds.length, pedestrians.length); i++) {
 				if (!pedestrians[i]) pedestrians.push(person(blue))
@@ -101,7 +101,7 @@ export function createActors(scene, gradientMap) {
 			}
 			bottles.count = nearby.length
 			nearby.forEach((b, i) => {
-				matrix.makeTranslation(b.x, -b.y, 0.11)
+				matrix.makeTranslation(b.x, -b.y, heightAt(b.x, b.y) + 0.11)
 				bottles.setMatrixAt(i, matrix)
 				bottles.setColorAt(i, color.set(b.can ? '#c0c4c8' : '#3d7a3a'))
 			})
@@ -118,7 +118,7 @@ export function createActors(scene, gradientMap) {
 				const light = lights[i]
 				lamps[i].group.visible = !!light
 				if (!light) continue
-				lamps[i].group.position.set(light.x, -light.y, 0)
+				lamps[i].group.position.set(light.x, -light.y, heightAt(light.x, light.y))
 				lamps[i].lamp.material = lampMaterials[light.state] ?? lampMaterials.red
 			}
 		},

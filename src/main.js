@@ -33,13 +33,13 @@ const canvas = document.getElementById('overlay')
 const shops = findShops(world)
 phase('shops')
 const city3d = createScene(document.getElementById('city'), world, shops)
-const actors = createActors(city3d.scene, city3d.gradient)
+const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
 phase('overlay, hud, traffic')
 const draw = createRenderer(canvas, world, shops)
-const visit = createVisit({ city3d, shops, player, pfand, say: hud.say })
+const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),

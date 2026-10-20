@@ -14,12 +14,17 @@ export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
 	if (!bbox) {
 		onStatus('Lade Karte…')
+		// The lie of the land comes alongside; without it the ground stays flat.
+		const terrain = fetch('/terrain.json')
+			.then((res) => (res.ok ? res.json() : null))
+			.catch(() => null)
 		const text = await (await fetch('/map.json')).text()
 		phase('fetch')
 		const json = JSON.parse(text)
 		phase('parse')
 		const map = decodeMap(json)
 		phase('decode')
+		map.terrain = await terrain
 		return map
 	}
 

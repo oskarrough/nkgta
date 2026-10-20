@@ -20,7 +20,9 @@ export function createCamera(world) {
 	let aheadY = 0
 	let boom = null
 
+	let ground = null
 	const active = () => thirdPerson && !suspended
+	const heightAt = world.heightAt ?? (() => 0)
 
 	return {
 		active,
@@ -96,18 +98,27 @@ export function createCamera(world) {
 				const clear = reach * fraction
 				boom = boom === null || clear < boom ? clear : boom + (clear - boom) * (1 - Math.exp(-3 * dt))
 				fraction = boom / reach
+				// Rises and dips with the ground under the player, a little behind,
+				// so the view glides over the slope instead of jolting on it.
+				const here = heightAt(target.x, target.y)
+				ground = ground === null ? here : ground + (here - ground) * (1 - Math.exp(-8 * dt))
+				const x = target.x + dx * fraction
+				const y = target.y + dy * fraction
+				// Never under the hill behind you, walking down it.
+				const z = Math.max(ground + height + Math.sin(pitch) * boom, heightAt(x, y) + 0.25)
 				return {
 					scale: 24 * devicePixelRatio,
 					third: {
-						x: target.x + dx * fraction,
-						y: target.y + dy * fraction,
-						z: height + Math.sin(pitch) * boom,
-						target: { x: target.x + aheadX, y: target.y + aheadY, z: height },
+						x,
+						y,
+						z,
+						target: { x: target.x + aheadX, y: target.y + aheadY, z: ground + height },
 					},
 					bounds: { x0: target.x - 64, y0: target.y - 64, x1: target.x + 64, y1: target.y + 64 },
 				}
 			}
 			boom = null
+			ground = null
 			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
 			cruise += (Math.abs(target.speed) - cruise) * Math.min(1, dt * 1.5)
 			// Only a touch: flat out you see about a fifth further than on foot.

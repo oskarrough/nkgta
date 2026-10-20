@@ -112,8 +112,7 @@ export function createScene(canvas, world, shops = []) {
 	// A generator, so chunks can be built a building at a time between frames.
 	const city = createChunks(world, renderer, function* (chunk) {
 		const group = new THREE.Group()
-		const plane = new THREE.Mesh(new THREE.PlaneGeometry(chunk.w, chunk.h), groundMaterial(BLANK.ground, world))
-		plane.position.set(chunk.x + chunk.w / 2, -(chunk.y + chunk.h / 2), 0)
+		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
 		plane.receiveShadow = true
 		plane.material.uniforms.time = time
 		group.add(plane)
@@ -123,7 +122,7 @@ export function createScene(canvas, world, shops = []) {
 		const spots = []
 		const lids = []
 		for (const n of chunk.buildings) {
-			const h = house(world.buildings[n], n, world.tileM)
+			const h = house(world.buildings[n], n, world)
 			houses.push(h)
 			wallParts.push(wallGeometry([h]))
 			const roof = roofGeometry([h])
@@ -153,7 +152,7 @@ export function createScene(canvas, world, shops = []) {
 		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
 		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
 		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			group.add(createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS)))
+			group.add(createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt))
 			yield
 		}
 		// Trees in cells, so the view skips most of them, or one plain blob
@@ -192,11 +191,8 @@ export function createScene(canvas, world, shops = []) {
 					return
 				}
 				plane.material.uniforms.map.value = texture
-				for (let i = 0; i < uv.count; i++) {
-					const x = chunk.x + (i % 2) * chunk.w
-					const y = chunk.y + (i < 2 ? 0 : chunk.h)
-					uv.setXY(i, (x - area.x) / area.w, 1 - (y - area.y) / area.h)
-				}
+				const at = plane.geometry.attributes.position
+				for (let i = 0; i < uv.count; i++) uv.setXY(i, (at.getX(i) - area.x) / area.w, 1 - (-at.getY(i) - area.y) / area.h)
 				uv.needsUpdate = true
 			},
 		}
@@ -204,8 +200,8 @@ export function createScene(canvas, world, shops = []) {
 	scene.add(city.group)
 	const clouds = createClouds(world, gradient)
 	scene.add(clouds.layer)
-	const cars = carMeshes(gradient)
-	const skids = skidMarks()
+	const cars = carMeshes(gradient, world)
+	const skids = skidMarks(world)
 	scene.add(...cars.meshes, skids.mesh)
 	// Sky light, then sun from the south-west, so south and west walls are bright.
 	scene.add(new THREE.AmbientLight(AMBIENT.color, AMBIENT.intensity))
@@ -227,9 +223,10 @@ export function createScene(canvas, world, shops = []) {
 	function focusSun(x, y, radius) {
 		const texel = (radius * 2) / SHADOW.size
 		sun.shadow.normalBias = texel * SHADOW.normalBias
-		const right = Math.round((x * sunRight.x + y * sunRight.y) / texel) * texel - (x * sunRight.x + y * sunRight.y)
-		const up = Math.round((x * sunUp.x + y * sunUp.y) / texel) * texel - (x * sunUp.x + y * sunUp.y)
-		focus.set(x + sunRight.x * right + sunUp.x * up, y + sunRight.y * right + sunUp.y * up, sunRight.z * right + sunUp.z * up)
+		focus.set(x, y, world.heightAt(x, -y))
+		const right = Math.round(focus.dot(sunRight) / texel) * texel - focus.dot(sunRight)
+		const up = Math.round(focus.dot(sunUp) / texel) * texel - focus.dot(sunUp)
+		focus.addScaledVector(sunRight, right).addScaledVector(sunUp, up)
 		sunTarget.position.copy(focus)
 		sun.position.copy(focus).addScaledVector(sunDir, radius * 2 + SHADOW.pad)
 		const shadow = sun.shadow.camera
@@ -298,7 +295,9 @@ export function createScene(canvas, world, shops = []) {
 		camera.rotation.set(0, 0, 0)
 		const cx = (cam.x + width / 2) / cam.scale
 		const cy = -(cam.y + height / 2) / cam.scale
-		camera.position.set(cx, cy, height / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)))
+		// As high over the ground in the middle of the view as over flat land,
+		// so the flat layer on top still lines up there.
+		camera.position.set(cx, cy, (cam.ground ?? world.heightAt(cx, -cy)) + height / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)))
 		return camera
 	}
 
@@ -373,7 +372,7 @@ const CAR_HEADLIGHT = '#fff3c8'
 // Cars are too low for the ink pass to find their edges, so they sit on a
 // dark rim this much wider than the body, in tiles. Tyres poke out past it.
 const CAR_RIM = { color: '#1a1e1b', width: 0.045 }
-function carMeshes(gradient) {
+function carMeshes(gradient, world) {
 	const box = (l, w, h, x, z) => new THREE.BoxGeometry(l, w, h).translate(x, 0, z + h / 2)
 	// Away from the sun, in scene units, and a flat quad to cast it.
 	const away = new THREE.Vector2(-SUN.direction[0], -SUN.direction[1]).normalize().multiplyScalar(CAR_SHADOW.offset)
@@ -414,8 +413,11 @@ function carMeshes(gradient) {
 	const ms = new THREE.Matrix4()
 	const at = new THREE.Vector3()
 	const q = new THREE.Quaternion()
-	const z = new THREE.Vector3(0, 0, 1)
 	const one = new THREE.Vector3(1, 1, 1)
+	const up = new THREE.Vector3()
+	const ahead = new THREE.Vector3()
+	const side = new THREE.Vector3()
+	const basis = new THREE.Matrix4()
 	const c = new THREE.Color()
 	const lit = new THREE.Color('#ff2a1a')
 	const dim = new THREE.Color('#5a0d0a')
@@ -426,8 +428,16 @@ function carMeshes(gradient) {
 				let n = 0
 				for (const car of cars) {
 					if (car.model !== model || n >= MAX_CARS) continue
-					m.compose(at.set(car.x, -car.y, 0), q.setFromAxisAngle(z, -car.angle), one)
-					ms.compose(at.set(car.x + away.x, -car.y + away.y, 0.03), q, one)
+					// Turned to its heading and tilted with the slope it stands on.
+					const [sx, sy] = world.slopeAt(car.x, car.y)
+					up.set(-sx, sy, 1).normalize()
+					ahead.set(Math.cos(car.angle), -Math.sin(car.angle), 0)
+					ahead.addScaledVector(up, -ahead.dot(up)).normalize()
+					side.crossVectors(up, ahead)
+					q.setFromRotationMatrix(basis.makeBasis(ahead, side, up))
+					const ground = world.heightAt(car.x, car.y)
+					m.compose(at.set(car.x, -car.y, ground), q, one)
+					ms.compose(at.set(car.x + away.x, -car.y + away.y, world.heightAt(car.x + away.x, car.y - away.y) + 0.03), q, one)
 					shadow.setMatrixAt(n, ms)
 					c.set(car.color)
 					for (const { kind, mesh } of parts) {
@@ -451,7 +461,7 @@ function carMeshes(gradient) {
 
 // Rubber on the road: a ring of thin quads, the oldest painted over first.
 const MAX_SKIDS = 4000
-function skidMarks() {
+function skidMarks(world) {
 	const pos = new Float32Array(MAX_SKIDS * 6 * 3)
 	const geo = new THREE.BufferGeometry()
 	geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -480,11 +490,36 @@ function skidMarks() {
 				[x1 - nx, y1 - ny],
 				[x0 - nx, y0 - ny],
 			]
-			corners.forEach(([x, y], k) => pos.set([x, -y, 0.03], (next * 6 + k) * 3))
+			corners.forEach(([x, y], k) => pos.set([x, -y, world.heightAt(x, y) + 0.03], (next * 6 + k) * 3))
 			next = (next + 1) % MAX_SKIDS
 			geo.attributes.position.needsUpdate = true
 		},
 	}
+}
+
+// A chunk's ground, in world coordinates: one quad where the land is flat,
+// else a mesh following its rises and dips, a vertex every GROUND_STEP
+// tiles, its normals from the slope so neighbouring chunks shade alike.
+const GROUND_STEP = 2
+const WALL_FOOT = 0.15 // tiles the walls reach below the ground they stand on
+const HILLSHADE = 1.5 // how much slopes lighten or darken; 1 is the sun's own
+function groundGeometry(chunk, world) {
+	const flat = world.flat
+	const cols = flat ? 1 : Math.ceil(chunk.w / GROUND_STEP)
+	const rows = flat ? 1 : Math.ceil(chunk.h / GROUND_STEP)
+	const geo = new THREE.PlaneGeometry(chunk.w, chunk.h, cols, rows).translate(chunk.x + chunk.w / 2, -(chunk.y + chunk.h / 2), 0)
+	const pos = geo.attributes.position
+	const nor = geo.attributes.normal
+	for (let i = 0; i < pos.count; i++) {
+		const x = pos.getX(i)
+		const y = -pos.getY(i)
+		pos.setZ(i, world.heightAt(x, y))
+		const [sx, sy] = world.slopeAt(x, y)
+		const len = Math.hypot(sx, sy, 1)
+		nor.setXYZ(i, -sx / len, sy / len, 1 / len)
+	}
+	geo.computeBoundingSphere()
+	return geo
 }
 
 // The map image keeps its own colours: the ground samples the shadow map and
@@ -507,11 +542,15 @@ function groundMaterial(map, world) {
 		vertexShader: `
 			varying vec2 vUv;
 			varying vec2 vTile;
+			varying float vHill;
 			#include <common>
 			#include <shadowmap_pars_vertex>
 
 			void main() {
 				vUv = uv;
+				// Slopes towards the sun a touch brighter, away from it darker.
+				vec3 toSun = normalize(vec3(${SUN.direction.join(', ')}));
+				vHill = 1.0 + (dot(normal, toSun) / toSun.z - 1.0) * ${d(HILLSHADE)};
 				#include <beginnormal_vertex>
 				#include <defaultnormal_vertex>
 				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
@@ -530,6 +569,7 @@ function groundMaterial(map, world) {
 			uniform bool receiveShadow;
 			varying vec2 vUv;
 			varying vec2 vTile;
+			varying float vHill;
 			#include <common>
 			#include <shadowmap_pars_fragment>
 			#include <shadowmask_pars_fragment>
@@ -538,7 +578,7 @@ function groundMaterial(map, world) {
 			void main() {
 				vec3 color = groundDetail(texture2D(map, vUv).rgb, vTile, time);
 				float lit = getShadowMask();
-				color *= mix(shade, sun, lit);
+				color *= mix(shade, sun, lit) * vHill;
 				// Sun glints on water: a few cells at a time flash a white point,
 				// gone once they'd be smaller than a pixel.
 				vec2 gc = floor(vTile / ${d(GROUND_DETAIL.glintCell)});
@@ -707,9 +747,16 @@ function inside(p, poly) {
 }
 
 // A building as the scene needs it: eaves height and outline in tiles, and
-// a pitched roof if its roof is tiled and its outline allows one. `top` is the height of the roof at a point.
-function house(b, n, tileM) {
+// a pitched roof if its roof is tiled and its outline allows one. `top` is
+// the height of the roof at a point, over sea level, so to speak: a house
+// stands on the lowest ground round it, and uphill its walls go into the
+// slope, as on a real street.
+function house(b, n, world) {
+	const tileM = world.tileM
 	const h = b.h / tileM
+	let base = Infinity
+	for (const r of b.rings) for (let i = 0; i < r.length; i += 2) base = Math.min(base, world.heightAt(r[i], r[i + 1]))
+	if (!Number.isFinite(base)) base = 0
 	const parts = footprint(b.rings)
 	const pitched = parts.length === 1 && roofOf(b, n).ridge
 	const rings = [parts[0]?.outer, ...(parts[0]?.holes ?? [])].map((r) => r?.map((p) => [p.x, p.y]))
@@ -722,7 +769,7 @@ function house(b, n, tileM) {
 		const e = outer[(i + 1) % outer.length]
 		if (a.distanceTo(e) > longest) [longest, axis] = [a.distanceTo(e), Math.atan2(e.y - a.y, e.x - a.x)]
 	})
-	return { n, h, parts, roof, axis, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
+	return { n, h, base, parts, roof, axis, top: roof ? (x, y) => base + h + roofHeight(roof, x, y) : () => base + h }
 }
 
 // Every edge of every outline becomes one wall quad, outer rings
@@ -733,9 +780,12 @@ function wallGeometry(houses) {
 	const nor = []
 	const col = []
 	const wall = [] // per vertex: distance along the wall, windows that fit, building height
+	const foot = [] // per vertex: the ground the building stands on
 	const plaster = FACADES.map((f) => new THREE.Color(f))
 	const c = new THREE.Color()
-	houses.forEach(({ n, h, parts, top }) => {
+	houses.forEach(({ n, h, base, parts, top }) => {
+		// Downhill a hair below the ground, so no light shows under the wall.
+		const z0 = base - WALL_FOOT
 		const j = roofHash(n + 500)
 		c.copy(plaster[Math.floor(j * plaster.length)]).offsetHSL(0, 0, (roofHash(n + 900) - 0.5) * 0.08)
 		for (const { outer, holes } of parts) {
@@ -754,10 +804,10 @@ function wallGeometry(houses) {
 					const ta = top(a.x, a.y)
 					const te = top(e.x, e.y)
 					const quad = [
-						[a, 0, 0],
-						[e, 0, len],
+						[a, z0, 0],
+						[e, z0, len],
 						[e, te, len],
-						[a, 0, 0],
+						[a, z0, 0],
 						[e, te, len],
 						[a, ta, 0],
 					]
@@ -766,6 +816,7 @@ function wallGeometry(houses) {
 						nor.push(nx, ny, 0)
 						col.push(c.r, c.g, c.b)
 						wall.push(d - lead, fit, h)
+						foot.push(base)
 					}
 				}
 			}
@@ -776,6 +827,7 @@ function wallGeometry(houses) {
 	geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
 	geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
 	geo.setAttribute('wall', new THREE.Float32BufferAttribute(wall, 3))
+	geo.setAttribute('foot', new THREE.Float32BufferAttribute(foot, 1))
 	return geo
 }
 
@@ -839,7 +891,8 @@ function roofGeometry(houses) {
 		geo.deleteAttribute('uv')
 		return withAxis(geo, axis)
 	}
-	for (const { h, parts, roof, axis } of houses) {
+	for (const { h: eaves, base, parts, roof, axis } of houses) {
+		const h = base + eaves
 		if (!roof) {
 			for (const { outer, holes } of parts) {
 				const shape = new THREE.Shape(outer)
@@ -953,13 +1006,13 @@ function wallMaterial(tileM, gradient) {
 	material.onBeforeCompile = (shader) => {
 		const decl = 'varying vec3 vWall;\nvarying float vZ;\n'
 		shader.vertexShader =
-			'attribute vec3 wall;\n' +
+			'attribute vec3 wall;\nattribute float foot;\n' +
 			decl +
 			shader.vertexShader.replace(
 				'#include <project_vertex>',
 				`#include <project_vertex>
 				vWall = wall;
-				vZ = position.z;`,
+				vZ = position.z - foot;`,
 			)
 		shader.fragmentShader =
 			decl +

@@ -9,6 +9,7 @@
 		"preview": "vite preview",
 		"fetch-osm": "bun scripts/fetch-osm.js",
 		"build-map": "bun scripts/build-map.js",
+		"build-terrain": "bun scripts/build-terrain.js",
 		"check": "oxlint --quiet && oxfmt --check",
 		"format": "oxfmt",
 		"deploy": "wrangler deploy"

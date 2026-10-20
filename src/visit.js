@@ -20,7 +20,7 @@ const smooth = (t) => t * t * (3 - 2 * t)
 const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-export function createVisit({ city3d, shops, player, pfand, say }) {
+export function createVisit({ city3d, shops, player, pfand, say, heightAt = () => 0 }) {
 	const interior = createInterior(city3d.gradient)
 	const portal = createPortal(city3d.renderer, {
 		radius: RADIUS,
@@ -51,8 +51,8 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 	// leaning back against it, foot on the ground.
 	const position = new THREE.Vector3()
 	const facing = new THREE.Vector3()
-	function tear(anchor, n, out) {
-		position.set(anchor.x - n.x * out, -(anchor.y - n.y * out), RADIUS * Math.cos(TILT))
+	function tear(anchor, n, out, ground = 0) {
+		position.set(anchor.x - n.x * out, -(anchor.y - n.y * out), ground + RADIUS * Math.cos(TILT))
 		facing.set(n.x, -n.y, 0).multiplyScalar(Math.cos(TILT)).addScaledVector(Z, Math.sin(TILT))
 		return [position, facing]
 	}
@@ -68,12 +68,12 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 	}
 	function aim(swing) {
 		const here = near()
-		portal.place(...tear(here.anchor, here.n, here.out))
+		portal.place(...tear(here.anchor, here.n, here.out, inside ? 0 : heightAt(shop.stand.x, shop.stand.y)))
 		// The far door faces the way you'd come out of it, turning to face
 		// the way you're going in, which leaves the far side upright.
 		const real = inside ? { x: -shop.nx, y: -shop.ny } : { x: -DOOR.nx, y: -DOOR.ny }
 		const a = turn(angleOf(here.n) - angleOf(real)) * smooth(swing)
-		portal.exit(...tear(inside ? shop.stand : ENTRY, rotated(real, a), here.out))
+		portal.exit(...tear(inside ? shop.stand : ENTRY, rotated(real, a), here.out, inside ? heightAt(shop.stand.x, shop.stand.y) : 0))
 	}
 
 	function open(s) {
@@ -187,7 +187,8 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 		render(cam, cars, dt) {
 			frame.cam = cam
 			frame.cars = cars
-			const view = (frame.view = city3d.aim(cam))
+			// The room stands on flat ground of its own.
+			const view = (frame.view = city3d.aim(inside ? { ...cam, ground: 0 } : cam))
 			const active = portal.phase !== 'closed'
 			if (active) portal.update(dt, view)
 			if (inside) city3d.draw(interior.scene, view)

@@ -12,6 +12,7 @@ const HANDBRAKE_GRIP = 0.35 // rear sideways grip left with the handbrake on
 const HANDBRAKE_ROLLING = 6
 const OFF_ROAD = 3 // rolling resistance on grass and earth
 const STEP = 1 / 120
+const GRAVITY = 9.81 // m/s²
 
 // Everything about a model's shape the physics needs, worked out once.
 const shapes = new Map()
@@ -114,6 +115,12 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	let fx = cos * engine - m.drag * speed * c.vx
 	let fy = sin * engine - m.drag * speed * c.vy
 	let torque = 0
+	// Gravity pulls down the slope, except on a parked car nobody's driving.
+	if (world.slopeAt && (throttle || speed > 0.2)) {
+		const [sx, sy] = world.slopeAt(c.x, c.y)
+		fx -= (GRAVITY / world.tileM) * sx
+		fy -= (GRAVITY / world.tileM) * sy
+	}
 
 	// Less lock the faster you go, or the front tyres scrub off all your speed.
 	const lock = m.steer / (1 + Math.max(0, forward - 2) * m.steerFade)

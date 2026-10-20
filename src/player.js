@@ -66,6 +66,12 @@ export function updatePlayer(p, input, world, dt) {
 	let max = (p.onBike ? 3.6 : 1.6) * push
 	if (p.onBike && (here === T.GRASS || here === T.GROUND)) max *= 0.55
 	if (p.onBike && here === T.CYCLEWAY) max *= 1.2
+	// Uphill is slower going, on foot a little, on the bike a lot; downhill
+	// is quicker.
+	const back = steering && steering.y > 0 ? -1 : 1
+	const [sx, sy] = world.slopeAt?.(p.x, p.y) ?? [0, 0]
+	const grade = (sx * Math.cos(p.dir) + sy * Math.sin(p.dir)) * back
+	max *= Math.max(0.45, Math.min(1.35, 1 - grade * (p.onBike ? 5 : 2.5)))
 	const boost = turbo ? 10 : 1
 	max *= boost
 

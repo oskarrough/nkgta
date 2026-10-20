@@ -1,11 +1,12 @@
 # NK GTA
 
-A little top-down game set in the real streets of Neukölln, in the spirit of GTA 1. Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3 m tile grid that decides where you can walk.
+A little top-down game set in the real streets of Neukölln, in the spirit of GTA 1. Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3 m tile grid that decides where you can walk. The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
 
 ```sh
 bun install
 bun run fetch-osm   # data/osm.json from Overpass, for the default area in src/default-area.js
 bun run build-map   # public/map.json, the static default map
+bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
 ```
 
@@ -13,7 +14,7 @@ In overhead view, W/S (or up/down) move forward/backward along your facing and A
 
 Traffic drives on the right along the real road network, one-way streets included, and cars stand parked along the kerbs. Mostly Kleinwagen, now and then a black SUV or a lambo, and BVG buses on the big roads that stop at the real bus stops. Each handles differently. It stops at the traffic lights OSM knows about; at other junctions the bigger road goes first and, between equals, rechts vor links. Get hit by a car and you're wasted: your bag of Pfand spills across the road and you start over. Step in front of a car to stop it, then E throws the driver out and it's yours: up is gas, down brakes and reverses, left and right steer, space is the handbrake. The handling is [Pat Kerr's 1996 tyre model](https://patkerr.co.uk/2d-vehicles/) from GTA 1: every tyre resists rolling a little and sliding sideways a lot. Press V to switch between the overhead view and an experimental third-person camera. In third person, hold the right mouse button and drag to look around; WASD walks relative to the camera and the wheel changes its distance. On bikes and in vehicles, the camera gently follows behind while moving, pulls back with speed and looks ahead. Holding right mouse takes over; after release it waits briefly before following again. It holds its angle when stopped and does not flip when reversing. Cars keep their steering controls. The camera pulls in at building walls. Shop entrances temporarily return to the overhead view. This first version stays on the ground: no jumping or rooftop movement yet. On a phone, a thumbstick appears under your left thumb: push it the way you want to go, and it walks, cycles or drives there. The right thumb has the action button and the turbo or handbrake; pinch with two fingers to zoom.
 
-Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched from Overpass in the browser, built there, and cached with TinyJoin in OPFS. OPFS needs https or localhost; over plain http the cache is skipped.
+Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched from Overpass in the browser, built there, and cached with TinyJoin in OPFS. Their ground stays flat. OPFS needs https or localhost; over plain http the cache is skipped.
 
 `/?perf` times each load step and each render pass; read them from `perf` in the console.
 
@@ -21,7 +22,7 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 
 - `src/overpass.js`, `src/build-map.js`: OSM data in; tile grid, ground shapes, building outlines, road network, places and stops out. Shared by the scripts and the browser.
 - `src/load-map.js`, `src/map-codec.js`, `src/area-cache.js`: getting a map into the game.
-- `src/world.js`: tile lookups and start points.
+- `src/world.js`: tile lookups and start points. `src/terrain.js`: the ground's height anywhere.
 - `src/player.js`, `src/pfand.js`, `src/input.js`, `src/touch.js`, `src/camera.js`: the game.
 - `src/shops.js`: which places you can walk into, and where their doors are. `src/signs.js`: their awnings, in the poster type from `src/poster.js`. `src/visit.js`: going in and out through `src/portal.js`, a tear in the air ported from dodgethis. `src/interior.js`: the room inside, one for every shop.
 - `src/car.js`: a car as a rigid body on four tyres, hitting walls and other cars. `src/models.js`: Kleinwagen, SUV, lambo and bus, their sizes, handling and looks. `src/roads.js`: the road network as lanes. `src/traffic.js`: how traffic drives them, and cars coming and going out of sight around the player. `src/junctions.js`: traffic lights and right of way. `src/wasted.js`: getting run over.
@@ -30,4 +31,4 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/chunks.js`, `src/paint-worker.js`: the city in square chunks. Each has its own meshes, so only what's near the view gets drawn, and its own ground and roof textures, painted in workers as it comes near, as sharp as the zoom needs, and let go when it's far.
 - `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names, the player) and the text.
 
-Map data © OpenStreetMap contributors, ODbL.
+Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.

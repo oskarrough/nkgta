@@ -150,8 +150,10 @@ export function createBridges(world, area, gradient) {
 			const py = my + sp.ex * off * side
 			if (onDeck(px, py, sp)) continue
 			const geo = new THREE.BoxGeometry(len, PARAPET.width, PARAPET.height)
+			// Tilted with the road, should it rise across the water.
+			geo.rotateY(-Math.atan((world.heightAt(sp.bx, sp.by) - world.heightAt(sp.ax, sp.ay)) / len))
 			geo.rotateZ(-Math.atan2(sp.ey, sp.ex))
-			geo.translate(px, -py, PARAPET.height / 2)
+			geo.translate(px, -py, PARAPET.height / 2 + world.heightAt(px, py))
 			parts.push(geo)
 		}
 	}

@@ -1,5 +1,6 @@
 // A loaded map plus the questions the game asks of it.
 import { T } from './tiles.js'
+import { createTerrain } from './terrain.js'
 
 export function createWorld(map) {
 	const { w: W, h: H, tiles, streetOf, bbox, tileM } = map
@@ -30,5 +31,8 @@ export function createWorld(map) {
 		return nearestOf(T.SIDEWALK, at)
 	}
 
-	return { ...map, W, H, tileAt, streetAt, startPoint }
+	// Ground height in tiles, and its rise per tile along x and y.
+	const { heightAt, slopeAt, flat } = createTerrain(map.terrain, map)
+
+	return { ...map, W, H, tileAt, streetAt, startPoint, heightAt, slopeAt, flat }
 }

@@ -2,3 +2,5 @@ node_modules
 dist/
 data/osm.json
 data/pieces/
+data/dgm/
+data/terrain*

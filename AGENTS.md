@@ -19,6 +19,14 @@ See README.md for what the game is and where the code lives.
 - When `src/build-map.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
 - Overpass is a shared public service. Fetch once and work from `data/osm.json`; never call it in a loop.
 
+## Ground height
+
+- `public/terrain.json` is a 12 m grid of heights for the default area, from Berlin's ATKIS DGM1 (bare ground, 1 m, EPSG:25833, dl-de/zero-2-0). `bun run build-terrain` downloads the 2 km tiles once into `data/dgm/` (`https://gdi.berlin.de/data/dgm1/atom/DGM1_<km east>_<km north>.zip`, ~18 MB each) and rebuilds it. Rerun after changing `src/default-area.js`. `--debug` writes shaded relief PNGs to `data/`.
+- The build fills dips and shaves ridges narrower than ~60 m before smoothing. Without that, bridges sink into the canals and Karl-Marx-Straße climbs over the Ringbahn embankment instead of passing under it.
+- Anything standing in the city gets its z from `world.heightAt(x, y)` (tiles, 0 at the lowest point); slopes from `world.slopeAt`. Without terrain, e.g. picked areas, both return 0, so new code must work flat too.
+- Buildings stand on the lowest ground under their outline; walls reach a little below it. The overhead camera rises with the ground at the view's centre so the 2D overlay lines up there. Shop interiors stay flat (`cam.ground: 0`).
+- `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
+
 ## Version control
 
 This repo uses jj (colocated with git). Commit messages say what changed for the player, not how.
