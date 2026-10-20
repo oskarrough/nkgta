@@ -3,8 +3,8 @@ import { PX } from './map-image.js'
 import { gameUpscale } from './ink.js'
 
 export function createCamera() {
-	let zoom = 8
-	let userZoom = 8
+	let zoom = 11
+	let userZoom = 11
 	let cruise = 0
 
 	return {

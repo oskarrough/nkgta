@@ -1,5 +1,6 @@
 // The flat layer over the 3D city, once per frame: Pfand, places, stops,
 // traffic lights, street names, the player and anyone fleeing their car.
+import { SOLID } from './tiles.js'
 import { iconSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
@@ -17,12 +18,28 @@ export function createRenderer(canvas, world) {
 	addEventListener('resize', resize)
 	resize()
 
-	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit }) {
+	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit, showWalls }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+		// K: the walk grid as the game sees it, every solid tile in red, and
+		// the player's footprint.
+		if (showWalls) {
+			ctx.fillStyle = 'rgba(255, 40, 40, 0.35)'
+			const x0 = Math.max(0, Math.floor(cam.x / scale))
+			const y0 = Math.max(0, Math.floor(cam.y / scale))
+			const x1 = Math.min(world.W, Math.ceil((cam.x + canvas.width) / scale))
+			const y1 = Math.min(world.H, Math.ceil((cam.y + canvas.height) / scale))
+			for (let y = y0; y < y1; y++)
+				for (let x = x0; x < x1; x++) if (SOLID.has(world.tileAt(x, y))) ctx.fillRect(...toScreen(x, y), scale, scale)
+			ctx.strokeStyle = '#fff'
+			ctx.lineWidth = 2
+			const [px, py] = toScreen(player.x - 0.3, player.y - 0.3)
+			ctx.strokeRect(px, py, scale * 0.6, scale * 0.6)
+		}
 
 		for (const b of bottles) {
 			const [sx, sy] = toScreen(b.x, b.y)

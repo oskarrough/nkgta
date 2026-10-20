@@ -4,6 +4,7 @@ import { driveCar, speedOf, toWorld } from './car.js'
 
 const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
+const NUDGE = 0.45 // tiles you get eased sideways round a corner
 
 export function createPlayer(start) {
 	return {
@@ -76,10 +77,36 @@ export function updatePlayer(p, axis, turbo, world, dt) {
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
 	const free = (x, y) =>
 		!solid(x - RADIUS, y - RADIUS) && !solid(x + RADIUS, y - RADIUS) && !solid(x - RADIUS, y + RADIUS) && !solid(x + RADIUS, y + RADIUS)
-	const nx = p.x + Math.cos(p.dir) * p.speed * dt
-	const ny = p.y + Math.sin(p.dir) * p.speed * dt
-	if (free(nx, p.y)) p.x = nx
-	else p.speed *= 0.5
-	if (free(p.x, ny)) p.y = ny
-	else p.speed *= 0.5
+	const step = p.speed * dt
+	const fromX = p.x
+	const fromY = p.y
+	slide(p, Math.cos(p.dir) * step, 0, free)
+	slide(p, 0, Math.sin(p.dir) * step, free)
+	// Walls cost you the part of your speed that went into them, nothing more.
+	if (dt > 0) p.speed = Math.min(p.speed, Math.hypot(p.x - fromX, p.y - fromY) / dt)
+}
+
+// Move along one axis. Blocked, look for a gap just to the side and drift
+// towards it, so you round corners and find doorways without lining up to
+// the pixel. Otherwise stay put against the wall.
+function slide(p, dx, dy, free) {
+	if (!dx && !dy) return
+	if (free(p.x + dx, p.y + dy)) {
+		p.x += dx
+		p.y += dy
+		return
+	}
+	const pace = Math.abs(dx + dy)
+	for (let off = 0.05; off <= NUDGE; off += 0.05) {
+		for (const side of [-1, 1]) {
+			const ox = dy ? side * off : 0
+			const oy = dx ? side * off : 0
+			if (free(p.x + ox, p.y + oy) && free(p.x + ox + dx, p.y + oy + dy)) {
+				const k = Math.min(1, pace / off)
+				p.x += ox * k
+				p.y += oy * k
+				return
+			}
+		}
+	}
 }

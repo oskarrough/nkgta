@@ -18,6 +18,7 @@ export function createInput(actions) {
 		if (key === '-') actions.zoom(0.8)
 		if (key === 'n') actions.toggleStreetNames()
 		if (key === 't') actions.toggleTransit()
+		if (key === 'k') actions.toggleWalls()
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
 	})

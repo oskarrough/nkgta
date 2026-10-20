@@ -37,6 +37,7 @@ const wasted = createWasted({
 })
 let showStreetNames = true
 let showTransit = true
+let showWalls = false
 
 const input = createInput({
 	use,
@@ -44,6 +45,7 @@ const input = createInput({
 	zoom: camera.zoomBy,
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),
+	toggleWalls: () => (showWalls = !showWalls),
 	cycleLook: () => hud.say(`Look: ${city3d.cycleLook()}`),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 })
@@ -84,7 +86,7 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, player, viewOf(cam), dt)
 	city3d.render(cam, traffic.cars)
-	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit })
+	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit, showWalls })
 	const car = !player.car && !player.onBike && traffic.enterable(player.x, player.y)
 	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active() }, dt)
 	requestAnimationFrame(frame)
