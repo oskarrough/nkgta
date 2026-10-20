@@ -729,7 +729,10 @@ function wallMaterial(tileM, gradient) {
 					float hi = mix(0.8, 0.74, shop);
 					float wx = smoothstep(0.5 - halfW - aa.x, 0.5 - halfW + aa.x, u) * (1.0 - smoothstep(0.5 + halfW - aa.x, 0.5 + halfW + aa.x, u));
 					float wz = smoothstep(lo - aa.y, lo + aa.y, fz) * (1.0 - smoothstep(hi - aa.y, hi + aa.y, fz));
-					float bay = fract(sin(dot(vec3(floor(along), f, vWall.y + vWall.z), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+					// Rounded, because interpolated varyings wobble in their last bits
+					// and the hash would blow that up into speckle.
+					float wallId = floor(vWall.y + 0.5) + floor(vWall.z * 8.0 + 0.5);
+					float bay = fract(sin(dot(vec3(floor(along), f, wallId), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 					// Dark glass with a pale glint across its top corner, now and
 					// then a lit window.
 					float wu = (u - 0.5 + halfW) / (2.0 * halfW);
