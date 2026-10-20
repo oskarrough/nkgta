@@ -93,6 +93,7 @@ export function createScene(canvas, world, shops = []) {
 	const scene = new THREE.Scene()
 	scene.background = new THREE.Color(DECK)
 	const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 5000)
+	const streetFog = new THREE.Fog(DECK, 35, 60)
 
 	// Hard shadows, one crisp step: no soft edges to smudge the flat fills.
 	renderer.shadowMap.enabled = true
@@ -275,6 +276,20 @@ export function createScene(canvas, world, shops = []) {
 	function aim(cam) {
 		fit(cam.scale)
 		const { width, height } = ink.frame
+		camera.fov = cam.third ? 65 : FOV
+		camera.near = cam.third ? 0.03 : 0.1
+		camera.far = cam.third ? 60 : 5000
+		camera.updateProjectionMatrix()
+		scene.fog = cam.third ? streetFog : null
+		if (cam.third) {
+			const { x, y, z, target } = cam.third
+			camera.up.set(0, 0, 1)
+			camera.position.set(x, -y, z)
+			camera.lookAt(target.x, -target.y, target.z)
+			return camera
+		}
+		camera.up.set(0, 1, 0)
+		camera.rotation.set(0, 0, 0)
 		const cx = (cam.x + width / 2) / cam.scale
 		const cy = -(cam.y + height / 2) / cam.scale
 		camera.position.set(cx, cy, height / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)))
@@ -290,8 +305,9 @@ export function createScene(canvas, world, shops = []) {
 			c.marks.length = 0
 		}
 		const { width, height } = ink.frame
-		focusSun(view.position.x, view.position.y, Math.hypot(width, height) / cam.scale / 2)
-		clouds.follow(view)
+		focusSun(view.position.x, view.position.y, cam.third ? 32 : Math.hypot(width, height) / cam.scale / 2)
+		clouds.layer.visible = !cam.third
+		if (!cam.third) clouds.follow(view)
 		time.value = performance.now() / 1000
 		city.update(viewOf(cam), cam.scale)
 		ink.render(scene, view, target)
@@ -299,6 +315,7 @@ export function createScene(canvas, world, shops = []) {
 
 	// The ground on screen, in tiles.
 	function viewOf(cam) {
+		if (cam.bounds) return cam.bounds
 		fit(cam.scale)
 		const { width, height } = ink.frame
 		return { x0: cam.x / cam.scale, y0: cam.y / cam.scale, x1: (cam.x + width) / cam.scale, y1: (cam.y + height) / cam.scale }

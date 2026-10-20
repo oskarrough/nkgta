@@ -16,6 +16,7 @@ export function createInput(actions) {
 		keys.add(key)
 		sound.start()
 		if (e.repeat) return
+		if (key === 'v') actions.toggleCamera()
 		if (key === 'l') actions.toggleMute()
 		if (key === 'e' || key === 'Enter') actions.use()
 		if (key === '+' || key === '=') actions.zoom(1.25)
@@ -26,6 +27,26 @@ export function createInput(actions) {
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
 	})
+	addEventListener('blur', () => keys.clear())
+	// Dragging keeps the cursor available for the rest of the game UI.
+	let looking = false
+	const canvas = document.getElementById('overlay')
+	canvas.addEventListener('contextmenu', (e) => {
+		if (actions.cameraActive()) e.preventDefault()
+	})
+	canvas.addEventListener('pointerdown', (e) => {
+		if (e.pointerType !== 'mouse' || e.button !== 2 || !actions.cameraActive()) return
+		looking = true
+		canvas.setPointerCapture(e.pointerId)
+		e.preventDefault()
+	})
+	canvas.addEventListener('pointermove', (e) => {
+		if (looking) actions.look(e.movementX, e.movementY)
+	})
+	const stopLooking = () => (looking = false)
+	canvas.addEventListener('pointerup', stopLooking)
+	canvas.addEventListener('lostpointercapture', stopLooking)
+	addEventListener('blur', stopLooking)
 	addEventListener('keyup', (e) => keys.delete(norm(e.key)))
 	addEventListener('wheel', (e) => actions.zoom(e.deltaY < 0 ? 1.1 : 0.9), { passive: true })
 
@@ -39,7 +60,7 @@ export function createInput(actions) {
 	return {
 		// Direction the player is pushing, each axis -1…1. A key wins if one
 		// is held; otherwise the thumbstick's analogue deflection.
-		axis: () => (keyDown() ? keyAxis() : touch.axis()),
+		axis: () => actions.move(keyDown() ? keyAxis() : touch.axis()),
 		// Testing: hold space for turbo; the touch boost button does the same.
 		turbo: () => keys.has(' ') || touch.turbo(),
 		// In a car: the keyboard's up/down/left/right, or the stick translated

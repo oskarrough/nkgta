@@ -49,6 +49,7 @@ export function createRenderer(canvas, world, shops = []) {
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
+		if (cam.third) return
 
 		// K: the walk grid as the game sees it, every solid tile in red, and
 		// the player's footprint.

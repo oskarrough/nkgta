@@ -109,6 +109,7 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 
 	return {
 		inside: () => inside,
+		busy: () => inside || !!warp || portal.phase !== 'closed',
 		warping: () => !!warp,
 		// Once the tear has swallowed most of the view, the street's markers go.
 		indoors: () => inside || (!!warp && warp.t > 0.4),

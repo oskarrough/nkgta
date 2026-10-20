@@ -12,6 +12,7 @@ import { createHud, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { findShops } from './shops.js'
 import { createVisit } from './visit.js'
+import { createActors } from './actors.js'
 
 import { sound } from './sound.js'
 
@@ -27,11 +28,12 @@ const world = createWorld(map)
 phase('createWorld')
 const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
-const camera = createCamera()
+const camera = createCamera(world)
 const canvas = document.getElementById('overlay')
 const shops = findShops(world)
 phase('shops')
 const city3d = createScene(document.getElementById('city'), world, shops)
+const actors = createActors(city3d.scene, city3d.gradient)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
@@ -48,7 +50,15 @@ let showStreetNames = true
 let showTransit = true
 let showWalls = false
 
+const overheadHelp = document.getElementById('help').textContent
 const input = createInput({
+	cameraActive: camera.active,
+	look: camera.look,
+	move: camera.move,
+	toggleCamera() {
+		const third = camera.toggle(player)
+		hud.say(third ? 'Verfolgerkamera · Rechte Maustaste halten und ziehen' : 'Vogelperspektive')
+	},
 	use,
 	toggleMute: () => hud.say(sound.toggleMute() ? 'Leise: Ton aus' : 'Ton an'),
 	zoom: camera.zoomBy,
@@ -77,23 +87,26 @@ function use() {
 }
 
 // The part of the map on screen, in tiles, shifted by (dx, dy) tiles.
-const viewOf = (cam, dx = 0, dy = 0) => ({
-	x0: cam.x / cam.scale + dx,
-	y0: cam.y / cam.scale + dy,
-	x1: (cam.x + canvas.width) / cam.scale + dx,
-	y1: (cam.y + canvas.height) / cam.scale + dy,
-})
+const viewOf = (cam, dx = 0, dy = 0) =>
+	cam.bounds ?? {
+		x0: cam.x / cam.scale + dx,
+		y0: cam.y / cam.scale + dy,
+		x1: (cam.x + canvas.width) / cam.scale + dx,
+		y1: (cam.y + canvas.height) / cam.scale + dy,
+	}
 
 let last = performance.now()
 let first = true
 function frame(now) {
 	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
+	camera.suspend(visit.busy())
 	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
 	visit.update(dt, input.axis())
 	wasted.update(dt)
 	const inside = visit.inside()
 	const indoors = visit.indoors()
+	camera.suspend(visit.busy())
 	const cam = camera.update(visit.focus(dt), canvas, dt, city3d.pixelGrid(), visit.closer())
 	// Inside a shop, the street carries on round its door.
 	const street = visit.street()
@@ -103,6 +116,13 @@ function frame(now) {
 	if (!inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
+	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt)
+	const help = camera.selected()
+		? cam.third
+			? 'V: Vogelperspektive · Rechte Maus ziehen: umsehen · Rad: Abstand · WASD: bewegen · E: benutzen · Leertaste: Turbo / Handbremse'
+			: 'Ladeneingang: Vogelperspektive · Danach wieder Verfolgerkamera · V: Kamera wechseln'
+		: overheadHelp
+	if (document.getElementById('help').textContent !== help) document.getElementById('help').textContent = help
 	visit.render(cam, traffic.cars, dt)
 	draw({
 		cam,
