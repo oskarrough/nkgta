@@ -25,6 +25,17 @@ const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
 // light, deep cool shade.
 const GROUND_SUN = '#fffaf0'
 const GROUND_SHADE = '#98a4c0'
+// What the ground is made of, drawn on top of the map's flat colours by
+// world position, so it stays sharp at every zoom and costs nothing per
+// building. Each is how much darker or lighter a pattern makes the ground.
+const GROUND_DETAIL = {
+	lawnClumps: 0.1, // darker clumps in the grass
+	lawnTufts: 0.16, // single dark tufts
+	yardWear: 0.08, // worn patches on courtyards and bare ground
+	yardJoints: 0.08, // the gaps between their cobbles
+	pavingJoints: 0.09, // and between the pavement slabs
+	asphaltPatches: 0.1, // repaired patches in the tarmac
+}
 // One 2048 map over the visible area, so the edges stay hard.
 // normalBias is in shadow texels, so it holds at every zoom.
 const SHADOW = { size: 2048, bias: -0.0003, normalBias: 1.5, pad: 60 }
@@ -304,6 +315,7 @@ function groundMaterial(map) {
 		uniforms,
 		vertexShader: `
 			varying vec2 vUv;
+			varying vec2 vTile;
 			#include <common>
 			#include <shadowmap_pars_vertex>
 
@@ -312,6 +324,7 @@ function groundMaterial(map) {
 				#include <beginnormal_vertex>
 				#include <defaultnormal_vertex>
 				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+				vTile = worldPosition.xy;
 				#include <shadowmap_vertex>
 				gl_Position = projectionMatrix * viewMatrix * worldPosition;
 			}
@@ -322,18 +335,103 @@ function groundMaterial(map) {
 			uniform vec3 shade;
 			uniform bool receiveShadow;
 			varying vec2 vUv;
+			varying vec2 vTile;
 			#include <common>
 			#include <shadowmap_pars_fragment>
 			#include <shadowmask_pars_fragment>
+			${groundDetail}
 
 			void main() {
-				vec3 color = texture2D(map, vUv).rgb;
+				vec3 color = groundDetail(texture2D(map, vUv).rgb, vTile);
 				gl_FragColor = vec4(color * mix(shade, sun, getShadowMask()), 1.0);
 				#include <colorspace_fragment>
 			}
 		`,
 	})
 }
+
+// The ground's materials, told apart by the colour the map painted: green
+// is lawn, dark grey is tarmac, pale grey is pavement, the khaki between is
+// courtyards and bare ground. Every pattern comes in hard steps, like paint,
+// and fades out before its stones get smaller than a pixel.
+const d = (v) => v.toFixed(3)
+const groundDetail = `
+float gHash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float gNoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+float gBlots(vec2 p) {
+	return gNoise(p) * 0.6 + gNoise(p * 2.3 + 7.1) * 0.4;
+}
+
+// Stones or slabs in staggered rows: x is the stone's own random, y how close to its
+// edge this point is (0 in the middle, 1 on the joint).
+vec2 gStones(vec2 p) {
+	p.x += floor(p.y) * 0.5;
+	vec2 cell = floor(p);
+	vec2 f = abs(fract(p) - 0.5) * 2.0;
+	return vec2(gHash(cell), max(f.x, f.y));
+}
+
+// Irregular stones: how close this point is to the joint between the
+// nearest two, 0 on the joint.
+float gSetts(vec2 p) {
+	vec2 cell = floor(p);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 c = cell + vec2(x, y);
+			vec2 o = c + 0.2 + 0.6 * vec2(gHash(c), gHash(c + 17.0)) - p;
+			float dist = dot(o, o);
+			if (dist < f1) {
+				f2 = f1;
+				f1 = dist;
+			} else if (dist < f2) f2 = dist;
+		}
+	}
+	return sqrt(f2) - sqrt(f1);
+}
+
+vec3 groundDetail(vec3 color, vec2 p) {
+	float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+	float green = color.g - max(color.r, color.b);
+	float grey = 1.0 - smoothstep(0.03, 0.08, max(color.r, max(color.g, color.b)) - min(color.r, min(color.g, color.b)) - lum * 0.25);
+	float lawn = smoothstep(0.05, 0.09, green);
+	float tarmac = grey * (1.0 - smoothstep(0.1, 0.14, lum));
+	float pavement = grey * smoothstep(0.3, 0.36, lum);
+	float yard = grey * (1.0 - tarmac) * (1.0 - pavement) * smoothstep(0.15, 0.19, lum);
+
+	// Tiles per screen pixel: fine patterns fade before they shimmer.
+	float px = length(fwidth(p));
+	float fine = 1.0 - smoothstep(0.05, 0.1, px);
+	float mid = 1.0 - smoothstep(0.15, 0.3, px);
+	float f = 1.0;
+
+	float clumps = gBlots(p * 0.8);
+	vec2 tuft = gStones(p * 2.2);
+	f -= lawn * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
+
+	float wear = gBlots(p * 0.45 + 3.7);
+	float setts = gSetts(p * 4.0);
+	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} + step(setts, 0.1) * ${d(GROUND_DETAIL.yardJoints)} * fine);
+
+	vec2 slab = gStones(p * 2.0);
+	f -= pavement * step(0.86, slab.y) * ${d(GROUND_DETAIL.pavingJoints)} * mid;
+
+	float repair = gBlots(p * 0.3 + 11.3);
+	f -= tarmac * step(0.73, repair) * ${d(GROUND_DETAIL.asphaltPatches)};
+
+	return color * f;
+}
+`
 
 // One row of tones shared by every toon material: hard steps, no falloff.
 function toonGradient() {
