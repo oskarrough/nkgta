@@ -9,10 +9,10 @@ import { DITHER, LUT_SIZE, PALETTE_SIZE, paletteLut, paletteTexture } from './pa
 export const PX_PER_TILE = 10
 export const gameUpscale = (scale) => Math.max(1, Math.round(scale / PX_PER_TILE))
 
-// Look knobs, and what the P key starts from. Comic is the default: smooth
-// everywhere, ink on, no palette. Palette adds the snap; pixel adds the grid.
+// Look knobs, and what the P key starts from. Palette is the default: smooth
+// everywhere, ink on, every colour snapped to the palette. Pixel adds the grid.
 export const PIXEL_GRID = false
-export const PALETTE_SNAP = false
+export const PALETTE_SNAP = true
 const INK = '#1A1E1B'
 const INNER_SHADE = 0.55 // inner edges are a darker shade of their own colour
 const DEPTH_EDGE = 0.012 // relative depth step that counts as a silhouette
