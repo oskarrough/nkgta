@@ -9,7 +9,8 @@ import * as THREE from 'three'
 //
 // Ported from dodgethis (src/core/portal.js). Changes for NK GTA: `up` for a z-up world, `clip`
 // to skip the oblique near plane (the ink pass reads depth, and a top-down camera never has
-// anything in front of the exit), `sparkSize` for a camera thirty tiles up, and `flash()`.
+// anything in front of the exit), `sparkSize` for a camera thirty tiles up, `level` for a tear
+// that leans, and `flash()`.
 
 const DEFAULTS = {
 	scene: null, // the far scene; may be the near scene itself
@@ -26,6 +27,7 @@ const DEFAULTS = {
 	up: new THREE.Vector3(0, 1, 0), // the world's up, which the tear's long axis leans towards
 	clip: true, // bend the far view's near plane onto the exit
 	sparkSize: 1, // spark size multiplier
+	level: false, // lay the light spill level on the ground on your side, for a tear that leans
 }
 
 // Walking through needs a hole this open; the test page's camera swap needs it too.
@@ -92,6 +94,7 @@ export function createPortal(renderer, options = {}) {
 		uColorB: { value: colorB },
 		uColorC: { value: colorC },
 		uSpark: { value: o.sparkSize },
+		uLevel: { value: o.level ? 1 : 0 },
 		tFar: { value: null },
 	}
 	// Premultiplied: the hole replaces what's behind it; rim light keeps its hue on bright ground.
@@ -239,7 +242,7 @@ export function createPortal(renderer, options = {}) {
 	let spill = null
 	if (floor !== null) {
 		spill = new THREE.Mesh(
-			new THREE.PlaneGeometry(R * 3.4, R * 2.6).rotateX(-Math.PI / 2).translate(0, -floor + 0.01, 0),
+			new THREE.PlaneGeometry(R * 3.4, R * 2.6).rotateX(-Math.PI / 2).translate(0, o.level ? 0 : -floor + 0.01, 0),
 			new THREE.ShaderMaterial({
 				uniforms,
 				vertexShader: /* glsl */ `
@@ -251,12 +254,15 @@ export function createPortal(renderer, options = {}) {
 					}`,
 				fragmentShader: /* glsl */ `
 					${SHAPE}
+					uniform float uLevel;
 					varying vec2 vP;
 					void main() {
 						vec2 r = tearRadii(uOpen);
-						vec2 q = vP / vec2(r.x * 1.4 + 0.06, 0.5);
+						vec2 q = (vP - vec2(0.0, 0.45 * uLevel)) / vec2(r.x * 1.4 + 0.06, 0.5 + 0.2 * uLevel);
 						float glow = exp(-dot(q, q) * 1.6) * smoothstep(0.0, 0.3, uOpen);
 						float flicker = 0.85 + 0.15 * sin(uTime * 7.3) * sin(uTime * 3.1 + 1.0);
+						// Level, it only pools on your side: the far side is a wall.
+						glow *= mix(1.0, smoothstep(-0.1, 0.3, vP.y) * 1.6, uLevel);
 						float h = min(0.5, glow * 0.45 * flicker * (1.0 + uFlare));
 						if (h < 0.004) discard;
 						// Pink pools on one side, cyan on the other, trading places slowly; never mixed to white.
@@ -269,6 +275,7 @@ export function createPortal(renderer, options = {}) {
 		)
 		spill.renderOrder = 49
 		spill.frustumCulled = false
+		spill.matrixAutoUpdate = !o.level
 		object.add(spill)
 	}
 	object.traverse((child) => child.layers.set(o.layer))
@@ -356,6 +363,18 @@ export function createPortal(renderer, options = {}) {
 		object.position.copy(position)
 		object.lookAt(v.copy(position).add(facing))
 		object.updateMatrixWorld(true)
+		if (spill && o.level) levelSpill()
+	}
+
+	// Flat on the ground `floor` below the centre, across the tear's foot, facing your side; it
+	// keeps its size while the tear itself is scaled.
+	const level = { x: new THREE.Vector3(), z: new THREE.Vector3(), m: new THREE.Matrix4() }
+	function levelSpill() {
+		level.x.setFromMatrixColumn(object.matrixWorld, 0).normalize()
+		level.z.crossVectors(level.x, o.up)
+		level.m.makeBasis(level.x, o.up, level.z).setPosition(v.copy(object.position).addScaledVector(o.up, 0.01 - floor))
+		spill.matrix.copy(inverse.copy(object.matrixWorld).invert()).multiply(level.m)
+		spill.matrixWorldNeedsUpdate = true
 	}
 
 	function exit(position, facing) {

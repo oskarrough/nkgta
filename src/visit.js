@@ -26,7 +26,8 @@ export function createVisit({ city3d, shops, player, pfand, say }) {
 		radius: RADIUS,
 		up: Z,
 		clip: false,
-		floor: null,
+		floor: RADIUS * Math.cos(TILT),
+		level: true,
 		samples: 0,
 		sparkSize: 5,
 		draw: (target, far) =>
