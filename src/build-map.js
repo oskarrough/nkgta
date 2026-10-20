@@ -292,11 +292,59 @@ export function buildMap(osm, bbox, tileM) {
 		transit.push({ kind, name, lines, x: round(x), y: round(y) })
 	}
 
+	// Street trees, decoration only: nothing on the tile grid, so you walk and
+	// drive through them. Rows are spaced about 8 m along the way.
+	const trees = []
+	const addTree = (tags, seed, x, y) => {
+		if (x < 0 || y < 0 || x >= W || y >= H) return
+		const { crown, top } = treeSize(tags, seed)
+		trees.push({ x: round(x), y: round(y), crown, top })
+	}
+	for (const e of osm.elements) {
+		if (e.type !== 'node' || e.tags?.natural !== 'tree') continue
+		const { x, y } = toTile(e)
+		addTree(e.tags, e.id, x, y)
+	}
+	const rowStep = 8 / tileM
+	for (const e of osm.elements) {
+		if (e.type !== 'way' || e.tags?.natural !== 'tree_row' || !e.geometry) continue
+		const pts = geom(e.geometry)
+		let n = 0
+		for (let i = 0; i + 1 < pts.length; i++) {
+			const a = pts[i]
+			const b = pts[i + 1]
+			const len = Math.hypot(b.x - a.x, b.y - a.y)
+			if (!len) continue
+			for (let d = 0; d < len; d += rowStep) addTree(e.tags, e.id * 31 + n++, a.x + ((b.x - a.x) * d) / len, a.y + ((b.y - a.y) * d) / len)
+		}
+		const end = pts.at(-1)
+		addTree(e.tags, e.id * 31 + n, end.x, end.y)
+	}
+
 	shapes.sort((a, b) => a.layer - b.layer)
-	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, roadNodes, roads, signals }
+	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees, roadNodes, roads, signals }
 }
 
 const round = (n) => Math.round(n * 10) / 10
+
+// Stable noise per tree, so sizes and shapes don't change between loads.
+const treeHash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
+
+// Crown diameter and top height in metres: from the tags where they exist,
+// otherwise a default with a little stable variation.
+function treeSize(tags, seed) {
+	const num = (k) => {
+		const v = parseFloat(tags?.[k])
+		return Number.isFinite(v) ? v : null
+	}
+	const h = num('height')
+	const circumference = num('circumference')
+	const crownTag = num('diameter_crown')
+	const r = treeHash(seed)
+	const crown = Math.min(13, Math.max(3.5, crownTag ?? (circumference != null ? 3 + circumference * 4 : 5 + r * 2.5)))
+	const top = Math.min(16, Math.max(6, h ?? crown * 1.4 + 2 + r * 2))
+	return { crown: round(crown), top: round(top) }
+}
 
 // A path widened to radius r: a box along each segment and an octagon at
 // each bend, as polygons for clipping.

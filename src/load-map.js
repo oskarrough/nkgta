@@ -7,7 +7,7 @@ import { areaFromUrl } from './area-url.js'
 import { TILE_M } from './default-area.js'
 
 // Bump when build-map.js changes, so cached areas get rebuilt.
-const BUILD_VERSION = 6
+const BUILD_VERSION = 7
 
 export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()

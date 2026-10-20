@@ -24,7 +24,7 @@ const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
 const camera = createCamera()
 const canvas = document.getElementById('overlay')
-const render3d = createScene(document.getElementById('city'), world)
+const city3d = createScene(document.getElementById('city'), world)
 const draw = createRenderer(canvas, world)
 const hud = createHud(world)
 const traffic = createTraffic(world)
@@ -41,6 +41,7 @@ const input = createInput({
 	zoom: camera.zoomBy,
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),
+	cycleLook: () => hud.say(`Look: ${city3d.cycleLook()}`),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 })
 
@@ -65,14 +66,14 @@ const viewOf = (cam) => ({
 
 let last = performance.now()
 function frame(now) {
-	const dt = Math.min(0.05, (now - last) / 1000)
+	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	last = now
 	if (!wasted.active()) updatePlayer(player, input.axis(), input.turbo(), world, dt)
 	wasted.update(dt)
-	const cam = camera.update(player, canvas, dt)
+	const cam = camera.update(player, canvas, dt, city3d.pixelGrid())
 	wasted.hit(traffic.update(dt, player, viewOf(cam)))
 	if (!player.car && !wasted.active()) pfand.update(player, hud.say)
-	render3d(cam, traffic.cars)
+	city3d.render(cam, traffic.cars)
 	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit })
 	const car = !player.car && !player.onBike && traffic.enterable(player.x, player.y)
 	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active() }, dt)

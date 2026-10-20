@@ -1,6 +1,6 @@
 # NK GTA
 
-A little top-down game set in the real streets of Neukölln, in the spirit of GTA 1. Streets, buildings, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3 m tile grid that decides where you can walk.
+A little top-down game set in the real streets of Neukölln, in the spirit of GTA 1. Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3 m tile grid that decides where you can walk.
 
 ```sh
 bun install
@@ -9,7 +9,7 @@ bun run build-map   # public/map.json, the static default map
 bun run dev
 ```
 
-Arrow keys or WASD walk, E gets on and off the bike and in and out of cars, space is turbo (for testing), +/− or the mouse wheel zooms, N toggles street names, T toggles U-Bahn and bus stops, M picks another area. Footpaths and Tordurchfahrten through buildings (`tunnel=building_passage`) cut through the block, so you can walk the Kino-Passage from Karl-Marx-Straße into the Hof and out onto Richardstraße. Private paths and passages are walkable too, hatched on the map. Collect Pfand bottles and cash them in at a Späti.
+Arrow keys or WASD walk, E gets on and off the bike and in and out of cars, space is turbo (for testing), +/− or the mouse wheel zooms, N toggles street names, T toggles U-Bahn and bus stops, P switches the look between comic, palette and pixel art, M picks another area. Footpaths and Tordurchfahrten through buildings (`tunnel=building_passage`) cut through the block, so you can walk the Kino-Passage from Karl-Marx-Straße into the Hof and out onto Richardstraße. Private paths and passages are walkable too, hatched on the map. Collect Pfand bottles and cash them in at a Späti.
 
 Traffic drives on the right along the real road network, one-way streets included, and cars stand parked along the kerbs. Mostly Kleinwagen, now and then a black SUV or a lambo, and BVG buses on the big roads that stop at the real bus stops. Each handles differently. It stops at the traffic lights OSM knows about; at other junctions the bigger road goes first and, between equals, rechts vor links. Get hit by a car and you're wasted: your bag of Pfand spills across the road and you start over. Step in front of a car to stop it, then E throws the driver out and it's yours: up is gas, down brakes and reverses, left and right steer, space is the handbrake. The handling is [Pat Kerr's 1996 tyre model](https://patkerr.co.uk/2d-vehicles/) from GTA 1: every tyre resists rolling a little and sliding sideways a lot.
 

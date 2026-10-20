@@ -12,17 +12,23 @@ export const T = {
 	PRIVATE: 9, // paths and passages you're not really meant to use
 }
 
+// Muted comic palette: charcoal roads, warm grey stone, slate water.
 export const COLORS = {
-	[T.GROUND]: '#8a8170',
-	[T.ROAD]: '#4a4a4f',
-	[T.SIDEWALK]: '#b9b2a6',
-	[T.BUILDING]: '#c8735a',
-	[T.GRASS]: '#6f9a4e',
-	[T.WATER]: '#3f6f9a',
-	[T.PLAYGROUND]: '#d9b45a',
-	[T.PITCH]: '#4f8a52',
-	[T.CYCLEWAY]: '#b4615a',
-	[T.PRIVATE]: '#a89f90',
+	[T.GROUND]: '#8d8577',
+	[T.ROAD]: '#46484c',
+	[T.SIDEWALK]: '#b3aa9b',
+	[T.BUILDING]: '#b86a52',
+	[T.GRASS]: '#668a49',
+	[T.WATER]: '#42605f',
+	[T.PLAYGROUND]: '#c9a45e',
+	[T.PITCH]: '#4c7a4b',
+	[T.CYCLEWAY]: '#a05d55',
+	[T.PRIVATE]: '#9d9484',
 }
+
+// Ink lines and the pale kerb between tarmac and pavement.
+export const INK = 'rgba(26, 30, 30, 0.55)'
+export const KERB = '#c9c1b2'
+export const MARK = '#f4f1e7'
 
 export const SOLID = new Set([T.BUILDING, T.WATER])
