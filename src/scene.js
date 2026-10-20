@@ -623,6 +623,9 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	float px = length(fwidth(p));
 	float fine = 1.0 - smoothstep(0.05, 0.1, px);
 	float mid = 1.0 - smoothstep(0.15, 0.3, px);
+	// Blotches turn into camouflage across a whole park, so far out the
+	// ground goes back to flat fills.
+	float near = 1.0 - smoothstep(0.05, 0.12, px);
 	float f = 1.0;
 
 	float clumps = gBlots(p * 0.8);
@@ -634,11 +637,11 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	vec2 wf = fract(q);
 	f += water * (1.0 - step(0.2, lum)) * mid * step(0.72, gHash(floor(q))) * step(abs(wf.y - 0.5), 0.13) * step(abs(wf.x - 0.5), 0.3) * ${d(GROUND_DETAIL.waves)};
 
-	f -= lawn * (1.0 - pitch) * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
+	f -= lawn * (1.0 - pitch) * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} * near + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
 
 	float wear = gBlots(p * 0.45 + 3.7);
 	float setts = gSetts(p * 4.0);
-	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} + step(setts, 0.1) * ${d(GROUND_DETAIL.yardJoints)} * fine);
+	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} * near + step(setts, 0.1) * ${d(GROUND_DETAIL.yardJoints)} * fine);
 
 	vec2 slab = gStones(p * 2.0);
 	f -= pavement * step(0.86, slab.y) * ${d(GROUND_DETAIL.pavingJoints)} * mid;

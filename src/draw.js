@@ -19,6 +19,8 @@ const BADGE = {
 	shrink: 0.75, // size while it fades
 	gap: 0.5, // tiles out past the awning's front edge
 	apart: 0.9, // overlapping badges further than this many sizes apart are both drawn
+	sparse: [12, 4], // below this many px per tile badges thin out, until at the second
+	sparseApart: 3.5, // only one in this many sizes is left
 }
 
 export function createRenderer(canvas, world, shops = []) {
@@ -92,6 +94,9 @@ export function createRenderer(canvas, world, shops = []) {
 		const t = Math.max(0, Math.min(1, (BADGE.fadeIn - perTile) / (BADGE.fadeIn - BADGE.full)))
 		const fade = t * t * (3 - 2 * t)
 		const placed = []
+		// Zoomed far out, a badge on every shop would carpet the map.
+		const thin = Math.max(0, Math.min(1, (BADGE.sparse[0] - perTile) / (BADGE.sparse[0] - BADGE.sparse[1])))
+		const apart = BADGE.apart + (BADGE.sparseApart - BADGE.apart) * thin
 		for (const b of inside ? [] : badges) {
 			const alpha = b.awning ? fade : 1
 			if (alpha <= 0) continue
@@ -99,7 +104,7 @@ export function createRenderer(canvas, world, shops = []) {
 			const s = b.awning ? size * (BADGE.shrink + (1 - BADGE.shrink) * fade) : size
 			if (!onScreen(sx, sy, s)) continue
 			// First come, first drawn: a badge on top of another is left out.
-			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * BADGE.apart)) continue
+			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * apart)) continue
 			placed.push([sx, sy])
 			ctx.globalAlpha = alpha
 			ctx.drawImage(icons[b.kind], sx - s / 2, sy - s / 2, s, s)
