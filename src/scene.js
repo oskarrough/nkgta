@@ -11,6 +11,19 @@ import { MODELS } from './models.js'
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
 
+// Facade details, drawn in the wall shader. Cornice is two depths below the
+// roof in tiles: the pale band, then its shadow. Sills are in storeys.
+const WALL = {
+	glass: '#1c2229',
+	glint: '#5b6b78',
+	lit: '#e6b45a',
+	stucco: '#ece4d2',
+	sill: 0.07,
+	cornice: [0.13, 0.21],
+	awnings: 0.45, // share of shopfronts with an awning
+}
+const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
+
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
 
@@ -433,6 +446,12 @@ vec3 groundDetail(vec3 color, vec2 p) {
 }
 `
 
+// A colour as a linear GLSL vec3, for baking into shader source.
+function glsl(hex) {
+	const c = new THREE.Color(hex)
+	return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`
+}
+
 // One row of tones shared by every toon material: hard steps, no falloff.
 function toonGradient() {
 	const data = new Uint8Array([...TOON_BANDS.map(() => 0), ...TOON_BANDS].map((v) => Math.round(v * 255)))
@@ -582,6 +601,7 @@ function wallMaterial(tileM, gradient) {
 				'#include <color_fragment>',
 				`#include <color_fragment>
 				float along = vWall.x;
+				vec2 aa = fwidth(vec2(along, vZ / ${storey}));
 				if (vWall.z > 2.0 && along > 0.0 && along < vWall.y && vZ < vWall.z - 0.3) {
 					float f = floor(vZ / ${storey});
 					float fz = fract(vZ / ${storey});
@@ -589,14 +609,34 @@ function wallMaterial(tileM, gradient) {
 					float shop = f < 0.5 ? 1.0 : 0.0;
 					float halfW = mix(0.22, 0.4, shop);
 					float lo = mix(0.35, 0.1, shop);
-					vec2 aa = fwidth(vec2(along, vZ / ${storey}));
+					float hi = mix(0.8, 0.74, shop);
 					float wx = smoothstep(0.5 - halfW - aa.x, 0.5 - halfW + aa.x, u) * (1.0 - smoothstep(0.5 + halfW - aa.x, 0.5 + halfW + aa.x, u));
-					float wz = smoothstep(lo - aa.y, lo + aa.y, fz) * (1.0 - smoothstep(0.8 - aa.y, 0.8 + aa.y, fz));
-					float lit = fract(sin(dot(vec3(floor(along), f, vWall.y + vWall.z), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-					vec3 glass = lit > 0.94 ? vec3(0.9, 0.7, 0.3) : vec3(0.05, 0.07, 0.1);
+					float wz = smoothstep(lo - aa.y, lo + aa.y, fz) * (1.0 - smoothstep(hi - aa.y, hi + aa.y, fz));
+					float bay = fract(sin(dot(vec3(floor(along), f, vWall.y + vWall.z), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+					// Dark glass with a pale glint across its top corner, now and
+					// then a lit window.
+					float wu = (u - 0.5 + halfW) / (2.0 * halfW);
+					float wv = (fz - lo) / (hi - lo);
+					float glint = step(abs(wu - wv - 0.15), 0.12) * (1.0 - shop);
+					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : mix(${glsl(WALL.glass)}, ${glsl(WALL.glint)}, glint);
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
+					// A pale sill under each upper window.
+					float sill = step(lo - ${WALL.sill.toFixed(3)}, fz) * step(fz, lo) * step(abs(u - 0.5), halfW + 0.04) * (1.0 - shop);
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8);
+					// Shopfronts: an awning over some, plain or striped.
+					float awning = shop * step(bay, ${WALL.awnings.toFixed(2)}) * step(hi + 0.03, fz) * step(fz, 0.97) * step(abs(u - 0.5), halfW + 0.06);
+					float pick = fract(bay * 7.31);
+					vec3 cloth = pick < 0.25 ? ${glsl(AWNINGS[0])} : pick < 0.5 ? ${glsl(AWNINGS[1])} : pick < 0.75 ? ${glsl(AWNINGS[2])} : ${glsl(AWNINGS[3])};
+					if (fract(bay * 3.7) < 0.5 && fract(along * 5.0) < 0.5) cloth = ${glsl(WALL.stucco)};
+					diffuseColor.rgb = mix(diffuseColor.rgb, cloth, awning);
 					float ledge = 1.0 - smoothstep(0.0, 0.05 + aa.y, fz);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
+				}
+				// Cornice: a pale stucco band under the roof with a dark line of
+				// its own shadow beneath.
+				if (vWall.z > 2.0) {
+					float down = vWall.z - vZ;
+					diffuseColor.rgb = down < ${WALL.cornice[0].toFixed(3)} ? mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45) : down < ${WALL.cornice[1].toFixed(3)} ? diffuseColor.rgb * 0.62 : diffuseColor.rgb;
 				}
 				// Darker towards the foot, in two steps, where the street's
 				// grime and the ground's shade reach up the wall.
