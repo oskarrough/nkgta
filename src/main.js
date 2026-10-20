@@ -10,6 +10,8 @@ import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud } from './hud.js'
 
+import { sound } from './sound.js'
+
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
 
 const loading = document.getElementById('loading')
@@ -38,6 +40,7 @@ let showTransit = true
 
 const input = createInput({
 	use,
+	toggleMute: () => hud.say(sound.toggleMute() ? 'Leise: Ton aus' : 'Ton an'),
 	zoom: camera.zoomBy,
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),
@@ -73,6 +76,7 @@ function frame(now) {
 	const cam = camera.update(player, canvas, dt, city3d.pixelGrid())
 	wasted.hit(traffic.update(dt, player, viewOf(cam)))
 	if (!player.car && !wasted.active()) pfand.update(player, hud.say)
+	sound.engine(player.car)
 	city3d.render(cam, traffic.cars)
 	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit })
 	const car = !player.car && !player.onBike && traffic.enterable(player.x, player.y)

@@ -1,5 +1,7 @@
 // Keyboard and wheel. Held keys are polled; one-shot actions fire callbacks.
 
+import { sound } from './sound.js'
+
 const norm = (key) => (key.length === 1 ? key.toLowerCase() : key)
 
 export function createInput(actions) {
@@ -8,7 +10,9 @@ export function createInput(actions) {
 		if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault()
 		const key = norm(e.key)
 		keys.add(key)
+		sound.start()
 		if (e.repeat) return
+		if (key === 'l') actions.toggleMute()
 		if (key === 'e' || key === 'Enter') actions.use()
 		if (key === '+' || key === '=') actions.zoom(1.25)
 		if (key === '-') actions.zoom(0.8)

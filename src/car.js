@@ -61,6 +61,9 @@ export function createCar({ x, y, angle = 0, color, speed = 0, model = MODELS.ca
 		color: color ?? model.colors[Math.floor(Math.random() * model.colors.length)],
 		braking: false,
 		tyres: shape.tyres.map(([lx, ly, front]) => ({ lx, ly, front, skid: false, mark: null })),
+		throttle: 0,
+		slip: 0,
+		impact: 0,
 		marks: [], // skid mark segments [x0, y0, x1, y1] waiting to be painted
 	}
 }
@@ -84,6 +87,9 @@ function push(c, ix, iy, px, py) {
 // controls: throttle −1…1 (negative brakes, then reverses), turn −1…1, handbrake,
 // and hold, for a foot on the brake while waiting.
 export function driveCar(c, controls, world, dt) {
+	c.throttle = controls.throttle ?? 0
+	c.slip = 0
+	c.impact = 0
 	const steps = Math.ceil(dt / STEP)
 	for (let i = 0; i < steps; i++) step(c, controls, world, dt / steps)
 
@@ -123,6 +129,7 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 		const rolling = vx * rx + vy * ry
 		const lateral = vx * -ry + vy * rx
 		const hand = handbrake && !t.front
+		c.slip = Math.max(c.slip, Math.abs(lateral), c.braking || hand ? Math.abs(rolling) * 0.4 : 0)
 		const kr = m.rolling * rough * (hand ? HANDBRAKE_ROLLING : 1)
 		const kl = m.lateral * (hand ? HANDBRAKE_GRIP : 1)
 		// Hysteresis, so marks don't flicker on and off at the threshold.
@@ -183,6 +190,7 @@ function impulse(c, px, py, nx, ny, bounce, friction) {
 	const [vx, vy] = pointVelocity(c, px, py)
 	const vn = vx * nx + vy * ny
 	if (vn >= 0) return
+	c.impact = Math.max(c.impact, -vn)
 	const arm = (px - c.x) * ny - (py - c.y) * nx
 	const j = (-(1 + bounce) * vn) / (1 + (arm * arm) / c.shape.inertia)
 	push(c, nx * j, ny * j, px, py)
@@ -227,6 +235,8 @@ export function collideCars(cars) {
 					const [bvx, bvy] = pointVelocity(b, px, py)
 					const vn = (avx - bvx) * nx + (avy - bvy) * ny
 					if (vn >= 0) continue
+					a.impact = Math.max(a.impact, -vn)
+					b.impact = Math.max(b.impact, -vn)
 					const armA = (px - a.x) * ny - (py - a.y) * nx
 					const armB = (px - b.x) * ny - (py - b.y) * nx
 					const ma = a.model.mass
