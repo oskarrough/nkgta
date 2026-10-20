@@ -211,16 +211,24 @@ export function createScene(canvas, world) {
 	}
 }
 
-// Paint and glass take the same flat bands as the walls; lamps stay lit.
+// Paint, glass and tyres take the same flat bands as the walls; lamps stay
+// lit, and the rim is plain ink.
 function carMaterial(kind, gradient) {
 	if (kind === 'lights') return new THREE.MeshBasicMaterial()
+	if (kind === 'heads') return new THREE.MeshBasicMaterial({ color: CAR_HEADLIGHT })
+	if (kind === 'rim') return new THREE.MeshBasicMaterial({ color: CAR_RIM.color })
 	return new THREE.MeshToonMaterial({ color: FIXED[kind] ?? '#fff', gradientMap: gradient })
 }
 
 // Vehicles from above, GTA 1 style: each model built from its own boxes
-// (see models.js), one instanced mesh per box, plus brake lights.
+// (see models.js), plus brake lights, headlights and an ink rim on the road
+// round it. Boxes of one kind are merged, so it's one instanced mesh each.
 const MAX_CARS = 256
-const FIXED = { glass: '#1b232b', roofbox: '#9a9a96' }
+const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', tyre: '#303231' }
+const CAR_HEADLIGHT = '#fff3c8'
+// Cars are too low for the ink pass to find their edges, so they sit on a
+// dark rim this much wider than the body, in tiles. Tyres poke out past it.
+const CAR_RIM = { color: '#1a1e1b', width: 0.045 }
 function carMeshes(gradient) {
 	const box = (l, w, h, x, z) => new THREE.BoxGeometry(l, w, h).translate(x, 0, z + h / 2)
 	// Away from the sun, in scene units, and a flat quad to cast it.
@@ -232,15 +240,23 @@ function carMeshes(gradient) {
 		depthWrite: false,
 	})
 	const kinds = Object.values(MODELS).map((m) => {
-		const parts = m.look.map(([kind, l, w, h, x, z]) => ({ kind, geo: box(l * m.length, w * m.width, h, x * m.length, z) }))
+		const boxes = new Map()
+		const add = (kind, geo) => boxes.set(kind, [...(boxes.get(kind) ?? []), geo])
+		for (const [kind, l, w, h, x, z] of m.look) add(kind, box(l * m.length, w * m.width, h, x * m.length, z))
 		const [, , , h, , z] = m.look[0]
-		const lamp = (s) => box(0.04, 0.12, 0.06, -m.length / 2, z + h * 0.55).translate(0, (s * m.width) / 3, 0)
-		parts.push({ kind: 'lights', geo: mergeGeometries([lamp(-1), lamp(1)]) })
-		for (const part of parts) {
-			part.mesh = new THREE.InstancedMesh(part.geo, carMaterial(part.kind, gradient), MAX_CARS)
-			part.mesh.count = 0
-			part.mesh.frustumCulled = false
+		const lamp = (x, s) => box(0.04, 0.12, 0.06, x, z + h * 0.55).translate(0, (s * m.width) / 3, 0)
+		for (const s of [-1, 1]) {
+			add('lights', lamp(-m.length / 2, s))
+			add('heads', lamp(m.length / 2, s))
 		}
+		const [, bl, bw] = m.look[0]
+		add('rim', box(bl * m.length + CAR_RIM.width * 2, bw * m.width + CAR_RIM.width * 2, 0.01, 0, 0.005))
+		const parts = [...boxes].map(([kind, geos]) => {
+			const mesh = new THREE.InstancedMesh(mergeGeometries(geos), carMaterial(kind, gradient), MAX_CARS)
+			mesh.count = 0
+			mesh.frustumCulled = false
+			return { kind, mesh }
+		})
 		const shadow = new THREE.InstancedMesh(
 			new THREE.PlaneGeometry(m.length * CAR_SHADOW.stretch, m.width * CAR_SHADOW.stretch),
 			shadowMaterial,
