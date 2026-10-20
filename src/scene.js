@@ -28,6 +28,8 @@ const GROUND_SHADE = '#98a4c0'
 // One 2048 map over the visible area, so the edges stay hard.
 // normalBias is in shadow texels, so it holds at every zoom.
 const SHADOW = { size: 2048, bias: -0.0003, normalBias: 1.5, pad: 60 }
+// Wall foot: two heights in tiles and how dark the wall is below each.
+const FOOT = [0.12, 0.3, 0.72, 0.86]
 // Cars are too small for the shadow map: a flat quad away from the sun keeps
 // their shadow crisp and stops them speckling.
 const CAR_SHADOW = { opacity: 0.42, offset: 0.34, stretch: 1.15 }
@@ -497,7 +499,10 @@ function wallMaterial(tileM, gradient) {
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
 					float ledge = 1.0 - smoothstep(0.0, 0.05 + aa.y, fz);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
-				}`,
+				}
+				// Darker towards the foot, in two steps, where the street's
+				// grime and the ground's shade reach up the wall.
+				diffuseColor.rgb *= vZ < ${FOOT[0].toFixed(3)} ? ${FOOT[2].toFixed(2)} : vZ < ${FOOT[1].toFixed(3)} ? ${FOOT[3].toFixed(2)} : 1.0;`,
 			)
 	}
 	return material

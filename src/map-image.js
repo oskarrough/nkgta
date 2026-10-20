@@ -11,6 +11,13 @@ const ROOF_PX = 12
 const TONE_SHIFT = 1.1 // tiles the lighter ground tone slides south-west
 const SHAPE_OUTLINE = 0.7 // ink around parks and water, tiles
 const PLOT_OUTLINE = 0.5 // contact ink around building plots, tiles
+// Contact shade on the ground round every building, in hard steps: total
+// width in tiles and how much darker each step makes it.
+const CONTACT_SHADE = [
+	[1.5, 0.12],
+	[0.9, 0.16],
+]
+const CONTACT_COLOR = '24, 28, 44'
 const KERB_EXTRA = 0.6 // pale kerb band outside the tarmac, tiles
 const ROAD_INK_EXTRA = 0.34 // dark edge inside the kerb, tiles
 const MARK_DASH = [1.1, 1.3]
@@ -141,20 +148,19 @@ export function renderMapImage(world) {
 		}
 	}
 
-	// A dark contact line just outside every building plot, so the walls sit in
-	// the ground rather than float on it. Buildings themselves are painted by
-	// their roofs in the 3D scene.
-	for (const b of buildings) {
-		if (!b.rings.length) continue
-		g.beginPath()
-		for (const r of b.rings) {
-			trace(g, r)
-			g.closePath()
-		}
-		g.strokeStyle = INK
-		g.lineWidth = PLOT_OUTLINE
-		g.stroke()
+	// Ground darkens towards every wall, then a dark contact line just outside
+	// the plot, so the walls sit in the ground rather than float on it.
+	// Buildings themselves are painted by their roofs in the 3D scene.
+	const plots = new Path2D()
+	for (const b of buildings) for (const r of b.rings) plots.addPath(ringPath([r]))
+	for (const [width, dark] of CONTACT_SHADE) {
+		g.strokeStyle = `rgba(${CONTACT_COLOR}, ${dark})`
+		g.lineWidth = width
+		g.stroke(plots)
 	}
+	g.strokeStyle = INK
+	g.lineWidth = PLOT_OUTLINE
+	g.stroke(plots)
 	return canvas
 }
 
