@@ -4,6 +4,15 @@ import { nearBike } from './player.js'
 import { euro } from './pfand.js'
 import { T } from './tiles.js'
 
+// What E does right now, for the HUD and the touch button.
+export function useHint(player, car) {
+	if (player.car) return 'aussteigen'
+	if (player.onBike) return 'absteigen'
+	if (nearBike(player)) return 'aufs Fahrrad'
+	if (car) return car.ai ? 'Auto klauen' : 'einsteigen'
+	return null
+}
+
 const stopName = (s) => {
 	const name = s.kind === 'ubahn' ? `🚇 U ${s.name || 'Bahnhof'}` : `🚏 ${s.name || 'Haltestelle'}`
 	return s.lines.length ? `${name} · ${s.lines.join(', ')}` : name
@@ -41,7 +50,8 @@ export function createHud(world) {
 			set('street', street)
 			set('wasted', wasted ? 'WASTED' : '')
 			const here = p ? `${ICONS[p.kind]} ${placeName(p)}` : world.tileAt(player.x, player.y) === T.PRIVATE ? '🔒 Privatweg' : ''
-			const hint = door ?? (nearBike(player) ? 'E: aufs Fahrrad' : car ? (car.ai ? 'E: Auto klauen' : 'E: einsteigen') : null)
+			const use = useHint(player, car)
+			const hint = door ?? (use ? `E: ${use}` : null)
 			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
 		},
 	}

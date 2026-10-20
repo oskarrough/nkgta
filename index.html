@@ -2,7 +2,8 @@
 <html lang="de">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+		<meta name="theme-color" content="#222" />
 		<title>NK GTA</title>
 		<style>
 			html,
@@ -10,16 +11,22 @@
 				margin: 0;
 				height: 100%;
 				overflow: hidden;
+				overscroll-behavior: none;
 				background: #222;
 				font-family: system-ui, sans-serif;
 				color: #fff;
+				touch-action: none;
+				user-select: none;
+				-webkit-user-select: none;
+				-webkit-tap-highlight-color: transparent;
 			}
 			canvas {
 				position: fixed;
 				inset: 0;
 				display: block;
 				width: 100vw;
-				height: 100vh;
+				height: 100dvh;
+				touch-action: none;
 			}
 			.hud {
 				position: fixed;
@@ -30,7 +37,7 @@
 				font-weight: 800;
 			}
 			#street {
-				top: 1rem;
+				top: calc(1rem + env(safe-area-inset-top));
 				left: 0;
 				right: 0;
 				text-align: center;
@@ -39,18 +46,18 @@
 				letter-spacing: 0.05em;
 			}
 			#money {
-				top: 1rem;
-				right: 1.5rem;
+				top: calc(1rem + env(safe-area-inset-top));
+				right: calc(1.5rem + env(safe-area-inset-right));
 				font-size: 2rem;
 				color: #9be86a;
 			}
 			#bag {
-				top: 3.5rem;
-				right: 1.5rem;
+				top: calc(3.5rem + env(safe-area-inset-top));
+				right: calc(1.5rem + env(safe-area-inset-right));
 				font-size: 1.4rem;
 			}
 			#place {
-				bottom: 2.5rem;
+				bottom: calc(2.5rem + env(safe-area-inset-bottom));
 				left: 0;
 				right: 0;
 				text-align: center;
@@ -73,11 +80,123 @@
 				font-size: 1.5rem;
 			}
 			#help {
-				bottom: 1rem;
-				left: 1rem;
+				bottom: calc(1rem + env(safe-area-inset-bottom));
+				left: calc(1rem + env(safe-area-inset-left));
 				font-size: 0.8rem;
 				font-weight: 400;
 				opacity: 0.6;
+			}
+
+			/* Touch controls. Hidden until a coarse pointer or a real touch. */
+			#touch {
+				display: none;
+				position: fixed;
+				inset: 0;
+				z-index: 10;
+				pointer-events: none;
+				touch-action: none;
+			}
+			body.touch #touch {
+				display: block;
+			}
+			body.touch #help {
+				display: none;
+			}
+			body.touch #place {
+				bottom: calc(8.5rem + env(safe-area-inset-bottom));
+			}
+			#stick {
+				position: absolute;
+				width: 120px;
+				height: 120px;
+				margin: -60px 0 0 -60px;
+				border-radius: 50%;
+				border: 2px solid rgba(231, 231, 229, 0.4);
+				background: rgba(26, 30, 27, 0.35);
+				opacity: 0;
+				pointer-events: none;
+			}
+			#stick.on {
+				opacity: 1;
+			}
+			#stick-knob {
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				width: 52px;
+				height: 52px;
+				margin: -26px 0 0 -26px;
+				border-radius: 50%;
+				background: rgba(232, 194, 26, 0.55);
+				border: 2px solid rgba(231, 231, 229, 0.6);
+			}
+			#touch-actions {
+				position: absolute;
+				right: calc(1rem + env(safe-area-inset-right));
+				bottom: calc(1rem + env(safe-area-inset-bottom));
+				display: flex;
+				align-items: flex-end;
+				gap: 0.75rem;
+				pointer-events: none;
+			}
+			.touch-button {
+				pointer-events: auto;
+				appearance: none;
+				-webkit-appearance: none;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 84px;
+				height: 84px;
+				padding: 0 0.4rem;
+				border-radius: 50%;
+				border: 2px solid rgba(231, 231, 229, 0.5);
+				background: rgba(26, 30, 27, 0.55);
+				color: #e7e7e5;
+				font:
+					800 0.72rem / 1.05 system-ui,
+					sans-serif;
+				text-transform: uppercase;
+				text-align: center;
+				letter-spacing: 0.04em;
+				text-shadow: 0 2px 0 #000;
+				touch-action: none;
+				-webkit-tap-highlight-color: transparent;
+				-webkit-touch-callout: none;
+			}
+			.touch-button.on {
+				background: rgba(232, 194, 26, 0.45);
+				border-color: rgba(232, 194, 26, 0.9);
+			}
+			.touch-button.dim {
+				opacity: 0.4;
+			}
+			#touch-use {
+				width: 92px;
+				height: 92px;
+				background: rgba(232, 194, 26, 0.22);
+				border-color: rgba(232, 194, 26, 0.65);
+			}
+			#touch-boost {
+				font-size: 0.62rem;
+			}
+
+			/* Narrow screens: the street name and the money share the top line. */
+			@media (max-width: 600px) {
+				#street {
+					left: calc(1rem + env(safe-area-inset-left));
+					right: auto;
+					text-align: left;
+					font-size: 1.35rem;
+					letter-spacing: 0.03em;
+				}
+				#money {
+					font-size: 1.6rem;
+				}
+				#bag {
+					top: calc(3rem + env(safe-area-inset-top));
+					font-size: 1.2rem;
+				}
 			}
 		</style>
 	</head>
@@ -93,6 +212,13 @@
 		<div class="hud" id="help">
 			WASD: laufen, fahren · E: Rad, Auto klauen, aussteigen, Laden · Leertaste: Turbo, Handbremse · +/−: Zoom · N: Straßen · T:
 			Haltestellen · K: Wände · P: Look · L: Leise · M: Gegend · Pfand zum Späti
+		</div>
+		<div id="touch" aria-hidden="true">
+			<div id="stick"><div id="stick-knob"></div></div>
+			<div id="touch-actions">
+				<button class="touch-button" id="touch-boost" type="button" aria-label="Turbo oder Handbremse">Turbo</button>
+				<button class="touch-button dim" id="touch-use" type="button" aria-label="Benutzen">E</button>
+			</div>
 		</div>
 		<script type="module" src="/src/main.js"></script>
 	</body>

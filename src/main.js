@@ -8,7 +8,7 @@ import { createPfand } from './pfand.js'
 import { createCamera } from './camera.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
-import { createHud } from './hud.js'
+import { createHud, useHint } from './hud.js'
 import { findShops } from './shops.js'
 import { createSigns } from './signs.js'
 import { createVisit } from './visit.js'
@@ -85,7 +85,7 @@ let last = performance.now()
 function frame(now) {
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	last = now
-	if (!wasted.active() && !visit.warping()) updatePlayer(player, input.axis(), input.turbo(), visit.world(world), dt)
+	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
 	visit.update(dt, input.axis())
 	wasted.update(dt)
 	const inside = visit.inside()
@@ -112,10 +112,13 @@ function frame(now) {
 		inside: indoors,
 	})
 	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
-	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door: visit.hint() }, dt)
+	const door = visit.hint()
+	input.setUse(door?.startsWith('E: ') ? door.slice(3) : door ? null : useHint(player, car))
+	input.setDriving(!!player.car)
+	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door }, dt)
 	requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
 
-// For poking at the game from the console while developing.
-if (import.meta.env.DEV) window.nkgta = { player, shops, visit, pfand, camera }
+// For poking at the game from the console and automated browser tests while developing.
+if (import.meta.env.DEV) window.nkgta = window.__nkgta = { player, shops, visit, pfand, camera, traffic }

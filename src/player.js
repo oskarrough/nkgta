@@ -44,21 +44,25 @@ export function leaveCar(p, world) {
 	p.speed = 0
 }
 
-export function updatePlayer(p, axis, turbo, world, dt) {
+export function updatePlayer(p, input, world, dt) {
 	// In a car: up is gas, down is brake and reverse, left and right steer,
-	// space is the handbrake.
+	// space is the handbrake. Touch asks the same question through `drive`.
 	if (p.car) {
 		const c = p.car
-		driveCar(c, { throttle: -axis.y, turn: axis.x, handbrake: turbo }, world, dt)
+		driveCar(c, input.drive(c), world, dt)
 		p.x = c.x
 		p.y = c.y
 		p.dir = c.angle
 		p.speed = speedOf(c)
 		return
 	}
+	const axis = input.axis()
+	const turbo = input.turbo()
 	const here = world.tileAt(p.x, p.y)
-	// Tiles per second. One tile is 3 m.
-	let max = p.onBike ? 3.6 : 1.6
+	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
+	// of the way walks that much slower.
+	const push = Math.min(1, Math.hypot(axis.x, axis.y))
+	let max = (p.onBike ? 3.6 : 1.6) * push
 	if (p.onBike && (here === T.GRASS || here === T.GROUND)) max *= 0.55
 	if (p.onBike && here === T.CYCLEWAY) max *= 1.2
 	const boost = turbo ? 10 : 1
