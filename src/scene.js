@@ -3,7 +3,7 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { roofHash, roofOf, roofSpots } from './map-image.js'
+import { roofHash, roofHatches, roofOf, roofSpots } from './map-image.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createBridges } from './bridges.js'
@@ -33,6 +33,8 @@ const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
 // Tile courses on pitched roofs: height between them in tiles of the map,
 // the share of each that is dark line, and how dark.
 const ROOF_TILES = { row: 0.18, line: 0.3, ink: 0.45 }
+// Roof hatches, in tiles: side, height, and the lid's share of the side.
+const HATCH = { size: 0.42, height: 0.14, lid: 0.78, frame: '#b9bdc0', lidColor: '#7e868d' }
 // Chimney stacks on the roofs: size along and across the ridge and height,
 // in tiles, and their brick and sooty plaster colours.
 const CHIMNEY = { length: 0.75, width: 0.42, height: 0.42, colors: ['#8a4c38', '#7a6d64', '#9a5a42'] }
@@ -119,6 +121,7 @@ export function createScene(canvas, world, shops = []) {
 		const wallParts = []
 		const roofParts = []
 		const spots = []
+		const lids = []
 		for (const n of chunk.buildings) {
 			const h = house(world.buildings[n], n, world.tileM)
 			houses.push(h)
@@ -126,6 +129,7 @@ export function createScene(canvas, world, shops = []) {
 			const roof = roofGeometry([h])
 			if (roof) roofParts.push(roof)
 			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
+			lids.push(...roofHatches(world.buildings[n], n, h.roof))
 			yield
 		}
 		const roofRect = new THREE.Vector4()
@@ -144,6 +148,7 @@ export function createScene(canvas, world, shops = []) {
 		const byIndex = []
 		for (const h of houses) byIndex[h.n] = h
 		const stacks = spots.length && chimneys(spots, byIndex, gradient)
+		const hatchMesh = lids.length && hatches(lids, byIndex, gradient)
 		yield
 		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
 		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
@@ -161,7 +166,7 @@ export function createScene(canvas, world, shops = []) {
 		}
 		const near = [...cells.values()].map((pick) => createTrees(world, gradient, pick))
 		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
-		for (const mesh of [stacks, ...near, ...far]) {
+		for (const mesh of [stacks, hatchMesh, ...near, ...far]) {
 			if (!mesh) continue
 			mesh.frustumCulled = true
 			mesh.computeBoundingSphere()
@@ -175,6 +180,7 @@ export function createScene(canvas, world, shops = []) {
 				for (const mesh of near) mesh.visible = scale >= DETAIL_PX
 				for (const mesh of far) mesh.visible = scale < DETAIL_PX
 				if (stacks) stacks.visible = scale >= DETAIL_PX
+				if (hatchMesh) hatchMesh.visible = scale >= DETAIL_PX
 			},
 			// Point the ground's corners, or the roofs' world positions, at
 			// where the chunk sits in the texture.
@@ -795,6 +801,34 @@ function chimneys(list, houses, gradient) {
 	return mesh
 }
 
+// Roof hatches: a frame with a lid, all of them one instance each of one
+// box pair, so they're a single draw and cast real shadows on the tar.
+function hatches(list, houses, gradient) {
+	const { size, height, lid } = HATCH
+	const frame = new THREE.BoxGeometry(size, size, height).translate(0, 0, height / 2)
+	const top = new THREE.BoxGeometry(size * lid, size * lid, 0.03).translate(0, 0, height + 0.015)
+	const paint = (geo, hex) => {
+		const c = new THREE.Color(hex)
+		geo.setAttribute('color', new THREE.Float32BufferAttribute(new Array(geo.attributes.position.count).fill([c.r, c.g, c.b]).flat(), 3))
+		return geo
+	}
+	const geo = mergeGeometries([paint(frame, HATCH.frame), paint(top, HATCH.lidColor)])
+	const mesh = new THREE.InstancedMesh(geo, new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradient }), list.length)
+	mesh.castShadow = true
+	mesh.receiveShadow = true
+	mesh.frustumCulled = false
+	const m = new THREE.Matrix4()
+	const q = new THREE.Quaternion()
+	const z = new THREE.Vector3(0, 0, 1)
+	const at = new THREE.Vector3()
+	const one = new THREE.Vector3(1, 1, 1)
+	list.forEach((h, i) => {
+		m.compose(at.set(h.x, -h.y, houses[h.n].top(h.x, -h.y) - 0.01), q.setFromAxisAngle(z, -h.angle), one)
+		mesh.setMatrixAt(i, m)
+	})
+	return mesh
+}
+
 // Every outline filled in at its building's height, or raised into its
 // pitched roof, all in one geometry, or null for no roofs. Pitched faces are flat-shaded, so each slope
 // takes one light band and the ink finds the ridges and hips.
@@ -883,24 +917,17 @@ function roofMaterial(rect, gradient, tex) {
 }
 
 // Grey flat roofs are tar paper, lined up with the building: pale seams
-// between the rolls, newer and older patches, and now and then a roof hatch with its
-// shadow, or a vent. Sizes in tiles; the hatch shadow falls away from the sun.
+// between the rolls, newer and older patches, and now and then a vent.
+// Sizes in tiles. The hatches stand up in 3D.
 const TAR = {
 	seam: 0.34, // roll width
 	seamLight: 0.35, // the sealed overlaps catch the light
 	patch: [2.2, 1.3], // patch size
 	patchTone: 0.14,
-	hatchCell: 3.5, // one hatch at most per cell this size
-	hatchShare: 0.55, // cells without one
-	hatch: 0.3, // half size
-	frame: '#b9bdc0',
-	lid: '#8c949b',
 	ventCell: 1.7,
 	ventShare: 0.86,
 	vent: 0.08,
 }
-// Where a raised thing's shadow falls, in tiles: away from the sun.
-const SUN_AWAY = [-SUN.direction[0] * 0.12, -SUN.direction[1] * 0.12]
 
 const tarPaper = `
 	vec2 ax = vec2(cos(vRoofAxis), sin(vRoofAxis));
@@ -911,24 +938,11 @@ const tarPaper = `
 	float patch_ = tarHash(floor(uv / vec2(${TAR.patch[0].toFixed(2)}, ${TAR.patch[1].toFixed(2)})));
 	f += (step(0.86, patch_) - step(patch_, 0.12)) * ${TAR.patchTone.toFixed(2)};
 	diffuseColor.rgb *= f;
-	// A hatch at a random spot in some cells: lid, frame, shadow.
-	vec2 cell = floor(uv / ${TAR.hatchCell.toFixed(1)});
-	vec2 at = (cell + 0.3 + 0.4 * vec2(tarHash(cell + 1.7), tarHash(cell + 9.1))) * ${TAR.hatchCell.toFixed(1)};
-	float hatch = step(${TAR.hatchShare.toFixed(2)}, tarHash(cell + 5.3));
-	vec2 d = uv - at;
-	vec2 ds = vec2(dot(vRoofPos.xy - ${glslVec(SUN_AWAY)}, ax), dot(vRoofPos.xy - ${glslVec(SUN_AWAY)}, side)) - at;
-	float lid = max(abs(d.x), abs(d.y));
-	float shadow = step(max(abs(ds.x), abs(ds.y)), ${TAR.hatch.toFixed(2)}) * step(${TAR.hatch.toFixed(2)}, lid);
-	diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, hatch * shadow);
-	diffuseColor.rgb = mix(diffuseColor.rgb, lid > ${(TAR.hatch * 0.6).toFixed(2)} ? ${glsl(TAR.frame)} : ${glsl(TAR.lid)}, hatch * step(lid, ${TAR.hatch.toFixed(2)}));
 	// Vents: small dark dots.
 	vec2 vcell = floor(uv / ${TAR.ventCell.toFixed(1)});
 	vec2 vd = uv - (vcell + 0.25 + 0.5 * vec2(tarHash(vcell + 3.3), tarHash(vcell + 4.4))) * ${TAR.ventCell.toFixed(1)};
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
-function glslVec([x, y]) {
-	return `vec2(${x.toFixed(3)}, ${y.toFixed(3)})`
-}
 
 // Walls draw their own windows: one per 3 m along the wall and per storey up
 // it, wider shop windows on the ground floor, a ledge between storeys and now

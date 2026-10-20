@@ -33,6 +33,9 @@ const PARAPET_LIGHT = 0
 const PARAPET_LIGHT_WIDTH = 0.6
 const PARAPET_INK = 0.6
 const PARAPET_INK_WIDTH = 0.34
+const HATCH_AREA = 9 // square tiles of roof per try at a roof hatch
+const HATCH_SHARE = 0.5
+const HATCH_MARGIN = 0.5 // tiles clear of the roof's edge
 const ROOF_SPOT_AREA = 10 // square tiles of roof per try at a chimney or skylight
 const CHIMNEY_SHARE = 0.55
 const SKYLIGHT_SHARE = 0.1
@@ -500,6 +503,51 @@ function outline(b) {
 	o = { path, minX, minY, maxX, maxY, angle }
 	outlines.set(b, o)
 	return o
+}
+
+// Roof hatches stand on the tar, at spots fixed per building, clear of the
+// roof's edge and its chimneys: { x, y, n, angle }. `pitch` is the pitched
+// roof the 3D scene gives it, if any.
+export function roofHatches(b, n, pitch) {
+	if (!b.rings.length) return []
+	// Where there's tar: all of a flat roof, or the flat top of a pitched one.
+	let top = null
+	if (pitch) {
+		const tops = flatTops(pitch)
+		if (!tops) return []
+		// The 3D scene's y points north; outlines' point south.
+		top = new Path2D()
+		for (const r of tops) {
+			r.forEach(([x, y], i) => (i ? top.lineTo(x, -y) : top.moveTo(x, -y)))
+			top.closePath()
+		}
+	} else if (roofOf(b, n).ridge) return []
+	const { path, minX, minY, maxX, maxY, angle } = outline(b)
+	const onTar = (x, y) => contains(path, x, y, ROOF_PX) && (!top || contains(top, x, y, ROOF_PX))
+	const stacks = roofSpots(b, n).filter((s) => s.chimney)
+	const hatches = []
+	let seed = n * 6151 + 17
+	const rand = () => roofHash((seed += 104729))
+	const tries = ((maxX - minX) * (maxY - minY)) / HATCH_AREA
+	const m = HATCH_MARGIN
+	for (let k = 0; k < tries; k++) {
+		const x = minX + rand() * (maxX - minX)
+		const y = minY + rand() * (maxY - minY)
+		if (rand() > HATCH_SHARE) continue
+		if (
+			![
+				[0, 0],
+				[-m, -m],
+				[m, -m],
+				[-m, m],
+				[m, m],
+			].every(([dx, dy]) => onTar(x + dx, y + dy))
+		)
+			continue
+		if (stacks.some((c) => Math.hypot(c.x - x, c.y - y) < 1.2)) continue
+		hatches.push({ x, y, n, angle })
+	}
+	return hatches
 }
 
 // Chimneys and skylights, at spots fixed per building: { chimney, x, y, n,
