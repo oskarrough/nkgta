@@ -24,6 +24,10 @@ const WALL = {
 }
 const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
 
+// Chimney stacks on the roofs: size along and across the ridge and height,
+// in tiles, and their brick and sooty plaster colours.
+const CHIMNEY = { length: 0.75, width: 0.42, height: 0.42, colors: ['#8a4c38', '#7a6d64', '#9a5a42'] }
+
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
 
@@ -72,7 +76,8 @@ export function createScene(canvas, world) {
 	// Tile (x, y) sits at (x, -y), so north stays up and z is height in tiles.
 	const ground = new THREE.CanvasTexture(renderMapImage(world))
 	ground.colorSpace = THREE.SRGBColorSpace
-	const roofTex = new THREE.CanvasTexture(renderRoofImage(world))
+	const roofImage = renderRoofImage(world)
+	const roofTex = new THREE.CanvasTexture(roofImage.canvas)
 	roofTex.colorSpace = THREE.SRGBColorSpace
 	// Crisp texels only on the pixel grid; the smooth looks keep their
 	// filtered, anisotropic textures.
@@ -94,6 +99,7 @@ export function createScene(canvas, world) {
 	const gradient = toonGradient()
 	const houses = world.buildings.map((b) => ({ h: b.h / world.tileM, parts: footprint(b.rings) }))
 	scene.add(walls(houses, world.tileM, gradient), roofs(houses, world, gradient, roofTex))
+	scene.add(chimneys(roofImage.chimneys, world.tileM, gradient))
 	scene.add(createTrees(world, gradient))
 	const cars = carMeshes(gradient)
 	const skids = skidMarks()
@@ -544,6 +550,28 @@ function walls(houses, tileM, gradient) {
 	const mesh = new THREE.Mesh(geo, wallMaterial(tileM, gradient))
 	mesh.castShadow = true
 	mesh.receiveShadow = true
+	return mesh
+}
+
+// Every chimney is one instance of one box, so the whole city's stacks are a
+// single draw, and they cast real shadows down the roof.
+function chimneys(list, tileM, gradient) {
+	const geo = new THREE.BoxGeometry(CHIMNEY.length, CHIMNEY.width, CHIMNEY.height).translate(0, 0, CHIMNEY.height / 2)
+	const mesh = new THREE.InstancedMesh(geo, new THREE.MeshToonMaterial({ color: '#fff', gradientMap: gradient }), list.length)
+	mesh.castShadow = true
+	mesh.receiveShadow = true
+	mesh.frustumCulled = false
+	const m = new THREE.Matrix4()
+	const q = new THREE.Quaternion()
+	const z = new THREE.Vector3(0, 0, 1)
+	const at = new THREE.Vector3()
+	const one = new THREE.Vector3(1, 1, 1)
+	const c = new THREE.Color()
+	list.forEach((ch, i) => {
+		m.compose(at.set(ch.x, -ch.y, ch.h / tileM), q.setFromAxisAngle(z, -ch.angle), one)
+		mesh.setMatrixAt(i, m)
+		mesh.setColorAt(i, c.set(CHIMNEY.colors[Math.floor(ch.tone * CHIMNEY.colors.length)]))
+	})
 	return mesh
 }
 

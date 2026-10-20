@@ -33,8 +33,10 @@ const PARAPET_LIGHT = 0
 const PARAPET_LIGHT_WIDTH = 0.6
 const PARAPET_INK = 0.6
 const PARAPET_INK_WIDTH = 0.34
-const CHIMNEY_COLOR = '#544a44'
-const CHIMNEY_LIT = 'rgba(255, 255, 255, 0.3)'
+const ROOF_SPOT_AREA = 10 // square tiles of roof per try at a chimney or skylight
+const CHIMNEY_SHARE = 0.55
+const SKYLIGHT_SHARE = 0.1
+const CHIMNEY_SOOT = 'rgba(30, 26, 24, 0.25)'
 const SKYLIGHT_COLOR = '#8fa3ae'
 const HATCH_INK = '#877e70'
 const HATCH_WIDTH = 2
@@ -166,7 +168,9 @@ export function renderMapImage(world) {
 
 // Roofs, painted from the building outlines and laid over the tops of the
 // 3D buildings. Each building picks a roof (tiles or slate) and gets flat
-// two-tone shading split along its ridge, plus the odd chimney or skylight.
+// two-tone shading split along its ridge, plus the odd skylight. Returns the
+// image and where the chimneys go: { x, y, h, angle, tone }, in tiles, metres
+// and radians.
 const ROOFS = [
 	{ base: '#a55f45', ridge: 1 },
 	{ base: '#96553f', ridge: 1 },
@@ -198,6 +202,7 @@ export function renderRoofImage(world) {
 	const g = canvas.getContext('2d')
 	g.scale(RPX, RPX)
 	g.lineJoin = 'round'
+	const chimneys = []
 
 	buildings.forEach((b, n) => {
 		// No outline means an endless bounding box below, so skip it. Maps
@@ -263,20 +268,21 @@ export function renderRoofImage(world) {
 			g.restore()
 		}
 
-		// Chimneys and skylights, at spots fixed per building.
+		// Chimneys and skylights, at spots fixed per building. Chimneys stand
+		// up in the 3D scene, so here they only leave a sooty footprint.
 		let seed = n * 7919
 		const rand = () => roofHash((seed += 104729))
-		const tries = ((maxX - minX) * (maxY - minY)) / 30
+		const tries = ((maxX - minX) * (maxY - minY)) / ROOF_SPOT_AREA
 		for (let k = 0; k < tries; k++) {
 			const x = minX + rand() * (maxX - minX)
 			const y = minY + rand() * (maxY - minY)
 			if (!g.isPointInPath(path, x * RPX, y * RPX, 'evenodd')) continue
-			if (b.h > 5 && rand() < 0.5) {
-				g.fillStyle = CHIMNEY_COLOR
-				g.fillRect(x - 0.3, y - 0.3, 0.6, 0.6)
-				g.fillStyle = CHIMNEY_LIT
-				g.fillRect(x - 0.3, y - 0.3, 0.6, 0.12)
-			} else if (!roof.ridge && rand() < 0.3) {
+			const inside = (dx, dy) => g.isPointInPath(path, (x + dx) * RPX, (y + dy) * RPX, 'evenodd')
+			if (b.h > 5 && rand() < CHIMNEY_SHARE && inside(-0.6, 0) && inside(0.6, 0) && inside(0, -0.6) && inside(0, 0.6)) {
+				chimneys.push({ x, y, h: b.h, angle, tone: rand() })
+				g.fillStyle = CHIMNEY_SOOT
+				g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8)
+			} else if (!roof.ridge && rand() < SKYLIGHT_SHARE) {
 				g.fillStyle = SKYLIGHT_COLOR
 				g.fillRect(x - 0.35, y - 0.25, 0.7, 0.5)
 			}
@@ -291,5 +297,5 @@ export function renderRoofImage(world) {
 		g.stroke(path)
 		g.restore()
 	})
-	return canvas
+	return { canvas, chimneys }
 }
