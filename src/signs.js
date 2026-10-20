@@ -5,7 +5,7 @@ import { posterText, posterWidth } from './poster.js'
 import { alongFacade } from './shops.js'
 
 const CLOTH = ['#C8302A', '#3D5E82', '#3FA34D', '#B5603F', '#E8C21A', '#2D333D']
-const DEPTH = 1.05 // how far the awning reaches out over the pavement, tiles
+export const DEPTH = 1.05 // how far the awning reaches out over the pavement, tiles
 const HIGH = 1.15 // where it meets the wall, tiles up
 const LOW = 0.85 // its front edge
 const WIDTH = [1.6, 7] // tiles

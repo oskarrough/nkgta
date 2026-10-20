@@ -2,14 +2,37 @@
 // traffic lights, street names, the player and anyone fleeing their car.
 import { SOLID } from './tiles.js'
 import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
+import { DEPTH as AWNING_DEPTH } from './signs.js'
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
-export function createRenderer(canvas, world) {
+// Badges, the classic map way: names when near, icons when far. A shop's
+// awning carries its name, so its badge fades in only once you've zoomed out
+// past where the awning reads (screen px per tile, before devicePixelRatio),
+// and shrinks a little on the way. It stands on the pavement in front of the
+// awning, never on it. Places without an awning always show theirs.
+const BADGE = {
+	fadeIn: 38, // awning names read well above this
+	full: 25, // and the badge is all there below this
+	size: [20, 26], // screen px, smallest and largest
+	perTile: 0.9, // badge size per tile while between those
+	shrink: 0.75, // size while it fades
+	gap: 0.5, // tiles out past the awning's front edge
+	apart: 0.9, // overlapping badges further than this many sizes apart are both drawn
+}
+
+export function createRenderer(canvas, world, shops = []) {
 	const ctx = canvas.getContext('2d')
 	const icons = badgeSprites()
 	const signs = transitSprites()
 	const labels = labelSprites(world.labels.map((l) => l.name))
+	// Where each place's badge stands, and whether it hides behind an awning.
+	const doors = new Map(shops.map((s) => [s.place, s]))
+	const badges = world.pois.map((p) => {
+		const s = doors.get(p)
+		const out = AWNING_DEPTH + BADGE.gap
+		return s ? { kind: p.kind, x: s.x + s.nx * out, y: s.y + s.ny * out, awning: true } : { kind: p.kind, x: p.x, y: p.y, awning: false }
+	})
 
 	function resize() {
 		canvas.width = innerWidth * devicePixelRatio
@@ -63,11 +86,24 @@ export function createRenderer(canvas, world) {
 			ctx.fill()
 		}
 
-		const icon = Math.max(10 * devicePixelRatio, scale * 1.4)
-		for (const p of inside ? [] : world.pois) {
-			const [sx, sy] = toScreen(p.x, p.y)
-			if (onScreen(sx, sy, icon)) ctx.drawImage(icons[p.kind], sx - icon / 2, sy - icon / 2, icon, icon)
+		const perTile = scale / devicePixelRatio
+		const size = Math.max(BADGE.size[0], Math.min(BADGE.size[1], perTile * BADGE.perTile)) * devicePixelRatio
+		const t = Math.max(0, Math.min(1, (BADGE.fadeIn - perTile) / (BADGE.fadeIn - BADGE.full)))
+		const fade = t * t * (3 - 2 * t)
+		const placed = []
+		for (const b of inside ? [] : badges) {
+			const alpha = b.awning ? fade : 1
+			if (alpha <= 0) continue
+			const [sx, sy] = toScreen(b.x, b.y)
+			const s = b.awning ? size * (BADGE.shrink + (1 - BADGE.shrink) * fade) : size
+			if (!onScreen(sx, sy, s)) continue
+			// First come, first drawn: a badge on top of another is left out.
+			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * BADGE.apart)) continue
+			placed.push([sx, sy])
+			ctx.globalAlpha = alpha
+			ctx.drawImage(icons[b.kind], sx - s / 2, sy - s / 2, s, s)
 		}
+		ctx.globalAlpha = 1
 
 		if (showTransit && !inside) {
 			const sign = Math.max(14 * devicePixelRatio, scale * 1.6)

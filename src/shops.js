@@ -70,7 +70,7 @@ export function findShops(world) {
 		}
 		if (!best) continue
 		const { x, y, nx, ny, ex, ey, out, room } = best
-		shops.push({ name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
+		shops.push({ place: p, name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
 	}
 
 	// Two shops in one shopfront: step their doors apart along the wall, if
