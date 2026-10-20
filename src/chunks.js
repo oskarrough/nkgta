@@ -129,6 +129,13 @@ export function createChunks(world, renderer, build) {
 			arrived.push([entry, data.bitmap])
 			dispatch()
 		}
+		// A texture that won't paint stays unpainted, and the worker moves on.
+		worker.onerror = (err) => {
+			console.error('Could not paint', worker.job?.key, err.message)
+			if (worker.job) worker.job.state = 'failed'
+			worker.job = null
+			dispatch()
+		}
 		return worker
 	})
 
