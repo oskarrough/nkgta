@@ -15,18 +15,23 @@ const BLOB_LIFT = 0.8 // how much of the crown's vertical slack blobs may use
 const TREE_TONE_MIN = 0.85 // per-tree brightness variation
 const TREE_TONE_MAX = 1.1
 const BLOB_TONE = [0.94, 1.06] // a little variation between a tree's own blobs
+const SIMPLE_RADIUS = 0.95 // a simple tree's one blob, as a share of the crown radius
 
 const hash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 const blobCount = (i) => BLOBS_MIN + Math.floor(hash(i * 7 + 2) * (BLOBS_MAX - BLOBS_MIN + 1))
 const mix = (range, t) => range[0] + t * (range[1] - range[0])
 
-export function createTrees(world, gradient) {
+// `pick` is which trees, by index, so each keeps its own looks wherever
+// it's drawn. `simple` gives each tree one plain blob in its own colour,
+// for when trees are too small on screen to show their lumps.
+export function createTrees(world, gradient, pick = (world.trees ?? []).keys(), simple = false) {
 	const trees = world.trees ?? []
+	const list = [...pick]
 	let total = 0
-	for (let i = 0; i < trees.length; i++) total += blobCount(i)
+	for (const i of list) total += simple ? 1 : blobCount(i)
 
 	const mesh = new THREE.InstancedMesh(
-		new THREE.IcosahedronGeometry(1, 1),
+		new THREE.IcosahedronGeometry(1, simple ? 0 : 1),
 		new THREE.MeshToonMaterial({ color: '#fff', gradientMap: gradient }),
 		total,
 	)
@@ -41,7 +46,8 @@ export function createTrees(world, gradient) {
 	const q = new THREE.Quaternion()
 	const c = new THREE.Color()
 	let n = 0
-	trees.forEach((t, i) => {
+	for (const i of list) {
+		const t = trees[i]
 		const r = t.crown / 2 / tileM
 		const bottom = BOTTOM / tileM
 		const top = Math.max(bottom + 1.5, t.top / tileM)
@@ -49,6 +55,13 @@ export function createTrees(world, gradient) {
 		const cz = (top + bottom) / 2
 		const base = Math.floor(hash(i * 5 + 1) * CROWNS.length)
 		const tone = TREE_TONE_MIN + hash(i * 3 + 7) * (TREE_TONE_MAX - TREE_TONE_MIN)
+		if (simple) {
+			pos.set(t.x, -t.y, cz)
+			scale.set(r * SIMPLE_RADIUS, r * SIMPLE_RADIUS, half)
+			mesh.setMatrixAt(n, m.compose(pos, q, scale))
+			mesh.setColorAt(n++, c.set(CROWNS[base]).multiplyScalar(tone))
+			continue
+		}
 		const phase = hash(i * 11 + 3) * Math.PI * 2
 		const count = blobCount(i)
 		for (let b = 0; b < count; b++) {
@@ -66,7 +79,7 @@ export function createTrees(world, gradient) {
 			mesh.setColorAt(n, c)
 			n++
 		}
-	})
+	}
 	mesh.instanceMatrix.needsUpdate = true
 	if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
 	return mesh

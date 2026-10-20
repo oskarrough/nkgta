@@ -26,7 +26,8 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/shops.js`: which places you can walk into, and where their doors are. `src/signs.js`: their awnings, in the poster type from `src/poster.js`. `src/visit.js`: going in and out through `src/portal.js`, a tear in the air ported from dodgethis. `src/interior.js`: the room inside, one for every shop.
 - `src/car.js`: a car as a rigid body on four tyres, hitting walls and other cars. `src/models.js`: Kleinwagen, SUV, lambo and bus, their sizes, handling and looks. `src/roads.js`: the road network as lanes. `src/traffic.js`: how traffic drives them, and cars coming and going out of sight around the player. `src/junctions.js`: traffic lights and right of way. `src/wasted.js`: getting run over.
 - `src/scene.js`: the 3D city in three.js. Buildings are raised from their outlines, with windows drawn in the wall shader, under a perspective camera looking straight down.
-- `src/map-image.js`: the ground and roof textures, painted once from the map's shapes.
+- `src/map-image.js`: the ground and roof textures, painted from the map's shapes, any part of the map at any sharpness.
+- `src/chunks.js`, `src/paint-worker.js`: the city in square chunks. Each has its own meshes, so only what's near the view gets drawn, and its own ground and roof textures, painted in workers as it comes near, as sharp as the zoom needs, and let go when it's far.
 - `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names, the player) and the text.
 
 Map data © OpenStreetMap contributors, ODbL.

@@ -23,7 +23,6 @@ const map = await loadMap((text) => (loading.textContent = text)).catch((err) =>
 	loading.textContent = `Karte konnte nicht laden: ${err.message}`
 	throw err
 })
-loading.remove()
 
 const world = createWorld(map)
 phase('createWorld')
@@ -40,6 +39,7 @@ const shops = findShops(world)
 const draw = createRenderer(canvas, world, shops)
 city3d.add(createSigns(shops, city3d.gradient))
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say })
+phase('shops')
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
@@ -128,6 +128,11 @@ function frame(now) {
 	first = false
 	requestAnimationFrame(frame)
 }
+// Hold the loading text until what's on screen is painted.
+loading.textContent = 'Male die Stadt…'
+await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
+phase('first textures')
+loading.remove()
 requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.

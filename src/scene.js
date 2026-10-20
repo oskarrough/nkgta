@@ -3,13 +3,14 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { renderMapImage, renderRoofImage, roofHash, roofOf } from './map-image.js'
+import { roofHash, roofOf, roofSpots } from './map-image.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
-import { phase, timePasses } from './perf.js'
+import { timePasses } from './perf.js'
+import { BLANK, createChunks } from './chunks.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -33,6 +34,11 @@ const ROOF_TILES = { row: 0.18, line: 0.3, ink: 0.45 }
 // Chimney stacks on the roofs: size along and across the ridge and height,
 // in tiles, and their brick and sooty plaster colours.
 const CHIMNEY = { length: 0.75, width: 0.42, height: 0.42, colors: ['#8a4c38', '#7a6d64', '#9a5a42'] }
+
+// Trees go in cells this many tiles a side, so the view only draws those
+// near it, and turn into simple blobs below this many screen pixels a tile.
+const TREE_CELL = 32
+const SIMPLE_TREES = 3
 
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
@@ -87,38 +93,93 @@ export function createScene(canvas, world) {
 	renderer.shadowMap.type = THREE.PCFShadowMap
 
 	// Tile (x, y) sits at (x, -y), so north stays up and z is height in tiles.
-	phase('scene setup')
-	const ground = new THREE.CanvasTexture(renderMapImage(world))
-	phase('renderMapImage')
-	ground.colorSpace = THREE.SRGBColorSpace
-	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
-	phase('houses (footprints, roof shapes)')
-	const roofImage = renderRoofImage(world, (n) => houses[n].roof)
-	phase('renderRoofImage')
-	const roofTex = new THREE.CanvasTexture(roofImage.canvas)
-	roofTex.colorSpace = THREE.SRGBColorSpace
-	// Crisp texels only on the pixel grid; the smooth looks keep their
-	// filtered, anisotropic textures.
-	const maps = [ground, roofTex]
-	function crispMaps(crisp) {
-		const anisotropy = crisp ? 1 : renderer.capabilities.getMaxAnisotropy()
-		for (const tex of maps) {
-			tex.magFilter = crisp ? THREE.NearestFilter : THREE.LinearFilter
-			tex.anisotropy = anisotropy
-			tex.needsUpdate = true
-		}
-	}
-	crispMaps(false)
-	const plane = new THREE.Mesh(new THREE.PlaneGeometry(world.W, world.H), groundMaterial(ground, world))
-	plane.position.set(world.W / 2, -world.H / 2, 0)
-	plane.receiveShadow = true
-	scene.add(plane)
-
+	// The city comes in chunks (see chunks.js), each with its own ground,
+	// walls, roofs, chimneys and trees, which take their textures as they're
+	// painted. Crisp texels only on the pixel grid; the smooth looks keep
+	// their filtered, anisotropic textures.
 	const gradient = toonGradient()
-	scene.add(walls(houses, world.tileM, gradient), roofs(houses, world, gradient, roofTex))
-	scene.add(chimneys(roofImage.chimneys, houses, gradient))
+	const time = { value: 0 }
+	const wallLook = wallMaterial(world.tileM, gradient)
+	// A generator, so chunks can be built a building at a time between frames.
+	const city = createChunks(world, renderer, function* (chunk) {
+		const group = new THREE.Group()
+		const plane = new THREE.Mesh(new THREE.PlaneGeometry(chunk.w, chunk.h), groundMaterial(BLANK.ground, world))
+		plane.position.set(chunk.x + chunk.w / 2, -(chunk.y + chunk.h / 2), 0)
+		plane.receiveShadow = true
+		plane.material.uniforms.time = time
+		group.add(plane)
+		const houses = []
+		const wallParts = []
+		const roofParts = []
+		const spots = []
+		for (const n of chunk.buildings) {
+			const h = house(world.buildings[n], n, world.tileM)
+			houses.push(h)
+			wallParts.push(wallGeometry([h]))
+			const roof = roofGeometry([h])
+			if (roof) roofParts.push(roof)
+			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
+			yield
+		}
+		const roofRect = new THREE.Vector4()
+		const top = roofParts.length ? new THREE.Mesh(mergeGeometries(roofParts), roofMaterial(roofRect, gradient, BLANK.roofs)) : null
+		const sides = houses.length ? new THREE.Mesh(mergeGeometries(wallParts), wallLook) : null
+		for (const mesh of [sides, top]) {
+			if (!mesh) continue
+			mesh.castShadow = true
+			mesh.receiveShadow = true
+			group.add(mesh)
+		}
+		yield
+		const byIndex = []
+		for (const h of houses) byIndex[h.n] = h
+		const stacks = spots.length && chimneys(spots, byIndex, gradient)
+		// Trees in cells, so the view skips most of them, or one plain blob
+		// each across the chunk once they're too small on screen for lumps.
+		const cells = new Map()
+		for (const i of chunk.trees) {
+			const t = world.trees[i]
+			const key = Math.floor(t.x / TREE_CELL) * 4096 + Math.floor(t.y / TREE_CELL)
+			cells.set(key, [...(cells.get(key) ?? []), i])
+		}
+		const near = [...cells.values()].map((pick) => createTrees(world, gradient, pick))
+		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
+		for (const mesh of [stacks, ...near, ...far]) {
+			if (!mesh) continue
+			mesh.frustumCulled = true
+			mesh.computeBoundingSphere()
+			group.add(mesh)
+		}
+		const uv = plane.geometry.attributes.uv
+		return {
+			group,
+			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
+			zoom(scale) {
+				for (const mesh of near) mesh.visible = scale >= SIMPLE_TREES
+				for (const mesh of far) mesh.visible = scale < SIMPLE_TREES
+			},
+			// Point the ground's corners, or the roofs' world positions, at
+			// where the chunk sits in the texture.
+			show(kind, texture, area) {
+				if (kind === 'roofs') {
+					if (!top) return
+					top.material.map = texture
+					roofRect.set(area.x, area.y, area.w, area.h)
+					return
+				}
+				plane.material.uniforms.map.value = texture
+				for (let i = 0; i < uv.count; i++) {
+					const x = chunk.x + (i % 2) * chunk.w
+					const y = chunk.y + (i < 2 ? 0 : chunk.h)
+					uv.setXY(i, (x - area.x) / area.w, 1 - (y - area.y) / area.h)
+				}
+				uv.needsUpdate = true
+			},
+		}
+	})
+	scene.add(city.group)
 	const clouds = createClouds(world, gradient)
-	scene.add(createTrees(world, gradient), clouds.layer)
+	scene.add(clouds.layer)
 	const cars = carMeshes(gradient)
 	const skids = skidMarks()
 	scene.add(...cars.meshes, skids.mesh)
@@ -188,7 +249,7 @@ export function createScene(canvas, world) {
 	function setLook(name) {
 		look = name
 		ink.setLook(name !== 'comic', name === 'pixel')
-		crispMaps(name === 'pixel')
+		city.setCrisp(name === 'pixel')
 		upscale = 0
 	}
 
@@ -214,8 +275,16 @@ export function createScene(canvas, world) {
 		const { width, height } = ink.frame
 		focusSun(view.position.x, view.position.y, Math.hypot(width, height) / cam.scale / 2)
 		clouds.follow(view)
-		plane.material.uniforms.time.value = performance.now() / 1000
+		time.value = performance.now() / 1000
+		city.update(viewOf(cam), cam.scale)
 		ink.render(scene, view, target)
+	}
+
+	// The ground on screen, in tiles.
+	function viewOf(cam) {
+		fit(cam.scale)
+		const { width, height } = ink.frame
+		return { x0: cam.x / cam.scale, y0: cam.y / cam.scale, x1: (cam.x + width) / cam.scale, y1: (cam.y + height) / cam.scale }
 	}
 
 	return {
@@ -225,9 +294,17 @@ export function createScene(canvas, world) {
 		aim,
 		renderer,
 		gradient,
+		scene,
 		add: (...objects) => scene.add(...objects),
 		// Another scene, such as a shop inside, in the same look.
 		draw: (other, view, target = null) => ink.render(other, view, target),
+		// Resolves once what's on screen at \`cam\` is painted, the shaders
+		// compiled meanwhile, and a first frame drawn.
+		async ready(cam) {
+			await Promise.all([city.ready(viewOf(cam), cam.scale), renderer.compileAsync(scene, aim(cam))])
+			render(cam, [])
+		},
+		chunks: city,
 		// Only the pixel grid needs the camera on whole game pixels.
 		pixelGrid: () => look === 'pixel',
 		// P: comic, palette, pixel, and round again.
@@ -599,20 +676,20 @@ function house(b, n, tileM) {
 		const e = outer[(i + 1) % outer.length]
 		if (a.distanceTo(e) > longest) [longest, axis] = [a.distanceTo(e), Math.atan2(e.y - a.y, e.x - a.x)]
 	})
-	return { h, parts, roof, axis, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
+	return { n, h, parts, roof, axis, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
 }
 
 // Every edge of every outline becomes one wall quad, outer rings
 // anticlockwise and courtyards clockwise, so walls face away from the
 // building. Each building gets a plaster colour from a stable hash.
-function walls(houses, tileM, gradient) {
+function wallGeometry(houses) {
 	const pos = []
 	const nor = []
 	const col = []
 	const wall = [] // per vertex: distance along the wall, windows that fit, building height
 	const plaster = FACADES.map((f) => new THREE.Color(f))
 	const c = new THREE.Color()
-	houses.forEach(({ h, parts, top }, n) => {
+	houses.forEach(({ n, h, parts, top }) => {
 		const j = roofHash(n + 500)
 		c.copy(plaster[Math.floor(j * plaster.length)]).offsetHSL(0, 0, (roofHash(n + 900) - 0.5) * 0.08)
 		for (const { outer, holes } of parts) {
@@ -653,10 +730,7 @@ function walls(houses, tileM, gradient) {
 	geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
 	geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
 	geo.setAttribute('wall', new THREE.Float32BufferAttribute(wall, 3))
-	const mesh = new THREE.Mesh(geo, wallMaterial(tileM, gradient))
-	mesh.castShadow = true
-	mesh.receiveShadow = true
-	return mesh
+	return geo
 }
 
 // Every chimney is one instance of one box, so the whole city's stacks are a
@@ -682,9 +756,9 @@ function chimneys(list, houses, gradient) {
 }
 
 // Every outline filled in at its building's height, or raised into its
-// pitched roof, all in one mesh. Pitched faces are flat-shaded, so each slope
+// pitched roof, all in one geometry, or null for no roofs. Pitched faces are flat-shaded, so each slope
 // takes one light band and the ink finds the ridges and hips.
-function roofs(houses, world, gradient, tex) {
+function roofGeometry(houses) {
 	const tops = []
 	const flat = (shape, z, axis) => {
 		const geo = new THREE.ShapeGeometry(shape).translate(0, 0, z).toNonIndexed()
@@ -715,11 +789,7 @@ function roofs(houses, world, gradient, tex) {
 		geo.computeVertexNormals()
 		tops.push(withAxis(geo, axis))
 	}
-	if (!tops.length) return new THREE.Group() // an area without buildings
-	const mesh = new THREE.Mesh(mergeGeometries(tops), roofMaterial(world, gradient, tex))
-	mesh.castShadow = true
-	mesh.receiveShadow = true
-	return mesh
+	return tops.length ? mergeGeometries(tops) : null
 }
 
 function withAxis(geo, axis) {
@@ -734,20 +804,21 @@ function triangulate(contour, holes) {
 	return THREE.ShapeUtils.triangulateShape(v(contour), holes.map(v))
 }
 
-// The roof image is one texture for the whole map, so each roof looks up its
-// patch by world position. Slopes draw their own tile courses: lines of
+// Each chunk's roof image covers its buildings, `rect` (x, y, width, height
+// in tiles), so each roof looks up its patch by world position. Slopes draw their own tile courses: lines of
 // equal height, so they run along the eaves of every face.
-function roofMaterial(world, gradient, tex) {
+function roofMaterial(rect, gradient, tex) {
 	const material = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient })
 	material.onBeforeCompile = (shader) => {
+		shader.uniforms.roofRect = { value: rect }
 		const decl = 'varying vec3 vRoofPos;\nvarying vec3 vRoofNormal;\nvarying float vRoofAxis;\n'
 		shader.vertexShader =
-			'attribute float axis;\n' +
+			'attribute float axis;\nuniform vec4 roofRect;\n' +
 			decl +
 			shader.vertexShader.replace(
 				'#include <uv_vertex>',
 				`#include <uv_vertex>
-				vMapUv = vec2(position.x / ${world.W.toFixed(1)}, 1.0 + position.y / ${world.H.toFixed(1)});
+				vMapUv = vec2((position.x - roofRect.x) / roofRect.z, 1.0 + (position.y + roofRect.y) / roofRect.w);
 				vRoofPos = position;
 				vRoofNormal = normal;
 				vRoofAxis = axis;`,

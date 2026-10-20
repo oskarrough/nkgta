@@ -123,22 +123,93 @@ function pitchLines(g, ring, path) {
 	g.restore()
 }
 
-export function renderMapImage(world) {
-	const { W, H, shapes, buildings } = world
-	const GPX = Math.max(2, Math.min(GROUND_PX, Math.floor(8192 / Math.max(W, H))))
+// A canvas to paint on, in the page or in a worker.
+function newCanvas(width, height) {
+	if (typeof document === 'undefined') return new OffscreenCanvas(width, height)
 	const canvas = document.createElement('canvas')
-	canvas.width = W * GPX
-	canvas.height = H * GPX
+	canvas.width = width
+	canvas.height = height
+	return canvas
+}
+
+// What to paint: a rectangle of the map in tiles, at `px` texture pixels per
+// tile. By default the whole map, as fine as fits in one texture.
+const wholeMap = ({ W, H }, px) => ({ x: 0, y: 0, w: W, h: H, px: Math.max(2, Math.min(px, Math.floor(8192 / Math.max(W, H)))) })
+
+// Bounding boxes, worked out once per shape or building.
+const boxes = new WeakMap()
+function boxOf(rings, key = rings) {
+	let box = boxes.get(key)
+	if (box) return box
+	box = [Infinity, Infinity, -Infinity, -Infinity]
+	for (const r of rings) {
+		for (let i = 0; i < r.length; i += 2) {
+			box[0] = Math.min(box[0], r[i])
+			box[1] = Math.min(box[1], r[i + 1])
+			box[2] = Math.max(box[2], r[i])
+			box[3] = Math.max(box[3], r[i + 1])
+		}
+	}
+	boxes.set(key, box)
+	return box
+}
+// Whether anything within `pad` tiles of these rings lands in the area.
+const touches = (area, rings, pad, key) => {
+	const [x0, y0, x1, y1] = boxOf(rings, key)
+	return x1 + pad > area.x && y1 + pad > area.y && x0 - pad < area.x + area.w && y0 - pad < area.y + area.h
+}
+
+// Which footpaths run through a park, asked once per path. Only parks whose
+// box holds the point can hold it, so they make up the path tested: the same
+// answer as every park in one path, right down to points on an outline.
+const parksOf = new WeakMap()
+const inParks = new WeakMap()
+function inPark(shapes, s) {
+	if (inParks.has(s)) return inParks.get(s)
+	let parks = parksOf.get(shapes)
+	if (!parks) {
+		parks = shapes.filter((p) => p.rings && p.t === T.GRASS).map((p) => ({ path: ringPath(p.rings), box: boxOf(p.rings, p) }))
+		parksOf.set(shapes, parks)
+	}
+	const i = Math.floor(s.line.length / 4) * 2
+	const [x, y] = [s.line[i], s.line[i + 1]]
+	const near = parks.filter(({ box }) => x >= box[0] && y >= box[1] && x <= box[2] && y <= box[3])
+	let path = near[0]?.path
+	if (near.length > 1) {
+		path = new Path2D()
+		for (const p of near) path.addPath(p.path)
+	}
+	const hit = !!path && contains(path, x, y, GROUND_PX)
+	inParks.set(s, hit)
+	return hit
+}
+// Point in path, tested at a fixed scale: edge cases come out the same as
+// they did when it was tested on the painted image at full sharpness.
+let scratch
+function contains(path, x, y, px) {
+	scratch ??= newCanvas(1, 1).getContext('2d')
+	scratch.setTransform(px, 0, 0, px, 0, 0)
+	return scratch.isPointInPath(path, x * px, y * px, 'evenodd')
+}
+
+export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
+	const { shapes, buildings } = world
+	const GPX = area.px
+	const canvas = newCanvas(Math.ceil(area.w * GPX), Math.ceil(area.h * GPX))
 	const g = canvas.getContext('2d')
 	g.fillStyle = COLORS[T.GROUND]
 	g.fillRect(0, 0, canvas.width, canvas.height)
 	g.scale(GPX, GPX)
+	g.translate(-area.x, -area.y)
 	g.lineCap = 'round'
 	g.lineJoin = 'round'
+	// Shapes that can't reach the area are skipped; strokes reach out by half
+	// their width, the contact shade by a tile and a half.
+	const near = (s) => touches(area, s.rings ?? [s.line], (s.w ?? 0) + 2, s)
 
-	// Diagonal hatching on private ground, like a plan's no-go area.
-	const hatchTile = document.createElement('canvas')
-	hatchTile.width = hatchTile.height = 8
+	// Diagonal hatching on private ground, like a plan's no-go area. Its
+	// stripes are fixed to the map, so they line up across textures.
+	const hatchTile = newCanvas(8, 8)
 	const hg = hatchTile.getContext('2d')
 	hg.fillStyle = COLORS[T.PRIVATE]
 	hg.fillRect(0, 0, 8, 8)
@@ -151,7 +222,7 @@ export function renderMapImage(world) {
 	}
 	hg.stroke()
 	const hatch = g.createPattern(hatchTile, 'repeat')
-	hatch.setTransform(new DOMMatrix().scale(1 / GPX))
+	hatch.setTransform(new DOMMatrix().scale(1 / GROUND_PX))
 	const paint = (t) => (t === T.PRIVATE ? hatch : COLORS[t])
 
 	const stroke = (s, style, width) => {
@@ -162,16 +233,10 @@ export function renderMapImage(world) {
 		g.stroke()
 	}
 
-	// Footpaths through parks are gravel, not paving.
-	const parks = new Path2D()
-	for (const s of shapes) if (s.rings && s.t === T.GRASS) parks.addPath(ringPath(s.rings))
-	const inPark = (line) => {
-		const i = Math.floor(line.length / 4) * 2
-		return g.isPointInPath(parks, line[i] * GPX, line[i + 1] * GPX, 'evenodd')
-	}
-
 	for (let k = 0; k < shapes.length; k++) {
 		const s = shapes[k]
+		// Roads go in runs below, so a run's first road can't be skipped.
+		if (!near(s) && (s.rings || s.t !== T.ROAD)) continue
 		if (s.rings) {
 			const path = ringPath(s.rings)
 			g.fillStyle = paint(s.t)
@@ -219,12 +284,13 @@ export function renderMapImage(world) {
 			// All the kerbs first, then all the tarmac, so junctions stay open.
 			let end = k
 			while (shapes[end]?.t === T.ROAD) end++
-			for (let j = k; j < end; j++) stroke(shapes[j], KERB, shapes[j].w + KERB_EXTRA)
-			for (let j = k; j < end; j++) stroke(shapes[j], INK, shapes[j].w + ROAD_INK_EXTRA)
-			for (let j = k; j < end; j++) stroke(shapes[j], COLORS[T.ROAD], shapes[j].w)
+			const run = shapes.slice(k, end).filter(near)
+			for (const r of run) stroke(r, KERB, r.w + KERB_EXTRA)
+			for (const r of run) stroke(r, INK, r.w + ROAD_INK_EXTRA)
+			for (const r of run) stroke(r, COLORS[T.ROAD], r.w)
 			k = end - 1
 		} else {
-			if (s.t === T.SIDEWALK && s.w <= FOOTPATH && inPark(s.line)) {
+			if (s.t === T.SIDEWALK && s.w <= FOOTPATH && inPark(shapes, s)) {
 				stroke(s, GRAVEL_EDGE, s.w + GRAVEL_EDGE_WIDTH)
 				stroke(s, GRAVEL, s.w)
 			} else stroke(s, paint(s.t), s.w)
@@ -235,7 +301,7 @@ export function renderMapImage(world) {
 	// the plot, so the walls sit in the ground rather than float on it.
 	// Buildings themselves are painted by their roofs in the 3D scene.
 	const plots = new Path2D()
-	for (const b of buildings) for (const r of b.rings) plots.addPath(ringPath([r]))
+	for (const b of buildings) if (touches(area, b.rings, 2)) for (const r of b.rings) plots.addPath(ringPath([r]))
 	for (const [width, dark] of CONTACT_SHADE) {
 		g.strokeStyle = `rgba(${CONTACT_COLOR}, ${dark})`
 		g.lineWidth = width
@@ -283,45 +349,74 @@ export function roofOf(b, n) {
 	return b.h <= 5 ? SHED_ROOF : ROOFS[Math.floor(roofHash(n) * ROOFS.length)]
 }
 
-export function renderRoofImage(world, pitched = () => false) {
-	const { W, H, buildings } = world
-	// Finer than the ground, but within what every GPU takes as one texture.
-	const RPX = Math.max(2, Math.min(ROOF_PX, Math.floor(8192 / Math.max(W, H))))
-	const canvas = document.createElement('canvas')
-	canvas.width = W * RPX
-	canvas.height = H * RPX
+// A building's outline as a path, its bounding box, and the direction of
+// its longest wall.
+const outlines = new WeakMap()
+function outline(b) {
+	let o = outlines.get(b)
+	if (o) return o
+	const path = new Path2D()
+	let longest = 0
+	let angle = 0
+	for (const r of b.rings) {
+		path.moveTo(r[0], r[1])
+		for (let i = 2; i < r.length; i += 2) {
+			path.lineTo(r[i], r[i + 1])
+			const len = Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1])
+			if (len > longest) [longest, angle] = [len, Math.atan2(r[i + 1] - r[i - 1], r[i] - r[i - 2])]
+		}
+		path.closePath()
+	}
+	const [minX, minY, maxX, maxY] = boxOf(b.rings)
+	o = { path, minX, minY, maxX, maxY, angle }
+	outlines.set(b, o)
+	return o
+}
+
+// Chimneys and skylights, at spots fixed per building: { chimney, x, y, n,
+// angle, tone } in tiles, the building's index, and radians, in the order
+// they're tried. Chimneys stand up in the 3D scene; the roof image only
+// gets their sooty footprint.
+export function roofSpots(b, n) {
+	if (!b.rings.length) return []
+	const roof = roofOf(b, n)
+	const { path, minX, minY, maxX, maxY, angle } = outline(b)
+	const spots = []
+	let seed = n * 7919
+	const rand = () => roofHash((seed += 104729))
+	const tries = ((maxX - minX) * (maxY - minY)) / ROOF_SPOT_AREA
+	for (let k = 0; k < tries; k++) {
+		const x = minX + rand() * (maxX - minX)
+		const y = minY + rand() * (maxY - minY)
+		if (!contains(path, x, y, ROOF_PX)) continue
+		const inside = (dx, dy) => contains(path, x + dx, y + dy, ROOF_PX)
+		if (b.h > 5 && rand() < CHIMNEY_SHARE && inside(-0.6, 0) && inside(0.6, 0) && inside(0, -0.6) && inside(0, 0.6)) {
+			spots.push({ chimney: true, x, y, n, angle, tone: rand() })
+		} else if (!roof.ridge && rand() < SKYLIGHT_SHARE) {
+			spots.push({ chimney: false, x, y })
+		}
+	}
+	return spots
+}
+
+// `area` as for the ground, plus `pick`, the buildings to paint, by index.
+export function renderRoofImage(world, pitched = () => false, area = wholeMap(world, ROOF_PX)) {
+	const { buildings } = world
+	const RPX = area.px
+	const canvas = newCanvas(Math.ceil(area.w * RPX), Math.ceil(area.h * RPX))
 	const g = canvas.getContext('2d')
 	g.scale(RPX, RPX)
+	g.translate(-area.x, -area.y)
 	g.lineJoin = 'round'
 	const chimneys = []
 
-	buildings.forEach((b, n) => {
+	for (const n of area.pick ?? buildings.keys()) {
+		const b = buildings[n]
 		// No outline means an endless bounding box below, so skip it. Maps
 		// built before build-map.js dropped these still have a few.
-		if (!b.rings.length) return
+		if (!b.rings.length) continue
 		const roof = roofOf(b, n)
-		const path = new Path2D()
-		let minX = Infinity
-		let minY = Infinity
-		let maxX = -Infinity
-		let maxY = -Infinity
-		let longest = 0
-		let angle = 0
-		for (const r of b.rings) {
-			path.moveTo(r[0], r[1])
-			for (let i = 2; i < r.length; i += 2) {
-				path.lineTo(r[i], r[i + 1])
-				const len = Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1])
-				if (len > longest) [longest, angle] = [len, Math.atan2(r[i + 1] - r[i - 1], r[i] - r[i - 2])]
-			}
-			path.closePath()
-			for (let i = 0; i < r.length; i += 2) {
-				minX = Math.min(minX, r[i])
-				maxX = Math.max(maxX, r[i])
-				minY = Math.min(minY, r[i + 1])
-				maxY = Math.max(maxY, r[i + 1])
-			}
-		}
+		const { path, minX, minY, maxX, maxY, angle } = outline(b)
 
 		const tar = TAR[Math.floor(roofHash(n + 77) * TAR.length)]
 		const pitch = pitched(n)
@@ -374,21 +469,13 @@ export function renderRoofImage(world, pitched = () => false) {
 			g.restore()
 		}
 
-		// Chimneys and skylights, at spots fixed per building. Chimneys stand
-		// up in the 3D scene, so here they only leave a sooty footprint.
-		let seed = n * 7919
-		const rand = () => roofHash((seed += 104729))
-		const tries = ((maxX - minX) * (maxY - minY)) / ROOF_SPOT_AREA
-		for (let k = 0; k < tries; k++) {
-			const x = minX + rand() * (maxX - minX)
-			const y = minY + rand() * (maxY - minY)
-			if (!g.isPointInPath(path, x * RPX, y * RPX, 'evenodd')) continue
-			const inside = (dx, dy) => g.isPointInPath(path, (x + dx) * RPX, (y + dy) * RPX, 'evenodd')
-			if (b.h > 5 && rand() < CHIMNEY_SHARE && inside(-0.6, 0) && inside(0.6, 0) && inside(0, -0.6) && inside(0, 0.6)) {
-				chimneys.push({ x, y, n, angle, tone: rand() })
+		for (const spot of roofSpots(b, n)) {
+			const { x, y } = spot
+			if (spot.chimney) {
+				chimneys.push(spot)
 				g.fillStyle = CHIMNEY_SOOT
 				g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8)
-			} else if (!roof.ridge && rand() < SKYLIGHT_SHARE) {
+			} else {
 				g.fillStyle = SKYLIGHT_COLOR
 				g.fillRect(x - 0.35, y - 0.25, 0.7, 0.5)
 			}
@@ -402,6 +489,6 @@ export function renderRoofImage(world, pitched = () => false) {
 		g.lineWidth = PARAPET_INK_WIDTH
 		g.stroke(path)
 		g.restore()
-	})
+	}
 	return { canvas, chimneys }
 }
