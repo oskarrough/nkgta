@@ -1,5 +1,6 @@
 // An awning over every shop door with the shop's name painted on it, readable
-// from above, where walls are seen edge on. One atlas, one mesh, one draw.
+// from above, where walls are seen edge on. One atlas, one mesh, one draw,
+// for the shops in `pick`, by index; each still makes room for every other.
 import * as THREE from 'three'
 import { posterText, posterWidth } from './poster.js'
 import { alongFacade } from './shops.js'
@@ -14,14 +15,15 @@ const CELL = 96 // atlas pixels across the awning's depth
 const TYPE = 54 // type size in those pixels
 const ATLAS_W = 2048
 
-export function createSigns(shops, gradient) {
-	if (!shops.length) return new THREE.Group()
+export function createSigns(shops, gradient, pick = shops.keys()) {
+	const list = [...pick]
+	if (!list.length) return new THREE.Group()
 	// Lay the names out in rows, then paint them.
 	const measure = document.createElement('canvas').getContext('2d')
 	const cells = []
 	let x = 0
 	let y = 0
-	for (const shop of shops) {
+	for (const shop of list.map((i) => shops[i])) {
 		const w = Math.min(ATLAS_W, Math.ceil(posterWidth(measure, shop.name, TYPE) + CELL * 0.5))
 		if (x + w > ATLAS_W) [x, y] = [0, y + CELL]
 		cells.push({ x, y, w })
@@ -34,8 +36,9 @@ export function createSigns(shops, gradient) {
 
 	const pos = []
 	const uv = []
-	shops.forEach((shop, i) => {
-		const cell = cells[i]
+	list.forEach((i, k) => {
+		const shop = shops[i]
+		const cell = cells[k]
 		const color = CLOTH[hash(shop.name) % CLOTH.length]
 		// Scene coordinates: y points north. Text reads from the street, its
 		// top towards the wall, turned round when that would put it upside down.

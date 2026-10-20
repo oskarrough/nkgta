@@ -11,6 +11,7 @@ import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
+import { createSigns } from './signs.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -36,9 +37,12 @@ const ROOF_TILES = { row: 0.18, line: 0.3, ink: 0.45 }
 const CHIMNEY = { length: 0.75, width: 0.42, height: 0.42, colors: ['#8a4c38', '#7a6d64', '#9a5a42'] }
 
 // Trees go in cells this many tiles a side, so the view only draws those
-// near it, and turn into simple blobs below this many screen pixels a tile.
+// near it. Below DETAIL_PX screen pixels a tile they turn into simple
+// blobs and chimneys, a pixel wide by then, go.
 const TREE_CELL = 32
-const SIMPLE_TREES = 3
+const DETAIL_PX = 3
+const SIGNS_PER_ATLAS = 24
+const inChunk = (c, { x, y }) => x >= c.x && y >= c.y && x < c.x + c.w && y < c.y + c.h
 
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
@@ -81,7 +85,7 @@ const FOOT = [0.12, 0.3, 0.72, 0.86]
 // their shadow crisp and stops them speckling.
 const CAR_SHADOW = { opacity: 0.42, offset: 0.34, stretch: 1.15 }
 
-export function createScene(canvas, world) {
+export function createScene(canvas, world, shops = []) {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
 	renderer.setPixelRatio(devicePixelRatio)
 	const scene = new THREE.Scene()
@@ -134,6 +138,13 @@ export function createScene(canvas, world) {
 		const byIndex = []
 		for (const h of houses) byIndex[h.n] = h
 		const stacks = spots.length && chimneys(spots, byIndex, gradient)
+		yield
+		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
+		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
+		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
+			group.add(createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS)))
+			yield
+		}
 		// Trees in cells, so the view skips most of them, or one plain blob
 		// each across the chunk once they're too small on screen for lumps.
 		const cells = new Map()
@@ -155,8 +166,9 @@ export function createScene(canvas, world) {
 			group,
 			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
 			zoom(scale) {
-				for (const mesh of near) mesh.visible = scale >= SIMPLE_TREES
-				for (const mesh of far) mesh.visible = scale < SIMPLE_TREES
+				for (const mesh of near) mesh.visible = scale >= DETAIL_PX
+				for (const mesh of far) mesh.visible = scale < DETAIL_PX
+				if (stacks) stacks.visible = scale >= DETAIL_PX
 			},
 			// Point the ground's corners, or the roofs' world positions, at
 			// where the chunk sits in the texture.

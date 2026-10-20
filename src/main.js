@@ -11,7 +11,6 @@ import { createScene } from './scene.js'
 import { createHud, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { findShops } from './shops.js'
-import { createSigns } from './signs.js'
 import { createVisit } from './visit.js'
 
 import { sound } from './sound.js'
@@ -30,16 +29,15 @@ const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
 const camera = createCamera()
 const canvas = document.getElementById('overlay')
-const city3d = createScene(document.getElementById('city'), world)
+const shops = findShops(world)
+phase('shops')
+const city3d = createScene(document.getElementById('city'), world, shops)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
 phase('overlay, hud, traffic')
-const shops = findShops(world)
 const draw = createRenderer(canvas, world, shops)
-city3d.add(createSigns(shops, city3d.gradient))
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say })
-phase('shops')
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
