@@ -1,5 +1,5 @@
 // The comic palette: tiny.london's sampled tones plus Neukölln terracotta,
-// BVG yellow and signal colours. The composite snaps every pixel to one of
+// BVG yellow, signal colours and cloud blues. The composite snaps every pixel to one of
 // these, so the frame never shows a colour that isn't on the list.
 import * as THREE from 'three'
 
@@ -51,6 +51,9 @@ export const PALETTE = [
 	'#3FA34D',
 	'#689A3E',
 	'#2D333D',
+	'#DCE3EA',
+	'#B4C1D0',
+	'#8D9CB1',
 ]
 
 export const PALETTE_SIZE = PALETTE.length

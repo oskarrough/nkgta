@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { renderMapImage, renderRoofImage, roofHash } from './map-image.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createTrees } from './trees.js'
+import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
@@ -66,7 +67,7 @@ export function createScene(canvas, world) {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
 	renderer.setPixelRatio(devicePixelRatio)
 	const scene = new THREE.Scene()
-	scene.background = new THREE.Color('#222')
+	scene.background = new THREE.Color(DECK)
 	const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 5000)
 
 	// Hard shadows, one crisp step: no soft edges to smudge the flat fills.
@@ -100,7 +101,8 @@ export function createScene(canvas, world) {
 	const houses = world.buildings.map((b) => ({ h: b.h / world.tileM, parts: footprint(b.rings) }))
 	scene.add(walls(houses, world.tileM, gradient), roofs(houses, world, gradient, roofTex))
 	scene.add(chimneys(roofImage.chimneys, world.tileM, gradient))
-	scene.add(createTrees(world, gradient))
+	const clouds = createClouds(world, gradient)
+	scene.add(createTrees(world, gradient), clouds.layer)
 	const cars = carMeshes(gradient)
 	const skids = skidMarks()
 	scene.add(...cars.meshes, skids.mesh)
@@ -187,6 +189,7 @@ export function createScene(canvas, world) {
 		const cy = -(cam.y + height / 2) / cam.scale
 		camera.position.set(cx, cy, height / 2 / cam.scale / Math.tan((FOV / 2) * (Math.PI / 180)))
 		focusSun(cx, cy, Math.hypot(width, height) / cam.scale / 2)
+		clouds.follow(camera)
 		ink.render(scene, camera)
 	}
 
