@@ -1,5 +1,5 @@
 // The text overlays: street name, money, bag, nearby place or message.
-import { ICONS, nearestPlace, placeName } from './places.js'
+import { badgeColor, nearestPlace, placeName } from './places.js'
 import { nearBike } from './player.js'
 import { euro } from './pfand.js'
 import { T } from './tiles.js'
@@ -14,9 +14,13 @@ export function useHint(player, car) {
 }
 
 const stopName = (s) => {
-	const name = s.kind === 'ubahn' ? `🚇 U ${s.name || 'Bahnhof'}` : `🚏 ${s.name || 'Haltestelle'}`
+	const name = s.kind === 'ubahn' ? `U ${s.name || 'Bahnhof'}` : s.name || 'Haltestelle'
 	return s.lines.length ? `${name} · ${s.lines.join(', ')}` : name
 }
+
+// The dot before the place line: the badge colour, or the stop sign's.
+const STOP_DOT = { ubahn: '#115d91', bus: '#f5d000' }
+const PRIVATE_DOT = '#9d9484'
 
 export function createHud(world) {
 	// Only touch the DOM when text changes; writing it every frame costs a layout.
@@ -25,6 +29,15 @@ export function createHud(world) {
 		if (shown[id] === text) return
 		shown[id] = text
 		document.getElementById(id).textContent = text
+	}
+
+	// The place line's dot is a CSS ::before coloured through --dot.
+	function dot(color) {
+		if (shown.dot === color) return
+		shown.dot = color
+		const el = document.getElementById('place')
+		el.classList.toggle('dot', !!color)
+		if (color) el.style.setProperty('--dot', color)
 	}
 
 	let street = ''
@@ -42,6 +55,7 @@ export function createHud(world) {
 				set('street', '')
 				set('wasted', '')
 				set('place', toast?.text ?? door ?? '')
+				dot(null)
 				return
 			}
 			street = world.streetAt(player.x, player.y) || street
@@ -49,10 +63,12 @@ export function createHud(world) {
 			const stop = showTransit && nearestPlace(world.transit ?? [], player.x, player.y, 2.5)
 			set('street', street)
 			set('wasted', wasted ? 'WASTED' : '')
-			const here = p ? `${ICONS[p.kind]} ${placeName(p)}` : world.tileAt(player.x, player.y) === T.PRIVATE ? '🔒 Privatweg' : ''
+			const privat = !p && world.tileAt(player.x, player.y) === T.PRIVATE
+			const here = p ? placeName(p) : privat ? 'Privatweg' : ''
 			const use = useHint(player, car)
 			const hint = door ?? (use ? `E: ${use}` : null)
 			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
+			dot(toast || hint ? null : stop ? STOP_DOT[stop.kind] : p ? badgeColor(p.kind) : privat ? PRIVATE_DOT : null)
 		},
 	}
 }

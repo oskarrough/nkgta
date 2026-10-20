@@ -1,13 +1,13 @@
 // The flat layer over the 3D city, once per frame: Pfand, places, stops,
 // traffic lights, street names, the player and anyone fleeing their car.
 import { SOLID } from './tiles.js'
-import { iconSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
+import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
 export function createRenderer(canvas, world) {
 	const ctx = canvas.getContext('2d')
-	const icons = iconSprites()
+	const icons = badgeSprites()
 	const signs = transitSprites()
 	const labels = labelSprites(world.labels.map((l) => l.name))
 

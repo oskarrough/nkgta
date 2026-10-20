@@ -1,20 +1,33 @@
 // Kinds of places on the map, how they look and what they're called.
 
-export const ICONS = {
-	spaeti: '🏪',
-	doener: '🥙',
-	imbiss: '🍟',
-	cafe: '☕',
-	bar: '🍺',
-	restaurant: '🍽️',
-	bikeshop: '🔧',
-	supermarket: '🛒',
-	bakery: '🥐',
-	pharmacy: '💊',
-	school: '🏫',
-	kita: '🧸',
-	playground: '🛝',
+// Every kind belongs to a family with its badge colour, so from far away the
+// colour alone says roughly what's there: warm food, amber drinks, teal
+// shops, grey services, green for outdoors. `glyph` is the colour drawn on it.
+export const FAMILIES = {
+	food: { color: '#B5603F', glyph: '#FFF4E2' },
+	drink: { color: '#E8B22A', glyph: '#1A1E1B' },
+	shop: { color: '#2F7F7B', glyph: '#FFFFFF' },
+	service: { color: '#6E7480', glyph: '#FFFFFF' },
+	outdoors: { color: '#3FA34D', glyph: '#FFFFFF' },
 }
+
+export const FAMILY = {
+	spaeti: 'shop',
+	doener: 'food',
+	imbiss: 'food',
+	cafe: 'drink',
+	bar: 'drink',
+	restaurant: 'food',
+	bikeshop: 'shop',
+	supermarket: 'shop',
+	bakery: 'food',
+	pharmacy: 'service',
+	school: 'service',
+	kita: 'service',
+	playground: 'outdoors',
+}
+
+export const badgeColor = (kind) => FAMILIES[FAMILY[kind]].color
 
 export const LABELS = {
 	spaeti: 'Späti',
