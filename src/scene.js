@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { roofHash, roofOf, roofSpots } from './map-image.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
+import { createBridges } from './bridges.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
@@ -135,6 +136,9 @@ export function createScene(canvas, world, shops = []) {
 			mesh.receiveShadow = true
 			group.add(mesh)
 		}
+		yield
+		const bridges = createBridges(world, chunk, gradient)
+		if (bridges) group.add(bridges)
 		yield
 		const byIndex = []
 		for (const h of houses) byIndex[h.n] = h
