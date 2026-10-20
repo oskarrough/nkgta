@@ -26,6 +26,9 @@ const WALL = {
 }
 const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
 
+// Tile courses on pitched roofs: height between them in tiles of the map,
+// the share of each that is dark line, and how dark.
+const ROOF_TILES = { row: 0.18, line: 0.3, ink: 0.45 }
 // Chimney stacks on the roofs: size along and across the ridge and height,
 // in tiles, and their brick and sooty plaster colours.
 const CHIMNEY = { length: 0.75, width: 0.42, height: 0.42, colors: ['#8a4c38', '#7a6d64', '#9a5a42'] }
@@ -699,15 +702,33 @@ function triangulate(contour, holes) {
 }
 
 // The roof image is one texture for the whole map, so each roof looks up its
-// patch by world position.
+// patch by world position. Slopes draw their own tile courses: lines of
+// equal height, so they run along the eaves of every face.
 function roofMaterial(world, gradient, tex) {
 	const material = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient })
 	material.onBeforeCompile = (shader) => {
-		shader.vertexShader = shader.vertexShader.replace(
-			'#include <uv_vertex>',
-			`#include <uv_vertex>
-			vMapUv = vec2(position.x / ${world.W.toFixed(1)}, 1.0 + position.y / ${world.H.toFixed(1)});`,
-		)
+		const decl = 'varying vec3 vRoofPos;\nvarying vec3 vRoofNormal;\n'
+		shader.vertexShader =
+			decl +
+			shader.vertexShader.replace(
+				'#include <uv_vertex>',
+				`#include <uv_vertex>
+				vMapUv = vec2(position.x / ${world.W.toFixed(1)}, 1.0 + position.y / ${world.H.toFixed(1)});
+				vRoofPos = position;
+				vRoofNormal = normal;`,
+			)
+		shader.fragmentShader =
+			decl +
+			shader.fragmentShader.replace(
+				'#include <map_fragment>',
+				`#include <map_fragment>
+				if (vRoofNormal.z < 0.97) {
+					float row = vRoofPos.z / ${ROOF_TILES.row.toFixed(3)};
+					float aa = fwidth(row);
+					float course = 1.0 - smoothstep(${ROOF_TILES.line.toFixed(2)} - aa, ${ROOF_TILES.line.toFixed(2)} + aa, fract(row));
+					diffuseColor.rgb *= 1.0 - (1.0 - smoothstep(0.25, 0.5, aa)) * course * ${ROOF_TILES.ink.toFixed(2)};
+				}`,
+			)
 	}
 	return material
 }

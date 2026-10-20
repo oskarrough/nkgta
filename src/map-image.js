@@ -346,8 +346,9 @@ export function renderRoofImage(world, pitched = () => false) {
 		}
 		g.restore()
 
-		// Faint tile rows, running along the longest wall.
-		if (roof.ridge) {
+		// Faint tile rows, running along the longest wall. Pitched roofs draw
+		// their own, along each slope.
+		if (roof.ridge && !pitched(n)) {
 			g.save()
 			g.translate(cx, cy)
 			g.rotate(angle)
