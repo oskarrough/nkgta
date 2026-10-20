@@ -49,22 +49,35 @@ function voice() {
 	const gritGain = context.createGain()
 	gritGain.gain.value = 0
 	const pan = context.createStereoPanner()
+	// Half-speed square detuned against the saw gives the uneven cylinder beat.
+	const sub = context.createOscillator()
+	sub.type = 'square'
+	const subGain = context.createGain()
+	subGain.gain.value = 0.25
+	// The firing pulse throbs the level, so it chugs instead of humming.
+	const chug = context.createGain()
+	const pulse = context.createOscillator()
+	const depth = context.createGain()
+	depth.gain.value = 0
+	pulse.connect(depth).connect(chug.gain)
 	motor.connect(filter)
+	sub.connect(subGain).connect(filter)
 	grit.connect(gritGain).connect(filter)
-	filter.connect(gain).connect(pan).connect(master)
+	filter.connect(chug).connect(gain).connect(pan).connect(master)
 	motor.start()
+	sub.start()
+	pulse.start()
 	grit.start()
-	return { motor, filter, gain, grit, gritGain, pan }
+	return { motor, sub, subGain, chug, pulse, depth, filter, gain, grit, gritGain, pan }
 }
 
 function stopVoice(v) {
 	if (!v) return
 	const end = context.currentTime + 0.2
 	smooth(v.gain.gain, 0, 0.025)
-	v.motor.stop(end)
-	v.grit.stop(end)
+	for (const o of [v.motor, v.sub, v.pulse, v.grit]) o.stop(end)
 	v.motor.onended = () => {
-		for (const node of [v.motor, v.filter, v.gain, v.grit, v.gritGain, v.pan]) node.disconnect()
+		for (const node of [v.motor, v.sub, v.subGain, v.chug, v.pulse, v.depth, v.filter, v.gain, v.grit, v.gritGain, v.pan]) node.disconnect()
 	}
 }
 
@@ -124,11 +137,24 @@ function engine(car) {
 	if (!playerVoice) return
 	const speed = Math.hypot(car.vx, car.vy)
 	const load = Math.abs(car.throttle ?? 0) * (car.braking ? 0.15 : 1)
-	const revs = Math.min(1, speed / 9 + load * 0.18)
-	smooth(playerVoice.motor.frequency, 27 + revs * 73)
-	smooth(playerVoice.filter.frequency, 130 + revs * 650)
-	smooth(playerVoice.gritGain.gain, 0.015 + load * 0.09)
-	smooth(playerVoice.gain.gain, 0.065 + revs * 0.045)
+	// Revs climb through each gear and drop on the shift, instead of one long vroom.
+	const gears = [0, 2, 4.2, 6.8, 10]
+	let gear = gears.findLastIndex((g) => speed >= g)
+	gear = Math.min(gear, gears.length - 2)
+	const inGear = Math.min(1, (speed - gears[gear]) / (gears[gear + 1] - gears[gear]))
+	const revs = Math.min(1, 0.12 + inGear * 0.7 + load * 0.18)
+	if (gear !== playerVoice.gear) {
+		if (playerVoice.gear !== undefined) playerVoice.gain.gain.setTargetAtTime(0.02, context.currentTime, 0.02)
+		playerVoice.gear = gear
+	}
+	const hz = 26 + revs * 34
+	smooth(playerVoice.motor.frequency, hz, 0.06)
+	smooth(playerVoice.sub.frequency, hz * 0.503, 0.06)
+	smooth(playerVoice.pulse.frequency, hz / 2, 0.06)
+	smooth(playerVoice.depth.gain, 0.25 - revs * 0.15, 0.1)
+	smooth(playerVoice.filter.frequency, 90 + revs * 220 + load * 150, 0.08)
+	smooth(playerVoice.gritGain.gain, 0.012 + load * 0.035)
+	smooth(playerVoice.gain.gain, 0.038 + revs * 0.02 + load * 0.012, 0.12)
 	if (car.impact > 0.6 && context.currentTime - lastImpact > 0.18) {
 		burst(85, Math.min(0.38, car.impact * 0.035), 0.18)
 		lastImpact = context.currentTime
@@ -224,7 +250,10 @@ function street(cars, player, view, dt) {
 		}
 		// A horn borrows its engine oscillator: still only two traffic voices.
 		const horn = now < (v.hornUntil ?? 0)
-		smooth(v.motor.frequency, horn ? 330 : 29 + Math.min(50, Math.hypot(car.vx, car.vy) * 7), 0.04)
+		const hz = horn ? 330 : 29 + Math.min(50, Math.hypot(car.vx, car.vy) * 7)
+		smooth(v.motor.frequency, hz, 0.04)
+		smooth(v.sub.frequency, hz * 0.503, 0.04)
+		smooth(v.pulse.frequency, hz / 2, 0.04)
 		smooth(v.filter.frequency, horn ? 950 : 170, 0.04)
 		smooth(v.gain.gain, horn ? 0.07 : 0.025 * (1 - distance(car) / 18) ** 2 * (player.car ? 0.55 : 1), 0.06)
 		smooth(v.pan.pan, Math.max(-1, Math.min(1, ((car.x - view.x0) / (view.x1 - view.x0)) * 2 - 1)))
