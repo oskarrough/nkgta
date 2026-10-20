@@ -4,6 +4,9 @@ import { gameUpscale } from './ink.js'
 import { T } from './tiles.js'
 import { forwardSpeed } from './car.js'
 
+const PROBE = 0.1 // tiles either side of the boom that must be clear of buildings
+const HOLD = 0.6 // seconds
+
 export function createCamera(world) {
 	let zoom = 11
 	let userZoom = 11
@@ -19,6 +22,7 @@ export function createCamera(world) {
 	let aheadX = 0
 	let aheadY = 0
 	let boom = null
+	let held = 0 // seconds the boom stays pulled in before easing out again
 
 	let ground = null
 	const active = () => thirdPerson && !suspended
@@ -89,14 +93,19 @@ export function createCamera(world) {
 					const t = i / steps
 					const x = target.x + dx * t
 					const y = target.y + dy * t
-					if ([-0.15, 0.15].some((ox) => [-0.15, 0.15].some((oy) => world.tileAt(x + ox, y + oy) === T.BUILDING))) {
+					if ([-PROBE, PROBE].some((ox) => [-PROBE, PROBE].some((oy) => world.tileAt(x + ox, y + oy) === T.BUILDING))) {
 						fraction = Math.max(0.03, (i - 1) / steps)
 						break
 					}
 				}
 				// Never ease through a wall. Only the return to open space is soft.
 				const clear = reach * fraction
-				boom = boom === null || clear < boom ? clear : boom + (clear - boom) * (1 - Math.exp(-3 * dt))
+				// It waits a moment before easing out, so a wall that comes and goes
+				// as you squeeze past corners doesn't pump it in and out.
+				if (clear < reach && clear < (boom ?? reach) + 0.1) held = HOLD
+				if (boom === null || clear < boom) boom = clear
+				else if (held > 0) held -= dt
+				else boom += (clear - boom) * (1 - Math.exp(-3 * dt))
 				fraction = boom / reach
 				// Rises and dips with the ground under the player, a little behind,
 				// so the view glides over the slope instead of jolting on it.

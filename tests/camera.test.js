@@ -79,7 +79,7 @@ describe('vehicle orbit camera', () => {
 		expect(cruising.target.x).toBeGreaterThan(parked.target.x + 1)
 	})
 
-	test('walls shorten the boom immediately, then it recovers gradually', () => {
+	test('walls shorten the boom immediately, then it waits and recovers gradually', () => {
 		let wall = false
 		const { step } = setup(null, (x) => (wall && x < -1 ? T.BUILDING : T.ROAD))
 		const open = step(180)
@@ -87,9 +87,21 @@ describe('vehicle orbit camera', () => {
 		const blocked = step()
 		expect(blocked.x).toBeGreaterThan(-1)
 		wall = false
-		const recovering = step()
+		expect(step(20).x).toBeCloseTo(blocked.x)
+		const recovering = step(30)
 		expect(recovering.x).toBeLessThan(blocked.x)
 		expect(recovering.x).toBeGreaterThan(open.x + 1)
 		expect(step(180).x).toBeCloseTo(open.x, 2)
+	})
+
+	test('a wall flickering in and out of the boom does not pump the camera', () => {
+		let frame = 0
+		const { step } = setup(null, (x) => (Math.floor(frame / 10) % 2 && x < -1 ? T.BUILDING : T.ROAD))
+		step(180)
+		const xs = []
+		for (; frame < 120; frame++) xs.push(step().x)
+		// Pulled in once, and no easing back out while the wall keeps returning.
+		const outward = xs.slice(1).filter((x, i) => x < xs[i] - 0.01)
+		expect(outward).toEqual([])
 	})
 })

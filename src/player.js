@@ -4,7 +4,8 @@ import { driveCar, speedOf, toWorld } from './car.js'
 
 const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
-const NUDGE = 0.45 // tiles you get eased sideways round a corner
+const SUBSTEP = 0.1 // most tiles moved between wall checks, well under RADIUS
+const NUDGE = 0.45 // tiles you get eased sideways round a corner you hit head on
 
 export function createPlayer(start) {
 	return {
@@ -86,39 +87,85 @@ export function updatePlayer(p, input, world, dt) {
 	}
 	p.speed = Math.min(p.speed, max)
 
-	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
-	const free = (x, y) =>
-		!solid(x - RADIUS, y - RADIUS) && !solid(x + RADIUS, y - RADIUS) && !solid(x - RADIUS, y + RADIUS) && !solid(x + RADIUS, y + RADIUS)
 	const step = p.speed * dt * (steering ? -steering.y : 1)
 	const fromX = p.x
 	const fromY = p.y
-	slide(p, Math.cos(p.dir) * step, 0, free)
-	slide(p, 0, Math.sin(p.dir) * step, free)
-	// Walls cost you the part of your speed that went into them, nothing more.
-	if (dt > 0) p.speed = Math.min(p.speed, Math.hypot(p.x - fromX, p.y - fromY) / dt)
-}
-
-// Move along one axis. Blocked, look for a gap just to the side and drift
-// towards it, so you round corners and find doorways without lining up to
-// the pixel. Otherwise stay put against the wall.
-function slide(p, dx, dy, free) {
-	if (!dx && !dy) return
-	if (free(p.x + dx, p.y + dy)) {
-		p.x += dx
-		p.y += dy
-		return
+	const n = Math.ceil(Math.abs(step) / SUBSTEP)
+	const ex = Math.cos(p.dir) * Math.sign(step)
+	const ey = Math.sin(p.dir) * Math.sign(step)
+	for (let i = 0; i < n; i++) {
+		p.x += (ex * Math.abs(step)) / n
+		p.y += (ey * Math.abs(step)) / n
+		pushOut(p, world)
 	}
-	const pace = Math.abs(dx + dy)
-	for (let off = 0.05; off <= NUDGE; off += 0.05) {
-		for (const side of [-1, 1]) {
-			const ox = dy ? side * off : 0
-			const oy = dx ? side * off : 0
-			if (free(p.x + ox, p.y + oy) && free(p.x + ox + dx, p.y + oy + dy)) {
-				const k = Math.min(1, pace / off)
-				p.x += ox * k
-				p.y += oy * k
-				return
+	// Hardly got anywhere: a corner dead ahead. Drift towards whichever side
+	// has room to go on.
+	const pace = Math.abs(step)
+	if (pace > 0 && (p.x - fromX) * ex + (p.y - fromY) * ey < pace * 0.3) {
+		search: for (let off = 0.05; off <= NUDGE; off += 0.05) {
+			for (const side of [-1, 1]) {
+				const sx = p.x - ey * side * off
+				const sy = p.y + ex * side * off
+				if (clear(sx, sy, world) && clear(sx + ex * pace, sy + ey * pace, world)) {
+					const k = Math.min(1, pace / off)
+					p.x += (sx - p.x) * k
+					p.y += (sy - p.y) * k
+					break search
+				}
 			}
 		}
+	}
+	// Sliding along a wall keeps your pace; only a wall you can't get round
+	// stops you. Trimming to the distance made every frame would compound,
+	// and a bike grazing a wall would grind to a halt.
+	const made = Math.hypot(p.x - fromX, p.y - fromY)
+	if (dt > 0 && made < pace * 0.25) p.speed = Math.min(p.speed, made / dt)
+}
+
+// You're round: a wall pushes you straight out of it, and what's left of
+// your step carries on along it. Rasterised diagonals, all steps, feel like
+// one slanted wall, and you round corners and find doorways without
+// lining up to the pixel.
+// No wall within RADIUS of (x, y).
+function clear(x, y, world) {
+	for (let ty = Math.floor(y - RADIUS); ty <= Math.floor(y + RADIUS); ty++) {
+		for (let tx = Math.floor(x - RADIUS); tx <= Math.floor(x + RADIUS); tx++) {
+			if (!SOLID.has(world.tileAt(tx, ty))) continue
+			if (Math.hypot(x - Math.max(tx, Math.min(tx + 1, x)), y - Math.max(ty, Math.min(ty + 1, y))) < RADIUS) return false
+		}
+	}
+	return true
+}
+
+function pushOut(p, world) {
+	for (let pass = 0; pass < 3; pass++) {
+		let moved = false
+		for (let ty = Math.floor(p.y - RADIUS); ty <= Math.floor(p.y + RADIUS); ty++) {
+			for (let tx = Math.floor(p.x - RADIUS); tx <= Math.floor(p.x + RADIUS); tx++) {
+				if (!SOLID.has(world.tileAt(tx, ty))) continue
+				// The nearest point of the tile, and how far into it you are.
+				const dx = p.x - Math.max(tx, Math.min(tx + 1, p.x))
+				const dy = p.y - Math.max(ty, Math.min(ty + 1, p.y))
+				const d = Math.hypot(dx, dy)
+				if (d >= RADIUS) continue
+				if (d > 1e-6) {
+					p.x += (dx / d) * (RADIUS - d)
+					p.y += (dy / d) * (RADIUS - d)
+				} else {
+					// Centre inside the tile: out the nearest side.
+					const sides = [
+						[tx - RADIUS - p.x, 0],
+						[tx + 1 + RADIUS - p.x, 0],
+						[0, ty - RADIUS - p.y],
+						[0, ty + 1 + RADIUS - p.y],
+					]
+					const [ox, oy] = sides.reduce((a, b) => (Math.hypot(...b) < Math.hypot(...a) ? b : a))
+					p.x += ox
+					p.y += oy
+				}
+				moved = true
+			}
+		}
+		if (!moved) return
 	}
 }

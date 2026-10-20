@@ -31,3 +31,27 @@ test('directional movement still follows its world axis', () => {
 	expect(p.y).toBeLessThan(10)
 	expect(p.dir).toBeCloseTo(-Math.PI / 2)
 })
+
+// A one-tile path rasterised on the diagonal: a staircase of tiles.
+const staircase = {
+	tileAt: (x, y) => (Math.floor(y) - Math.floor(x) === 0 || Math.floor(y) - Math.floor(x) === 1 ? T.SIDEWALK : T.BUILDING),
+}
+const ride = (world, x, y, frames = 180) => {
+	const p = createPlayer({ x: 5.5, y: 5.5 })
+	p.onBike = true
+	for (let i = 0; i < frames; i++) updatePlayer(p, { axis: () => ({ x, y }), turbo: () => false }, world, 1 / 60)
+	return p
+}
+
+test('a bike rides a diagonal staircase path without grinding to a halt', () => {
+	const p = ride(staircase, Math.SQRT1_2, Math.SQRT1_2)
+	expect(Math.hypot(p.x - 5.5, p.y - 5.5)).toBeGreaterThan(7)
+	expect(staircase.tileAt(p.x, p.y)).toBe(T.SIDEWALK)
+})
+
+test('grazing a wall keeps your pace', () => {
+	const corridor = { tileAt: (x, y) => (Math.floor(y) === 5 ? T.SIDEWALK : T.BUILDING) }
+	const p = ride(corridor, 0.97, 0.24)
+	expect(p.speed).toBeGreaterThan(3)
+	expect(p.y).toBeLessThanOrEqual(5.7 + 1e-9)
+})
