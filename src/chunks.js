@@ -19,12 +19,12 @@ const UNDERSAMPLE = 0.75
 // filtering never reaches past the edge of the texture and leaves a seam.
 const GUTTER = 4
 const MARGIN = 32 // tiles round the view that count as in view, so textures are ready before they show
-const BUDGET = 192 * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
+const BUDGET = 128 * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
 // Share of the time between frames spent building chunk meshes that
 // aren't needed yet, and the most per frame, in ms.
 const BUILD_SHARE = 0.25
 const BUILD_MS = 12
-const UPLOAD_BYTES = 24 * 2 ** 20 // texture bytes sent to the GPU per frame, at least one texture
+const UPLOAD_BYTES = 8 * 2 ** 20 // texture bytes sent to the GPU per frame, at least one texture
 const MAX_PX = 8192 // texture size every GPU takes
 const KINDS = ['ground', 'roofs']
 
@@ -341,7 +341,10 @@ export function createChunks(world, renderer, build) {
 			chunks: chunks.length,
 			textures: [...entries.values()].filter((e) => e.texture).length,
 			painting: workers.filter((w) => w.job).length + queue.length,
-			mb: Math.round(([...entries.values()].reduce((s, e) => s + (e.texture ? e.bytes : 0), 0) / 2 ** 20) * 10) / 10,
+			// Megabytes of textures on the GPU, mipmaps included: the coarse
+			// ones every chunk keeps, and the finer ones round the view.
+			coarseMb: Math.round(([...entries.values()].reduce((s, e) => s + (e.texture && e.pinned ? e.bytes : 0), 0) / 2 ** 20) * 10) / 10,
+			fineMb: Math.round((bytes / 2 ** 20) * 10) / 10,
 			paintMs: PERF ? [...entries.values()].filter((e) => e.ms).map((e) => [e.key, Math.round(e.ms)]) : undefined,
 			buildMs: PERF ? chunks.filter((c) => c.parts).map((c) => [c.i, Math.round(c.buildMs)]) : undefined,
 		}),
