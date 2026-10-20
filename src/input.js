@@ -67,6 +67,8 @@ export function createInput(actions) {
 		// Direction the player is pushing, each axis -1…1. A key wins if one
 		// is held; otherwise the thumbstick's analogue deflection.
 		axis: () => actions.move(keyDown() ? keyAxis() : touch.axis()),
+		// Overhead keyboard movement follows the player; touch stays directional.
+		steer: () => (!actions.cameraActive() && keyDown() ? keyAxis() : null),
 		// Testing: hold space for turbo; the touch boost button does the same.
 		turbo: () => keys.has(' ') || touch.turbo(),
 		// In a car: the keyboard's up/down/left/right, or the stick translated

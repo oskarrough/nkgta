@@ -56,20 +56,22 @@ export function updatePlayer(p, input, world, dt) {
 		p.speed = speedOf(c)
 		return
 	}
-	const axis = input.axis()
+	const steering = input.steer?.()
+	const axis = steering || input.axis()
 	const turbo = input.turbo()
 	const here = world.tileAt(p.x, p.y)
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
-	const push = Math.min(1, Math.hypot(axis.x, axis.y))
+	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
 	let max = (p.onBike ? 3.6 : 1.6) * push
 	if (p.onBike && (here === T.GRASS || here === T.GROUND)) max *= 0.55
 	if (p.onBike && here === T.CYCLEWAY) max *= 1.2
 	const boost = turbo ? 10 : 1
 	max *= boost
 
-	if (axis.x || axis.y) {
-		let diff = Math.atan2(axis.y, axis.x) - p.dir
+	if (steering) p.dir += steering.x * dt * (p.onBike ? 2.5 : 3.5)
+	if (push) {
+		let diff = steering ? 0 : Math.atan2(axis.y, axis.x) - p.dir
 		diff = Math.atan2(Math.sin(diff), Math.cos(diff))
 		p.dir += diff * Math.min(1, dt * (p.onBike ? 6 : 14))
 		p.speed += dt * (p.onBike ? 4 : 12) * boost
@@ -81,7 +83,7 @@ export function updatePlayer(p, input, world, dt) {
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
 	const free = (x, y) =>
 		!solid(x - RADIUS, y - RADIUS) && !solid(x + RADIUS, y - RADIUS) && !solid(x - RADIUS, y + RADIUS) && !solid(x + RADIUS, y + RADIUS)
-	const step = p.speed * dt
+	const step = p.speed * dt * (steering ? -steering.y : 1)
 	const fromX = p.x
 	const fromY = p.y
 	slide(p, Math.cos(p.dir) * step, 0, free)
