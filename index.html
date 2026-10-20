@@ -56,6 +56,15 @@
 				right: calc(1.5rem + env(safe-area-inset-right));
 				font-size: 1.4rem;
 			}
+			#bag:not(:empty)::before {
+				content: '';
+				display: inline-block;
+				width: 1.1em;
+				height: 1.1em;
+				margin-right: 0.15em;
+				background: var(--bottle) center / contain no-repeat;
+				vertical-align: -0.15em;
+			}
 			#place {
 				bottom: calc(2.5rem + env(safe-area-inset-bottom));
 				left: 0;

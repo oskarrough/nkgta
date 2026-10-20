@@ -58,14 +58,45 @@ const box = (g, x0, y0, x1, y1, r = 0) => {
 	g.fill()
 }
 
+function bottle(g) {
+	box(g, 25, 28, 39, 51, 4)
+	box(g, 29, 16, 35, 30)
+	box(g, 28, 12, 36, 17, 1)
+}
+
+// The Späti badge's bottle on its own, white with an ink outline like the HUD
+// text, as an image URL for the bag counter.
+export function bottleIcon() {
+	const c = document.createElement('canvas')
+	c.width = c.height = 64
+	const g = c.getContext('2d')
+	// Fill the square: the bottle spans x 25–39, y 12–51 on the badge grid.
+	g.translate(32, 32)
+	g.scale(1.5, 1.5)
+	g.translate(-32, -31.5)
+	g.lineJoin = 'round'
+	g.fillStyle = g.strokeStyle = INK
+	g.save()
+	g.lineWidth = 6
+	for (const [x0, y0, x1, y1, r] of [
+		[25, 28, 39, 51, 4],
+		[29, 16, 35, 30, 0],
+		[28, 12, 36, 17, 1],
+	]) {
+		g.beginPath()
+		g.roundRect(x0, y0, x1 - x0, y1 - y0, r)
+		g.stroke()
+	}
+	g.restore()
+	g.fillStyle = '#FFFFFF'
+	bottle(g)
+	return c.toDataURL()
+}
+
 // Each glyph gets the badge colour too, for cutting lines into itself.
 const GLYPHS = {
 	// A Pfand bottle.
-	spaeti(g) {
-		box(g, 25, 28, 39, 51, 4)
-		box(g, 29, 16, 35, 30)
-		box(g, 28, 12, 36, 17, 1)
-	},
+	spaeti: bottle,
 	// The spit: a cone of meat in layers on its pole.
 	doener(g, cut) {
 		box(g, 30.5, 10, 33.5, 54, 1)

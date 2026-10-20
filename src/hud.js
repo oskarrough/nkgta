@@ -1,5 +1,6 @@
 // The text overlays: street name, money, bag, nearby place or message.
 import { badgeColor, nearestPlace, placeName } from './places.js'
+import { bottleIcon } from './sprites.js'
 import { nearBike } from './player.js'
 import { euro } from './pfand.js'
 import { T } from './tiles.js'
@@ -40,6 +41,8 @@ export function createHud(world) {
 		if (color) el.style.setProperty('--dot', color)
 	}
 
+	document.getElementById('bag').style.setProperty('--bottle', `url(${bottleIcon()})`)
+
 	let street = ''
 	let toast = null
 
@@ -50,7 +53,7 @@ export function createHud(world) {
 		update({ player, car, bag, showTransit, wasted, inside, door }, dt) {
 			if (toast && (toast.t -= dt) < 0) toast = null
 			set('money', euro(bag.cents))
-			set('bag', bag.bottles ? `🍾 ${bag.bottles}` : '')
+			set('bag', bag.bottles ? String(bag.bottles) : '')
 			if (inside) {
 				set('street', '')
 				set('wasted', '')

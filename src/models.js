@@ -10,7 +10,7 @@
 
 export const MODELS = {
 	car: {
-		name: '🚗 Kleinwagen',
+		name: 'Kleinwagen',
 		noun: 'Auto',
 		pace: 1, // how fast its drivers like to go
 		length: 1.5,
@@ -33,7 +33,7 @@ export const MODELS = {
 		],
 	},
 	suv: {
-		name: '🚙 SUV',
+		name: 'SUV',
 		noun: 'Auto',
 		pace: 1.15,
 		length: 1.65,
@@ -56,7 +56,7 @@ export const MODELS = {
 		],
 	},
 	lambo: {
-		name: '🏎️ Lambo',
+		name: 'Lambo',
 		noun: 'Lambo',
 		pace: 1.4,
 		length: 1.5,
@@ -80,7 +80,7 @@ export const MODELS = {
 		],
 	},
 	bus: {
-		name: '🚌 Bus',
+		name: 'Bus',
 		noun: 'Bus',
 		pace: 0.85,
 		length: 4,
