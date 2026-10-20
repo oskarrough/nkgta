@@ -28,9 +28,11 @@ const UPLOAD_BYTES = 8 * 2 ** 20 // texture bytes sent to the GPU per frame, at 
 const MAX_PX = 8192 // texture size every GPU takes
 const KINDS = ['ground', 'roofs']
 
+// The hex's own sRGB bytes: THREE.Color would hand back linear values, and
+// stored in an sRGB texture those come out darker, a muddy brown.
 const solid = (hex) => {
-	const c = new THREE.Color(hex)
-	const tex = new THREE.DataTexture(new Uint8Array([c.r * 255, c.g * 255, c.b * 255, 255]), 1, 1)
+	const n = parseInt(hex.slice(1), 16)
+	const tex = new THREE.DataTexture(new Uint8Array([(n >> 16) & 255, (n >> 8) & 255, n & 255, 255]), 1, 1)
 	tex.colorSpace = THREE.SRGBColorSpace
 	tex.needsUpdate = true
 	return tex
