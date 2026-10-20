@@ -2,12 +2,14 @@
 // from above, where walls are seen edge on. One atlas, one mesh, one draw.
 import * as THREE from 'three'
 import { posterText, posterWidth } from './poster.js'
+import { alongFacade } from './shops.js'
 
 const CLOTH = ['#C8302A', '#3D5E82', '#3FA34D', '#B5603F', '#E8C21A', '#2D333D']
 const DEPTH = 1.05 // how far the awning reaches out over the pavement, tiles
 const HIGH = 1.15 // where it meets the wall, tiles up
 const LOW = 0.85 // its front edge
 const WIDTH = [1.6, 7] // tiles
+const GAP = 0.15 // between neighbours' awnings, tiles
 const CELL = 96 // atlas pixels across the awning's depth
 const TYPE = 54 // type size in those pixels
 const ATLAS_W = 2048
@@ -44,9 +46,19 @@ export function createSigns(shops, gradient) {
 		if (flip) [up, right] = [up.map((v) => -v), right.map((v) => -v)]
 		paintCell(g, cell, shop.name, color, flip)
 
-		const width = Math.max(WIDTH[0], Math.min(WIDTH[1], (cell.w / CELL) * DEPTH))
+		// Along the wall from the door, stopping halfway to a neighbour's door.
+		const want = Math.max(WIDTH[0], Math.min(WIDTH[1], (cell.w / CELL) * DEPTH)) / 2
+		let lo = -want
+		let hi = want
+		for (const other of shops) {
+			const t = other === shop ? null : alongFacade(shop, other)
+			if (t === null || Math.abs(t) > want * 2 + WIDTH[1]) continue
+			if (t >= 0) hi = Math.min(hi, Math.max(t / 2 - GAP / 2, 0.5))
+			else lo = Math.max(lo, Math.min(t / 2 + GAP / 2, -0.5))
+		}
+		const width = hi - lo
 		const e = [shop.ex, -shop.ey]
-		const door = [shop.x, -shop.y]
+		const door = [shop.x + shop.ex * ((lo + hi) / 2), -(shop.y + shop.ey * ((lo + hi) / 2))]
 		const centre = [door[0] + (n[0] * DEPTH) / 2, door[1] + (n[1] * DEPTH) / 2]
 		// A hair apart, so neighbouring awnings don't flicker where they overlap.
 		const lift = (i % 7) * 0.004

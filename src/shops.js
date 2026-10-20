@@ -7,6 +7,7 @@ const KINDS = new Set(['spaeti', 'doener', 'imbiss', 'cafe', 'bar', 'restaurant'
 const REACH = 6 // how far a place may be from its facade, tiles
 const STAND = [0.35, 0.6, 0.9, 1.2] // where you might stand at the door, out from the wall, tiles
 const MARGIN = 0.6 // door at least this far from a corner, tiles
+const SPACING = 1.8 // doors on one facade at least this far apart, tiles
 const AT_DOOR = { along: 0.75, out: 0.8 } // how close to where you stand counts as at the door
 
 export function findShops(world) {
@@ -71,7 +72,36 @@ export function findShops(world) {
 		const { x, y, nx, ny, ex, ey, out, room } = best
 		shops.push({ name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
 	}
+
+	// Two shops in one shopfront: step their doors apart along the wall, if
+	// there's still somewhere to stand.
+	for (let i = 0; i < shops.length; i++) {
+		for (let j = i + 1; j < shops.length; j++) {
+			const t = alongFacade(shops[i], shops[j])
+			if (t === null || Math.abs(t) >= SPACING) continue
+			// Along the first one's wall, which may run the other way to the second's.
+			const { ex, ey } = shops[i]
+			const step = ((SPACING - Math.abs(t)) / 2) * (t < 0 ? -1 : 1)
+			for (const [s, k] of [
+				[shops[i], -step],
+				[shops[j], step],
+			]) {
+				const stand = { x: s.stand.x + ex * k, y: s.stand.y + ey * k }
+				if (!free(stand.x, stand.y) || free(s.x + ex * k - s.nx * 0.5, s.y + ey * k - s.ny * 0.5)) continue
+				Object.assign(s, { x: s.x + ex * k, y: s.y + ey * k, stand })
+			}
+		}
+	}
 	return shops
+}
+
+// How far along a's wall b's door is, if they share a facade, else null.
+export function alongFacade(a, b) {
+	if (a.nx * b.nx + a.ny * b.ny < 0.95) return null
+	const dx = b.x - a.x
+	const dy = b.y - a.y
+	if (Math.abs(dx * a.nx + dy * a.ny) > 0.5) return null
+	return dx * a.ex + dy * a.ey
 }
 
 // Does carrying wall [ax, ay, bx, by] on to (x, y) keep it within about 8°?
