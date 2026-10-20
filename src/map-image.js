@@ -34,8 +34,8 @@ const HATCH_WIDTH = 2
 
 // Flat second tone for parks and water, one step lighter than the base.
 const TONES = {
-	[T.GRASS]: '#719750',
-	[T.PITCH]: '#577f54',
+	[T.GRASS]: '#679a3d',
+	[T.PITCH]: '#5a8a48',
 	[T.PLAYGROUND]: '#d3b171',
 	[T.WATER]: '#4b6a69',
 	[T.SIDEWALK]: '#bcb3a4',

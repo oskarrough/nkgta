@@ -21,8 +21,10 @@ const SUN = { color: '#fff4e2', intensity: 2.55, direction: [-0.5, -0.6, 0.8] }
 // Flat bands instead of a falloff, from grazing sun to full sun. Faces turned
 // away from the sun get none at all, so they can't flicker in and out of shadow.
 const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
-// What the map's own colours are multiplied by in shadow.
-const GROUND_SHADE = '#b8c0ce'
+// What the map's own colours are multiplied by in sun and in shadow: warm
+// light, deep cool shade.
+const GROUND_SUN = '#fffaf0'
+const GROUND_SHADE = '#98a4c0'
 // One 2048 map over the visible area, so the edges stay hard.
 // normalBias is in shadow texels, so it holds at every zoom.
 const SHADOW = { size: 2048, bias: -0.0003, normalBias: 1.5, pad: 60 }
@@ -287,7 +289,13 @@ function skidMarks() {
 // The map image keeps its own colours: the ground samples the shadow map and
 // multiplies by one fixed shade, so nothing is lit twice.
 function groundMaterial(map) {
-	const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.lights, { shade: { value: new THREE.Color(GROUND_SHADE) } }])
+	const uniforms = THREE.UniformsUtils.merge([
+		THREE.UniformsLib.lights,
+		{
+			sun: { value: new THREE.Color(GROUND_SUN) },
+			shade: { value: new THREE.Color(GROUND_SHADE) },
+		},
+	])
 	uniforms.map = { value: map }
 	return new THREE.ShaderMaterial({
 		lights: true,
@@ -308,6 +316,7 @@ function groundMaterial(map) {
 		`,
 		fragmentShader: `
 			uniform sampler2D map;
+			uniform vec3 sun;
 			uniform vec3 shade;
 			uniform bool receiveShadow;
 			varying vec2 vUv;
@@ -317,7 +326,7 @@ function groundMaterial(map) {
 
 			void main() {
 				vec3 color = texture2D(map, vUv).rgb;
-				gl_FragColor = vec4(color * mix(shade, vec3(1.0), 1.0 - getShadowMask()), 1.0);
+				gl_FragColor = vec4(color * mix(shade, sun, getShadowMask()), 1.0);
 				#include <colorspace_fragment>
 			}
 		`,

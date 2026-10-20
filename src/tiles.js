@@ -18,10 +18,10 @@ export const COLORS = {
 	[T.ROAD]: '#46484c',
 	[T.SIDEWALK]: '#b3aa9b',
 	[T.BUILDING]: '#b86a52',
-	[T.GRASS]: '#668a49',
+	[T.GRASS]: '#5b8636',
 	[T.WATER]: '#42605f',
 	[T.PLAYGROUND]: '#c9a45e',
-	[T.PITCH]: '#4c7a4b',
+	[T.PITCH]: '#4f8040',
 	[T.CYCLEWAY]: '#a05d55',
 	[T.PRIVATE]: '#9d9484',
 }

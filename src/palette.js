@@ -49,6 +49,8 @@ export const PALETTE = [
 	'#E8C46A',
 	'#C8302A',
 	'#3FA34D',
+	'#689A3E',
+	'#2D333D',
 ]
 
 export const PALETTE_SIZE = PALETTE.length
