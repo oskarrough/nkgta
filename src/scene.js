@@ -3,7 +3,8 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { renderMapImage, renderRoofImage, roofHash } from './map-image.js'
+import { isPitched, renderMapImage, renderRoofImage, roofHash } from './map-image.js'
+import { clipConvex, hipRoof, roofFaces, roofHeight } from './roofs.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
@@ -100,9 +101,9 @@ export function createScene(canvas, world) {
 	scene.add(plane)
 
 	const gradient = toonGradient()
-	const houses = world.buildings.map((b) => ({ h: b.h / world.tileM, parts: footprint(b.rings) }))
+	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
 	scene.add(walls(houses, world.tileM, gradient), roofs(houses, world, gradient, roofTex))
-	scene.add(chimneys(roofImage.chimneys, world.tileM, gradient))
+	scene.add(chimneys(roofImage.chimneys, houses, gradient))
 	const clouds = createClouds(world, gradient)
 	scene.add(createTrees(world, gradient), clouds.layer)
 	const cars = carMeshes(gradient)
@@ -512,6 +513,21 @@ function inside(p, poly) {
 	return hit
 }
 
+// A building as the scene needs it: eaves height and outline in tiles, and
+// a pitched roof if it gets one. `top` is the height of the roof at a point.
+function house(b, n, tileM) {
+	const h = b.h / tileM
+	const parts = footprint(b.rings)
+	const roof = isPitched(b, n, tileM)
+		? hipRoof(
+				parts[0].outer.map((p) => [p.x, p.y]),
+				b.h,
+				tileM,
+			)
+		: null
+	return { h, parts, roof, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
+}
+
 // Every edge of every outline becomes one wall quad, outer rings
 // anticlockwise and courtyards clockwise, so walls face away from the
 // building. Each building gets a plaster colour from a stable hash.
@@ -522,7 +538,7 @@ function walls(houses, tileM, gradient) {
 	const wall = [] // per vertex: distance along the wall, windows that fit, building height
 	const plaster = FACADES.map((f) => new THREE.Color(f))
 	const c = new THREE.Color()
-	houses.forEach(({ h, parts }, n) => {
+	houses.forEach(({ h, parts, top }, n) => {
 		const j = roofHash(n + 500)
 		c.copy(plaster[Math.floor(j * plaster.length)]).offsetHSL(0, 0, (roofHash(n + 900) - 0.5) * 0.08)
 		for (const { outer, holes } of parts) {
@@ -537,13 +553,16 @@ function walls(houses, tileM, gradient) {
 					// Centre the windows on the wall; too short a wall gets none.
 					const fit = len < 0.7 ? 0 : Math.floor(len)
 					const lead = (len - fit) / 2
+					// Up to the roof, which under a pitched one is above the eaves.
+					const ta = top(a.x, a.y)
+					const te = top(e.x, e.y)
 					const quad = [
 						[a, 0, 0],
 						[e, 0, len],
-						[e, h, len],
+						[e, te, len],
 						[a, 0, 0],
-						[e, h, len],
-						[a, h, 0],
+						[e, te, len],
+						[a, ta, 0],
 					]
 					for (const [p, z, d] of quad) {
 						pos.push(p.x, p.y, z)
@@ -568,7 +587,7 @@ function walls(houses, tileM, gradient) {
 
 // Every chimney is one instance of one box, so the whole city's stacks are a
 // single draw, and they cast real shadows down the roof.
-function chimneys(list, tileM, gradient) {
+function chimneys(list, houses, gradient) {
 	const geo = new THREE.BoxGeometry(CHIMNEY.length, CHIMNEY.width, CHIMNEY.height).translate(0, 0, CHIMNEY.height / 2)
 	const mesh = new THREE.InstancedMesh(geo, new THREE.MeshToonMaterial({ color: '#fff', gradientMap: gradient }), list.length)
 	mesh.castShadow = true
@@ -581,22 +600,48 @@ function chimneys(list, tileM, gradient) {
 	const one = new THREE.Vector3(1, 1, 1)
 	const c = new THREE.Color()
 	list.forEach((ch, i) => {
-		m.compose(at.set(ch.x, -ch.y, ch.h / tileM), q.setFromAxisAngle(z, -ch.angle), one)
+		m.compose(at.set(ch.x, -ch.y, houses[ch.n].top(ch.x, -ch.y) - 0.05), q.setFromAxisAngle(z, -ch.angle), one)
 		mesh.setMatrixAt(i, m)
 		mesh.setColorAt(i, c.set(CHIMNEY.colors[Math.floor(ch.tone * CHIMNEY.colors.length)]))
 	})
 	return mesh
 }
 
-// Every outline filled in at its building's height, all in one mesh.
+// Every outline filled in at its building's height, or raised into its
+// pitched roof, all in one mesh. Pitched faces are flat-shaded, so each slope
+// takes one light band and the ink finds the ridges and hips.
 function roofs(houses, world, gradient, tex) {
 	const tops = []
-	for (const { h, parts } of houses) {
-		for (const { outer, holes } of parts) {
-			const shape = new THREE.Shape(outer)
-			shape.holes = holes.map((hole) => new THREE.Path(hole))
-			tops.push(new THREE.ShapeGeometry(shape).translate(0, 0, h))
+	const pos = []
+	for (const { h, parts, roof } of houses) {
+		if (!roof) {
+			for (const { outer, holes } of parts) {
+				const shape = new THREE.Shape(outer)
+				shape.holes = holes.map((hole) => new THREE.Path(hole))
+				const geo = new THREE.ShapeGeometry(shape).translate(0, 0, h).toNonIndexed()
+				geo.deleteAttribute('uv')
+				tops.push(geo)
+			}
+			continue
 		}
+		const outline = parts[0].outer.map((p) => [p.x, p.y])
+		for (const face of roofFaces(roof)) {
+			const piece = clipConvex(outline, face)
+			if (piece.length < 3) continue
+			const flat = piece.map(([x, y]) => new THREE.Vector2(x, y))
+			for (const tri of THREE.ShapeUtils.triangulateShape(flat, [])) {
+				const [a, b, c] = tri.map((i) => piece[i])
+				// Anticlockwise from above, so the face points up.
+				const order = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0 ? [a, c, b] : [a, b, c]
+				for (const [x, y] of order) pos.push(x, y, h + roofHeight(roof, x, y))
+			}
+		}
+	}
+	if (pos.length) {
+		const geo = new THREE.BufferGeometry()
+		geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+		geo.computeVertexNormals()
+		tops.push(geo)
 	}
 	if (!tops.length) return new THREE.Group() // an area without buildings
 	const mesh = new THREE.Mesh(mergeGeometries(tops), roofMaterial(world, gradient, tex))
@@ -677,7 +722,7 @@ function wallMaterial(tileM, gradient) {
 				// its own shadow beneath.
 				if (vWall.z > 2.0) {
 					float down = vWall.z - vZ;
-					diffuseColor.rgb = down < ${WALL.cornice[0].toFixed(3)} ? mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45) : down < ${WALL.cornice[1].toFixed(3)} ? diffuseColor.rgb * 0.62 : diffuseColor.rgb;
+					diffuseColor.rgb = down < 0.0 ? diffuseColor.rgb : down < ${WALL.cornice[0].toFixed(3)} ? mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45) : down < ${WALL.cornice[1].toFixed(3)} ? diffuseColor.rgb * 0.62 : diffuseColor.rgb;
 				}
 				// Darker towards the foot, in two steps, where the street's
 				// grime and the ground's shade reach up the wall.
