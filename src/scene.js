@@ -3,8 +3,8 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { isPitched, renderMapImage, renderRoofImage, roofHash } from './map-image.js'
-import { clipConvex, hipRoof, roofFaces, roofHeight } from './roofs.js'
+import { renderMapImage, renderRoofImage, roofHash, roofOf } from './map-image.js'
+import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
@@ -82,7 +82,8 @@ export function createScene(canvas, world) {
 	// Tile (x, y) sits at (x, -y), so north stays up and z is height in tiles.
 	const ground = new THREE.CanvasTexture(renderMapImage(world))
 	ground.colorSpace = THREE.SRGBColorSpace
-	const roofImage = renderRoofImage(world)
+	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
+	const roofImage = renderRoofImage(world, (n) => !!houses[n].roof)
 	const roofTex = new THREE.CanvasTexture(roofImage.canvas)
 	roofTex.colorSpace = THREE.SRGBColorSpace
 	// Crisp texels only on the pixel grid; the smooth looks keep their
@@ -103,7 +104,6 @@ export function createScene(canvas, world) {
 	scene.add(plane)
 
 	const gradient = toonGradient()
-	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
 	scene.add(walls(houses, world.tileM, gradient), roofs(houses, world, gradient, roofTex))
 	scene.add(chimneys(roofImage.chimneys, houses, gradient))
 	const clouds = createClouds(world, gradient)
@@ -545,17 +545,13 @@ function inside(p, poly) {
 }
 
 // A building as the scene needs it: eaves height and outline in tiles, and
-// a pitched roof if it gets one. `top` is the height of the roof at a point.
+// a pitched roof if its roof is tiled and its outline allows one. `top` is the height of the roof at a point.
 function house(b, n, tileM) {
 	const h = b.h / tileM
 	const parts = footprint(b.rings)
-	const roof = isPitched(b, n, tileM)
-		? hipRoof(
-				parts[0].outer.map((p) => [p.x, p.y]),
-				b.h,
-				tileM,
-			)
-		: null
+	const pitched = parts.length === 1 && roofOf(b, n).ridge
+	const rings = [parts[0]?.outer, ...(parts[0]?.holes ?? [])].map((r) => r?.map((p) => [p.x, p.y]))
+	const roof = pitched ? roofShape(rings, b.h, tileM) : null
 	return { h, parts, roof, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
 }
 
@@ -655,18 +651,17 @@ function roofs(houses, world, gradient, tex) {
 			}
 			continue
 		}
-		const outline = parts[0].outer.map((p) => [p.x, p.y])
-		for (const face of roofFaces(roof)) {
-			const piece = clipConvex(outline, face)
-			if (piece.length < 3) continue
-			const flat = piece.map(([x, y]) => new THREE.Vector2(x, y))
-			for (const tri of THREE.ShapeUtils.triangulateShape(flat, [])) {
-				const [a, b, c] = tri.map((i) => piece[i])
-				// Anticlockwise from above, so the face points up.
-				const order = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0 ? [a, c, b] : [a, b, c]
-				for (const [x, y] of order) pos.push(x, y, h + roofHeight(roof, x, y))
-			}
+		// Under a mansard, which follows a simplified outline, the flat roof
+		// stays just below to fill the slivers it leaves.
+		if (roof.kind === 'mansard') {
+			const shape = new THREE.Shape(parts[0].outer)
+			shape.holes = parts[0].holes.map((hole) => new THREE.Path(hole))
+			const geo = new THREE.ShapeGeometry(shape).translate(0, 0, h - 0.02).toNonIndexed()
+			geo.deleteAttribute('uv')
+			tops.push(geo)
 		}
+		const tris = roofTriangles(roof, triangulate)
+		for (let i = 0; i < tris.length; i += 3) pos.push(tris[i], tris[i + 1], h + tris[i + 2])
 	}
 	if (pos.length) {
 		const geo = new THREE.BufferGeometry()
@@ -679,6 +674,13 @@ function roofs(houses, world, gradient, tex) {
 	mesh.castShadow = true
 	mesh.receiveShadow = true
 	return mesh
+}
+
+// Earcut over [x, y] points, as roofs.js wants it: indices into the
+// contour followed by the holes.
+function triangulate(contour, holes) {
+	const v = (r) => r.map(([x, y]) => new THREE.Vector2(x, y))
+	return THREE.ShapeUtils.triangulateShape(v(contour), holes.map(v))
 }
 
 // The roof image is one texture for the whole map, so each roof looks up its

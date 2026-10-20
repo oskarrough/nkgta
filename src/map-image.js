@@ -2,7 +2,6 @@
 // pavements curve the way they do in town. It becomes the ground texture of
 // the 3D scene. The tile grid underneath still decides where you can walk.
 import { T, COLORS, INK, KERB, MARK } from './tiles.js'
-import { hipRoof } from './roofs.js'
 
 export const PX = 4 // screen pixels per tile at zoom 1
 
@@ -236,7 +235,8 @@ export function renderMapImage(world) {
 
 // Roofs, painted from the building outlines and laid over the tops of the
 // 3D buildings. Each building picks a roof (tiles or slate) and gets flat
-// two-tone shading split along its ridge, plus the odd skylight. Returns the
+// two-tone shading split along its ridge, unless `pitched(n)` says the 3D
+// scene gives it a real one, plus the odd skylight. Returns the
 // image and where the chimneys go: { x, y, n, angle, tone }, in tiles, the
 // building's index, and radians.
 const ROOFS = [
@@ -265,16 +265,7 @@ export function roofOf(b, n) {
 	return b.h <= 5 ? SHED_ROOF : ROOFS[Math.floor(roofHash(n) * ROOFS.length)]
 }
 
-// Tiled roofs over a single, nearly rectangular outline are pitched in 3D.
-export function isPitched(b, n, tileM) {
-	if (b.rings.length !== 1 || !roofOf(b, n).ridge) return false
-	const r = b.rings[0]
-	const pts = []
-	for (let i = 0; i < r.length; i += 2) pts.push([r[i], r[i + 1]])
-	return !!hipRoof(pts, b.h, tileM)
-}
-
-export function renderRoofImage(world) {
+export function renderRoofImage(world, pitched = () => false) {
 	const { W, H, buildings } = world
 	// Finer than the ground, but within what every GPU takes as one texture.
 	const RPX = Math.max(2, Math.min(ROOF_PX, Math.floor(8192 / Math.max(W, H))))
@@ -326,13 +317,12 @@ export function renderRoofImage(world) {
 		// gets the lighter tone; the other keeps the base.
 		const lit = 0.6 * Math.sin(angle) + 0.8 * Math.cos(angle)
 		// Pitched roofs in 3D take their light from the sun instead.
-		const pitched = isPitched(b, n, world.tileM)
 		g.save()
 		g.translate(cx, cy)
 		g.rotate(angle)
 		g.fillStyle = shade(roof.base, roof.ridge ? ROOF_TILE_TONE : ROOF_FLAT_TONE)
-		if (!pitched) g.fillRect(-reach, lit > 0 ? 0 : -reach, reach * 2, reach)
-		if (roof.ridge && !pitched) {
+		if (!pitched(n)) g.fillRect(-reach, lit > 0 ? 0 : -reach, reach * 2, reach)
+		if (roof.ridge && !pitched(n)) {
 			g.strokeStyle = RIDGE_INK
 			g.lineWidth = RIDGE_WIDTH
 			g.beginPath()
