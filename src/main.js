@@ -51,11 +51,16 @@ const input = createInput({
 // E: out of the car, off the bike, or onto whichever is closer, bike or car.
 function use() {
 	if (wasted.active()) return
-	if (player.car) return leaveCar(player, world)
+	if (player.car) {
+		leaveCar(player, world)
+		sound.door()
+		return
+	}
 	const car = !player.onBike && traffic.enterable(player.x, player.y)
 	if (car && !(nearBike(player) && Math.hypot(player.bike.x - player.x, player.bike.y - player.y) < 0.6)) {
 		traffic.steal(car, hud.say)
 		player.car = car
+		sound.door()
 	} else toggleBike(player)
 }
 
@@ -77,6 +82,7 @@ function frame(now) {
 	wasted.hit(traffic.update(dt, player, viewOf(cam)))
 	if (!player.car && !wasted.active()) pfand.update(player, hud.say)
 	sound.engine(player.car)
+	sound.street(traffic.cars, player, viewOf(cam), dt)
 	city3d.render(cam, traffic.cars)
 	draw({ cam, player, peds: traffic.peds, lights: traffic.lights(), bottles: pfand.bottles, showStreetNames, showTransit })
 	const car = !player.car && !player.onBike && traffic.enterable(player.x, player.y)

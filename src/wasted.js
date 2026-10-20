@@ -2,6 +2,8 @@
 // wasted: you lie in the road for a moment, then you're back on your feet
 // where the game started, bike beside you.
 
+import { sound } from './sound.js'
+
 const LETHAL = 2.3 // tiles per second
 const DOWN_FOR = 3 // seconds
 
@@ -12,6 +14,7 @@ export function createWasted({ player, onDown, respawn }) {
 
 		hit(speed) {
 			if (down || speed < LETHAL) return
+			sound.hit(speed)
 			down = DOWN_FOR
 			player.down = true
 			player.speed = 0

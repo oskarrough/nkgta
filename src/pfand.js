@@ -1,4 +1,5 @@
 // Pfand bottles lying around on pavements and in parks, cashed in at Spätis.
+import { sound } from './sound.js'
 import { T } from './tiles.js'
 import { nearestPlace, placeName } from './places.js'
 
@@ -30,6 +31,7 @@ export function createPfand(world) {
 			const b = bottles[i]
 			if (bag.bottles >= BAG_SIZE || Math.hypot(b.x - player.x, b.y - player.y) > 0.8) continue
 			// 8 cents a bottle, 25 a can.
+			sound.clink()
 			bag.bottles++
 			bag.pending += b.can ? 25 : 8
 			bottles.splice(i, 1)
@@ -38,6 +40,7 @@ export function createPfand(world) {
 
 		const spaeti = nearestPlace(world.pois, player.x, player.y, 2, 'spaeti')
 		if (spaeti && bag.bottles) {
+			sound.till()
 			bag.cents += bag.pending
 			say(`${placeName(spaeti)}: ${bag.bottles} Flaschen, +${euro(bag.pending)}`)
 			bag.bottles = 0
@@ -47,6 +50,7 @@ export function createPfand(world) {
 
 	// Knocked over: the bag splits and the bottles roll about.
 	function spill(x, y) {
+		sound.spill(bag.bottles)
 		for (let i = 0; i < bag.bottles; i++) {
 			const a = Math.random() * Math.PI * 2
 			const r = 0.4 + Math.random() * 1.2
