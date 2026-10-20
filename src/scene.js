@@ -207,6 +207,8 @@ export function createScene(canvas, world) {
 
 	return {
 		render,
+		gradient,
+		add: (...objects) => scene.add(...objects),
 		// Only the pixel grid needs the camera on whole game pixels.
 		pixelGrid: () => look === 'pixel',
 		// P: comic, palette, pixel, and round again.

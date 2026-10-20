@@ -9,6 +9,8 @@ import { createCamera } from './camera.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud } from './hud.js'
+import { findShops } from './shops.js'
+import { createSigns } from './signs.js'
 
 import { sound } from './sound.js'
 
@@ -30,6 +32,7 @@ const city3d = createScene(document.getElementById('city'), world)
 const draw = createRenderer(canvas, world)
 const hud = createHud(world)
 const traffic = createTraffic(world)
+city3d.add(createSigns(findShops(world), city3d.gradient))
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
