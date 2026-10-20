@@ -35,7 +35,7 @@ const hud = createHud(world)
 const traffic = createTraffic(world)
 const shops = findShops(world)
 city3d.add(createSigns(shops, city3d.gradient))
-const visit = createVisit({ city3d, shops, player })
+const visit = createVisit({ city3d, shops, player, pfand, say: hud.say })
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
@@ -96,7 +96,7 @@ function frame(now) {
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
 	const hit = traffic.update(dt, street, streetView)
 	if (!inside && !visit.warping()) wasted.hit(hit)
-	if (!inside && !player.car && !wasted.active()) pfand.update(player, hud.say)
+	if (!inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	visit.render(cam, traffic.cars, dt)

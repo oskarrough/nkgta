@@ -19,7 +19,7 @@ const smooth = (t) => t * t * (3 - 2 * t)
 const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-export function createVisit({ city3d, shops, player }) {
+export function createVisit({ city3d, shops, player, pfand, say }) {
 	const interior = createInterior(city3d.gradient)
 	const portal = createPortal(city3d.renderer, {
 		radius: RADIUS,
@@ -154,6 +154,7 @@ export function createVisit({ city3d, shops, player }) {
 				const dx = player.x - DOOR.x
 				const dy = player.y - DOOR.y
 				if (armed && Math.abs(dx) < 0.75 && Math.abs(dy) < 0.5 && pushing({ x: DOOR.nx, y: DOOR.ny })) startWarp()
+				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) pfand.cashIn(shop.name, say)
 				return
 			}
 			if (!shop || portal.phase === 'closed') return
@@ -184,6 +185,7 @@ export function createVisit({ city3d, shops, player }) {
 		hint() {
 			if (warp) return ''
 			if (inside) {
+				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) return pfand.bag.bottles ? '' : 'Pfand? Erst sammeln.'
 				return 'E: raus auf die Straße'
 			}
 			if (player.car || player.onBike) return null

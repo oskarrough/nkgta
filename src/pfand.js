@@ -1,7 +1,7 @@
-// Pfand bottles lying around on pavements and in parks, cashed in at Spätis.
+// Pfand bottles lying around on pavements and in parks, cashed in at the
+// counter inside a Späti.
 import { sound } from './sound.js'
 import { T } from './tiles.js'
-import { nearestPlace, placeName } from './places.js'
 
 const BAG_SIZE = 30
 const RESPAWN_MS = 20000
@@ -26,7 +26,7 @@ export function createPfand(world) {
 	// About one bottle per 50 m × 50 m.
 	for (let i = 0; i < (world.W * world.H) / 300; i++) spawn()
 
-	function update(player, say) {
+	function update(player) {
 		for (let i = bottles.length - 1; i >= 0; i--) {
 			const b = bottles[i]
 			if (bag.bottles >= BAG_SIZE || Math.hypot(b.x - player.x, b.y - player.y) > 0.8) continue
@@ -37,15 +37,16 @@ export function createPfand(world) {
 			bottles.splice(i, 1)
 			setTimeout(spawn, RESPAWN_MS)
 		}
+	}
 
-		const spaeti = nearestPlace(world.pois, player.x, player.y, 2, 'spaeti')
-		if (spaeti && bag.bottles) {
-			sound.till()
-			bag.cents += bag.pending
-			say(`${placeName(spaeti)}: ${bag.bottles} Flaschen, +${euro(bag.pending)}`)
-			bag.bottles = 0
-			bag.pending = 0
-		}
+	// Over the counter at `shop`, if there's anything in the bag.
+	function cashIn(shop, say) {
+		if (!bag.bottles) return
+		sound.till()
+		bag.cents += bag.pending
+		say(`${shop}: ${bag.bottles} Flaschen, +${euro(bag.pending)}`)
+		bag.bottles = 0
+		bag.pending = 0
 	}
 
 	// Knocked over: the bag splits and the bottles roll about.
@@ -60,5 +61,5 @@ export function createPfand(world) {
 		bag.pending = 0
 	}
 
-	return { bottles, bag, update, spill }
+	return { bottles, bag, update, cashIn, spill }
 }
