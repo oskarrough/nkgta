@@ -70,8 +70,9 @@ const GROUND_DETAIL = {
 	asphaltPatches: 0.1, // repaired patches in the tarmac
 	waves: 0.65, // pale wave dashes on water
 	waveDrift: 0.15, // and how fast they drift, tiles a second
-	glints: 0.06, // share of sunlit water cells sparkling at any moment
-	glintSize: 0.09, // tiles
+	glints: 0.035, // share of sunlit water cells sparkling at any moment
+	glintCell: 1.3, // tiles, one glint at most in each
+	glintSize: 0.13, // tiles
 }
 const GLINT = '#ffffff'
 // Tiles over which the ground fades into the sky at the map edge.
@@ -511,12 +512,14 @@ function groundMaterial(map, world) {
 				vec3 color = groundDetail(texture2D(map, vUv).rgb, vTile, time);
 				float lit = getShadowMask();
 				color *= mix(shade, sun, lit);
-				// Sun glints on water: a few cells at a time flash a white point.
-				vec2 gc = floor(vTile * 1.5);
-				vec2 gp = fract(vTile * 1.5) - 0.25 - 0.5 * vec2(gHash(gc + 3.1), gHash(gc + 7.7));
+				// Sun glints on water: a few cells at a time flash a white point,
+				// gone once they'd be smaller than a pixel.
+				vec2 gc = floor(vTile / ${d(GROUND_DETAIL.glintCell)});
+				vec2 gp = (fract(vTile / ${d(GROUND_DETAIL.glintCell)}) - 0.25 - 0.5 * vec2(gHash(gc + 3.1), gHash(gc + 7.7))) * ${d(GROUND_DETAIL.glintCell)};
 				float flash = step(fract(gHash(gc) * 13.0 + time * 0.4), ${d(GROUND_DETAIL.glints)});
-				float spot = step(abs(gp.x) + abs(gp.y), ${d(GROUND_DETAIL.glintSize * 1.5)});
-				color = mix(color, ${glsl(GLINT)}, gWater * step(0.5, lit) * flash * spot);
+				float spot = step(abs(gp.x) + abs(gp.y), ${d(GROUND_DETAIL.glintSize)});
+				float seen = 1.0 - step(${d(GROUND_DETAIL.glintSize)}, length(fwidth(vTile)) * 1.2);
+				color = mix(color, ${glsl(GLINT)}, gWater * step(0.5, lit) * flash * spot * seen);
 				// The last few tiles fade into the sky under the clouds.
 				vec2 edge = min(vTile * vec2(1.0, -1.0), size - vTile * vec2(1.0, -1.0));
 				color = mix(deck, color, smoothstep(0.0, ${EDGE_FADE.toFixed(1)}, min(edge.x, edge.y)));
@@ -588,8 +591,9 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	// Pitches are a bluer green than lawns and keep their mown look, water
 	// a teal: green and blue well over red and close to each other.
 	float pitch = lawn * smoothstep(0.5, 0.58, color.b / max(color.r, 0.001));
-	float water = step(0.075, lum) * step(color.r * 1.5, color.g) * step(color.r * 1.5, color.b) * (1.0 - step(0.035, abs(color.g - color.b)));
-	gWater = water;
+	float water = step(0.045, lum) * step(color.r * 1.5, color.g) * step(color.r * 1.5, color.b) * (1.0 - step(0.035, abs(color.g - color.b)));
+	// Glints only off water in the sun, not in a quay wall's shadow.
+	gWater = water * step(0.075, lum);
 	float tarmac = grey * (1.0 - water) * (1.0 - smoothstep(0.1, 0.14, lum));
 	float pavement = grey * (1.0 - water) * smoothstep(0.3, 0.36, lum);
 	float yard = grey * (1.0 - water) * (1.0 - tarmac) * (1.0 - pavement) * smoothstep(0.15, 0.19, lum);

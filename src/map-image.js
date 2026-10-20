@@ -38,9 +38,24 @@ const CHIMNEY_SHARE = 0.55
 const SKYLIGHT_SHARE = 0.1
 const CHIMNEY_SOOT = 'rgba(30, 26, 24, 0.25)'
 const SKYLIGHT_COLOR = '#8fa3ae'
-// Shallows along water's edge: colour and how far in from the bank, tiles.
-// The bank's ink covers the outer SHAPE_OUTLINE / 2 of it.
-const SHALLOWS = [['#5f8e8a', 0.9]]
+// Water: paler shallows along every bank, a granite quay coping and an ink
+// line round it, and the quay wall's shadow on the water, which lies below
+// the street; in the shadow the shallows don't show. Sizes in tiles; the shadow falls away from the south-west sun.
+const WATER = {
+	shallows: '#5f8e8a',
+	shallowsWidth: 0.9,
+	coping: '#b9b2a2',
+	copingWidth: 0.35,
+	ink: '#1a1e1b',
+	inkWidth: 0.18,
+	drop: 1.5, // how far the wall's shadow reaches
+	shadow: '#2f4a4c', // the water in it: one flat tone, no shallows
+}
+// Bridges: wherever a road or path is over water it's carried on a deck,
+// pavement either side of a road, with a parapet along each edge.
+const BRIDGE = { walk: 0.8, path: 0.25, deck: '#b3aa9b', rail: '#3d3f40', railWidth: 0.22 }
+// Towards the sun on the ground, in the image's frame (y points south).
+const TO_SUN = [-0.64, 0.77]
 const PITCH_INSET = 1 // touchline distance from the pitch's edge, tiles
 const PITCH_LINE = 0.25
 const PITCH_CIRCLE = 3 // at most, and a quarter of the pitch's width
@@ -192,6 +207,117 @@ function contains(path, x, y, px) {
 	return scratch.isPointInPath(path, x * px, y * px, 'evenodd')
 }
 
+// Roads are drawn from this layer up; water goes on just before them.
+const ROADS_LAYER = 7
+const DECKED = new Set([T.SIDEWALK, T.CYCLEWAY, T.PRIVATE])
+// Which lines are carried over water on a deck, and how wide it is.
+export const isDeck = (s) => !!s.line && (s.t === T.ROAD || (DECKED.has(s.t) && s.w <= FOOTPATH && s.layer > 3))
+export const deckWidth = (s) => (s.t === T.ROAD ? s.w + BRIDGE.walk * 2 : s.w + BRIDGE.path * 2)
+
+// All the area's water at once, so where shapes overlap they make one body
+// of water with one bank: the coping and ink under everything, then the
+// shallows, then the deep water shrunk away from every bank. Then the quay
+// walls' and bridges' shadows, worked out on a mask of the water, and the
+// bridge decks over it, cut to the water so they stop at the banks.
+function paintWater(g, area, waters, decks) {
+	const rings = waters.filter((s) => s.rings).map((s) => ringPath(s.rings))
+	const lines = waters.filter((s) => s.line)
+	const each = (ctx, ringStyle, ringWidth, lineStyle, lineWidth) => {
+		for (const path of rings) {
+			if (ringWidth) {
+				ctx.strokeStyle = ringStyle
+				ctx.lineWidth = ringWidth
+				ctx.stroke(path)
+			} else {
+				ctx.fillStyle = ringStyle
+				ctx.fill(path, 'evenodd')
+			}
+		}
+		for (const s of lines) {
+			ctx.beginPath()
+			trace(ctx, s.line)
+			ctx.strokeStyle = lineStyle
+			ctx.lineWidth = lineWidth(s)
+			ctx.stroke()
+		}
+	}
+	const { coping, copingWidth, ink, inkWidth, shallows, shallowsWidth } = WATER
+	const deep = COLORS[T.WATER]
+	each(g, coping, (copingWidth + inkWidth) * 2, coping, (s) => s.w + (copingWidth + inkWidth) * 2)
+	each(g, ink, inkWidth * 2, ink, (s) => s.w + inkWidth * 2)
+	each(g, shallows, 0, shallows, (s) => s.w)
+	for (const path of rings) {
+		g.save()
+		g.clip(path, 'evenodd')
+		g.fillStyle = deep
+		g.fill(path, 'evenodd')
+		g.strokeStyle = shallows
+		g.lineWidth = shallowsWidth * 2
+		g.stroke(path)
+		g.restore()
+	}
+	for (const s of lines) {
+		g.beginPath()
+		trace(g, s.line)
+		g.strokeStyle = deep
+		g.lineWidth = Math.max(0, s.w - shallowsWidth * 2)
+		g.stroke()
+	}
+
+	// Masks at the texture's size and frame.
+	const { width, height } = g.canvas
+	const layer = () => {
+		const ctx = newCanvas(width, height).getContext('2d')
+		ctx.setTransform(g.getTransform())
+		ctx.lineCap = 'round'
+		ctx.lineJoin = 'round'
+		return ctx
+	}
+	const stroked = (ctx, style, extra) => {
+		ctx.strokeStyle = style
+		for (const s of decks) {
+			ctx.beginPath()
+			trace(ctx, s.line)
+			ctx.lineWidth = deckWidth(s) + extra
+			ctx.stroke()
+		}
+	}
+	const wet = layer()
+	each(wet, '#000', 0, '#000', (s) => s.w)
+	const deck = layer()
+	stroked(deck, BRIDGE.rail, BRIDGE.railWidth * 2)
+	stroked(deck, BRIDGE.deck, 0)
+	// The open water, without the decks over it.
+	const open = layer()
+	open.save()
+	open.setTransform(1, 0, 0, 1, 0, 0)
+	open.drawImage(wet.canvas, 0, 0)
+	open.restore()
+	open.globalCompositeOperation = 'destination-out'
+	stroked(open, '#000', BRIDGE.railWidth * 2)
+	// Shadow wherever the way to the sun crosses a bank or a deck: the open
+	// water, less itself moved away from the sun.
+	const shade = layer()
+	const px = area.px
+	shade.setTransform(1, 0, 0, 1, 0, 0)
+	shade.drawImage(open.canvas, 0, 0)
+	shade.globalCompositeOperation = 'destination-out'
+	shade.drawImage(open.canvas, -TO_SUN[0] * WATER.drop * px, -TO_SUN[1] * WATER.drop * px)
+	shade.globalCompositeOperation = 'source-in'
+	shade.fillStyle = WATER.shadow
+	shade.fillRect(0, 0, width, height)
+	// The decks only where there's water under them.
+	deck.setTransform(1, 0, 0, 1, 0, 0)
+	deck.globalCompositeOperation = 'destination-in'
+	deck.drawImage(wet.canvas, 0, 0)
+
+	g.save()
+	g.setTransform(1, 0, 0, 1, 0, 0)
+	g.drawImage(shade.canvas, 0, 0)
+	g.drawImage(deck.canvas, 0, 0)
+	g.restore()
+}
+
 export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 	const { shapes, buildings } = world
 	const GPX = area.px
@@ -233,8 +359,20 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 		g.stroke()
 	}
 
+	// Water waits until everything under the roads is down, so pavements and
+	// paths stop at the bank, and goes on top of them with its bridges.
+	const waters = shapes.filter((s) => s.t === T.WATER && near(s))
+	let watered = !waters.length
+	const water = () => {
+		watered = true
+		const decks = shapes.filter((s) => isDeck(s) && near(s))
+		paintWater(g, area, waters, decks)
+	}
+
 	for (let k = 0; k < shapes.length; k++) {
 		const s = shapes[k]
+		if (!watered && s.layer >= ROADS_LAYER) water()
+		if (s.t === T.WATER) continue
 		// Roads go in runs below, so a run's first road can't be skipped.
 		if (!near(s) && (s.rings || s.t !== T.ROAD)) continue
 		if (s.rings) {
@@ -254,17 +392,6 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 				g.restore()
 			}
 			if (s.t === T.PITCH) pitchLines(g, s.rings[0], path)
-			// Paler shallows along the bank.
-			if (s.t === T.WATER) {
-				g.save()
-				g.clip(path, 'evenodd')
-				for (const [color, width] of SHALLOWS) {
-					g.strokeStyle = color
-					g.lineWidth = width * 2
-					g.stroke(path)
-				}
-				g.restore()
-			}
 			// Ink around the shape, clipped so it stays inside the fill.
 			if (OUTLINED.has(s.t)) {
 				g.save()
@@ -296,6 +423,8 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 			} else stroke(s, paint(s.t), s.w)
 		}
 	}
+
+	if (!watered) water()
 
 	// Ground darkens towards every wall, then a dark contact line just outside
 	// the plot, so the walls sit in the ground rather than float on it.
