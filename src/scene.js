@@ -89,7 +89,7 @@ export function createScene(canvas, world) {
 	const ground = new THREE.CanvasTexture(renderMapImage(world))
 	ground.colorSpace = THREE.SRGBColorSpace
 	const houses = world.buildings.map((b, n) => house(b, n, world.tileM))
-	const roofImage = renderRoofImage(world, (n) => !!houses[n].roof)
+	const roofImage = renderRoofImage(world, (n) => houses[n].roof)
 	const roofTex = new THREE.CanvasTexture(roofImage.canvas)
 	roofTex.colorSpace = THREE.SRGBColorSpace
 	// Crisp texels only on the pixel grid; the smooth looks keep their
@@ -570,7 +570,15 @@ function house(b, n, tileM) {
 	const pitched = parts.length === 1 && roofOf(b, n).ridge
 	const rings = [parts[0]?.outer, ...(parts[0]?.holes ?? [])].map((r) => r?.map((p) => [p.x, p.y]))
 	const roof = pitched ? roofShape(rings, b.h, tileM) : null
-	return { h, parts, roof, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
+	// The building's axis, along its longest wall, for lining up tar paper.
+	let axis = 0
+	let longest = 0
+	const outer = parts[0]?.outer ?? []
+	outer.forEach((a, i) => {
+		const e = outer[(i + 1) % outer.length]
+		if (a.distanceTo(e) > longest) [longest, axis] = [a.distanceTo(e), Math.atan2(e.y - a.y, e.x - a.x)]
+	})
+	return { h, parts, roof, axis, top: roof ? (x, y) => h + roofHeight(roof, x, y) : () => h }
 }
 
 // Every edge of every outline becomes one wall quad, outer rings
@@ -657,15 +665,17 @@ function chimneys(list, houses, gradient) {
 // takes one light band and the ink finds the ridges and hips.
 function roofs(houses, world, gradient, tex) {
 	const tops = []
-	const pos = []
-	for (const { h, parts, roof } of houses) {
+	const flat = (shape, z, axis) => {
+		const geo = new THREE.ShapeGeometry(shape).translate(0, 0, z).toNonIndexed()
+		geo.deleteAttribute('uv')
+		return withAxis(geo, axis)
+	}
+	for (const { h, parts, roof, axis } of houses) {
 		if (!roof) {
 			for (const { outer, holes } of parts) {
 				const shape = new THREE.Shape(outer)
 				shape.holes = holes.map((hole) => new THREE.Path(hole))
-				const geo = new THREE.ShapeGeometry(shape).translate(0, 0, h).toNonIndexed()
-				geo.deleteAttribute('uv')
-				tops.push(geo)
+				tops.push(flat(shape, h, axis))
 			}
 			continue
 		}
@@ -674,24 +684,26 @@ function roofs(houses, world, gradient, tex) {
 		if (roof.kind === 'mansard') {
 			const shape = new THREE.Shape(parts[0].outer)
 			shape.holes = parts[0].holes.map((hole) => new THREE.Path(hole))
-			const geo = new THREE.ShapeGeometry(shape).translate(0, 0, h - 0.02).toNonIndexed()
-			geo.deleteAttribute('uv')
-			tops.push(geo)
+			tops.push(flat(shape, h - 0.02, axis))
 		}
 		const tris = roofTriangles(roof, triangulate)
+		const pos = []
 		for (let i = 0; i < tris.length; i += 3) pos.push(tris[i], tris[i + 1], h + tris[i + 2])
-	}
-	if (pos.length) {
 		const geo = new THREE.BufferGeometry()
 		geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
 		geo.computeVertexNormals()
-		tops.push(geo)
+		tops.push(withAxis(geo, axis))
 	}
 	if (!tops.length) return new THREE.Group() // an area without buildings
 	const mesh = new THREE.Mesh(mergeGeometries(tops), roofMaterial(world, gradient, tex))
 	mesh.castShadow = true
 	mesh.receiveShadow = true
 	return mesh
+}
+
+function withAxis(geo, axis) {
+	geo.setAttribute('axis', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count).fill(axis), 1))
+	return geo
 }
 
 // Earcut over [x, y] points, as roofs.js wants it: indices into the
@@ -707,18 +719,21 @@ function triangulate(contour, holes) {
 function roofMaterial(world, gradient, tex) {
 	const material = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient })
 	material.onBeforeCompile = (shader) => {
-		const decl = 'varying vec3 vRoofPos;\nvarying vec3 vRoofNormal;\n'
+		const decl = 'varying vec3 vRoofPos;\nvarying vec3 vRoofNormal;\nvarying float vRoofAxis;\n'
 		shader.vertexShader =
+			'attribute float axis;\n' +
 			decl +
 			shader.vertexShader.replace(
 				'#include <uv_vertex>',
 				`#include <uv_vertex>
 				vMapUv = vec2(position.x / ${world.W.toFixed(1)}, 1.0 + position.y / ${world.H.toFixed(1)});
 				vRoofPos = position;
-				vRoofNormal = normal;`,
+				vRoofNormal = normal;
+				vRoofAxis = axis;`,
 			)
 		shader.fragmentShader =
 			decl +
+			'float tarHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
 			shader.fragmentShader.replace(
 				'#include <map_fragment>',
 				`#include <map_fragment>
@@ -727,10 +742,60 @@ function roofMaterial(world, gradient, tex) {
 					float aa = fwidth(row);
 					float course = 1.0 - smoothstep(${ROOF_TILES.line.toFixed(2)} - aa, ${ROOF_TILES.line.toFixed(2)} + aa, fract(row));
 					diffuseColor.rgb *= 1.0 - (1.0 - smoothstep(0.25, 0.5, aa)) * course * ${ROOF_TILES.ink.toFixed(2)};
+				} else if (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)) < 0.05) {
+					${tarPaper}
 				}`,
 			)
 	}
 	return material
+}
+
+// Grey flat roofs are tar paper, lined up with the building: pale seams
+// between the rolls, newer and older patches, and now and then a roof hatch with its
+// shadow, or a vent. Sizes in tiles; the hatch shadow falls away from the sun.
+const TAR = {
+	seam: 0.34, // roll width
+	seamLight: 0.35, // the sealed overlaps catch the light
+	patch: [2.2, 1.3], // patch size
+	patchTone: 0.14,
+	hatchCell: 3.5, // one hatch at most per cell this size
+	hatchShare: 0.55, // cells without one
+	hatch: 0.3, // half size
+	frame: '#b9bdc0',
+	lid: '#8c949b',
+	ventCell: 1.7,
+	ventShare: 0.86,
+	vent: 0.08,
+}
+// Where a raised thing's shadow falls, in tiles: away from the sun.
+const SUN_AWAY = [-SUN.direction[0] * 0.12, -SUN.direction[1] * 0.12]
+
+const tarPaper = `
+	vec2 ax = vec2(cos(vRoofAxis), sin(vRoofAxis));
+	vec2 side = vec2(-ax.y, ax.x);
+	vec2 uv = vec2(dot(vRoofPos.xy, ax), dot(vRoofPos.xy, side));
+	float fine = 1.0 - smoothstep(0.05, 0.1, length(fwidth(uv)));
+	float f = 1.0 + step(fract(uv.y / ${TAR.seam.toFixed(3)}), 0.1) * ${TAR.seamLight.toFixed(2)} * fine;
+	float patch_ = tarHash(floor(uv / vec2(${TAR.patch[0].toFixed(2)}, ${TAR.patch[1].toFixed(2)})));
+	f += (step(0.86, patch_) - step(patch_, 0.12)) * ${TAR.patchTone.toFixed(2)};
+	diffuseColor.rgb *= f;
+	// A hatch at a random spot in some cells: lid, frame, shadow.
+	vec2 cell = floor(uv / ${TAR.hatchCell.toFixed(1)});
+	vec2 at = (cell + 0.3 + 0.4 * vec2(tarHash(cell + 1.7), tarHash(cell + 9.1))) * ${TAR.hatchCell.toFixed(1)};
+	float hatch = step(${TAR.hatchShare.toFixed(2)}, tarHash(cell + 5.3));
+	vec2 d = uv - at;
+	vec2 ds = vec2(dot(vRoofPos.xy - ${glslVec(SUN_AWAY)}, ax), dot(vRoofPos.xy - ${glslVec(SUN_AWAY)}, side)) - at;
+	float lid = max(abs(d.x), abs(d.y));
+	float shadow = step(max(abs(ds.x), abs(ds.y)), ${TAR.hatch.toFixed(2)}) * step(${TAR.hatch.toFixed(2)}, lid);
+	diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, hatch * shadow);
+	diffuseColor.rgb = mix(diffuseColor.rgb, lid > ${(TAR.hatch * 0.6).toFixed(2)} ? ${glsl(TAR.frame)} : ${glsl(TAR.lid)}, hatch * step(lid, ${TAR.hatch.toFixed(2)}));
+	// Vents: small dark dots.
+	vec2 vcell = floor(uv / ${TAR.ventCell.toFixed(1)});
+	vec2 vd = uv - (vcell + 0.25 + 0.5 * vec2(tarHash(vcell + 3.3), tarHash(vcell + 4.4))) * ${TAR.ventCell.toFixed(1)};
+	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
+`
+function glslVec([x, y]) {
+	return `vec2(${x.toFixed(3)}, ${y.toFixed(3)})`
 }
 
 // Walls draw their own windows: one per 3 m along the wall and per storey up

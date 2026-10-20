@@ -2,6 +2,7 @@
 // pavements curve the way they do in town. It becomes the ground texture of
 // the 3D scene. The tile grid underneath still decides where you can walk.
 import { T, COLORS, INK, KERB, MARK } from './tiles.js'
+import { flatTops } from './roofs.js'
 
 export const PX = 4 // screen pixels per tile at zoom 1
 
@@ -23,7 +24,6 @@ const ROAD_INK_EXTRA = 0.34 // dark edge inside the kerb, tiles
 const MARK_DASH = [1.1, 1.3]
 const MARK_WIDTH = 0.18
 const ROOF_TILE_TONE = 0.1 // second tone on pitched roofs, mixed towards white
-const ROOF_FLAT_TONE = 0.06
 const ROOF_ROW_INK = 0.05 // faint tile rows on pitched roofs
 const ROOF_ROW_STEP = 0.5 // tiles between rows
 const ROOF_ROW_WIDTH = 0.2
@@ -249,8 +249,9 @@ export function renderMapImage(world) {
 
 // Roofs, painted from the building outlines and laid over the tops of the
 // 3D buildings. Each building picks a roof (tiles or slate) and gets flat
-// two-tone shading split along its ridge, unless `pitched(n)` says the 3D
-// scene gives it a real one, plus the odd skylight. Returns the
+// two-tone shading split along its ridge, unless `pitched(n)` hands over the
+// real roof the 3D scene builds, whose flat top is tar paper like every flat
+// roof; plus the odd skylight. Returns the
 // image and where the chimneys go: { x, y, n, angle, tone }, in tiles, the
 // building's index, and radians.
 const ROOFS = [
@@ -262,6 +263,9 @@ const ROOFS = [
 	{ base: '#6f787d', ridge: 0 },
 ]
 const SHED_ROOF = { base: '#8a8b86', ridge: 0 }
+// Flat roofs, and the flat tops of pitched ones, are tar paper: dark
+// bitumen, a silver coat, or weathered grey. The roof shader adds the rest.
+const TAR = ['#5b5f63', '#7b7f82', '#999d9f', '#66696c']
 
 export const roofHash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 
@@ -319,24 +323,37 @@ export function renderRoofImage(world, pitched = () => false) {
 			}
 		}
 
+		const tar = TAR[Math.floor(roofHash(n + 77) * TAR.length)]
+		const pitch = pitched(n)
 		g.save()
 		g.clip(path, 'evenodd')
-		g.fillStyle = roof.base
+		g.fillStyle = roof.ridge ? roof.base : tar
 		g.fill(path, 'evenodd')
+		const tops = pitch && flatTops(pitch)
+		if (tops) {
+			// The 3D scene's y points north; the image's points south.
+			const top = new Path2D()
+			for (const r of tops) {
+				r.forEach(([x, y], i) => (i ? top.lineTo(x, -y) : top.moveTo(x, -y)))
+				top.closePath()
+			}
+			g.fillStyle = tar
+			g.fill(top, 'evenodd')
+		}
 
 		const cx = (minX + maxX) / 2
 		const cy = (minY + maxY) / 2
 		const reach = Math.hypot(maxX - minX, maxY - minY) / 2 + 1
-		// Ridge line along the longest wall. The half facing the south-west sun
-		// gets the lighter tone; the other keeps the base.
+		// A tiled roof left flat gets a painted ridge along the longest wall:
+		// the half facing the south-west sun gets the lighter tone, the other
+		// keeps the base. Pitched roofs in 3D take their light from the sun.
 		const lit = 0.6 * Math.sin(angle) + 0.8 * Math.cos(angle)
-		// Pitched roofs in 3D take their light from the sun instead.
 		g.save()
 		g.translate(cx, cy)
 		g.rotate(angle)
-		g.fillStyle = shade(roof.base, roof.ridge ? ROOF_TILE_TONE : ROOF_FLAT_TONE)
-		if (!pitched(n)) g.fillRect(-reach, lit > 0 ? 0 : -reach, reach * 2, reach)
-		if (roof.ridge && !pitched(n)) {
+		g.fillStyle = shade(roof.base, ROOF_TILE_TONE)
+		if (roof.ridge && !pitch) {
+			g.fillRect(-reach, lit > 0 ? 0 : -reach, reach * 2, reach)
 			g.strokeStyle = RIDGE_INK
 			g.lineWidth = RIDGE_WIDTH
 			g.beginPath()
@@ -348,7 +365,7 @@ export function renderRoofImage(world, pitched = () => false) {
 
 		// Faint tile rows, running along the longest wall. Pitched roofs draw
 		// their own, along each slope.
-		if (roof.ridge && !pitched(n)) {
+		if (roof.ridge && !pitch) {
 			g.save()
 			g.translate(cx, cy)
 			g.rotate(angle)

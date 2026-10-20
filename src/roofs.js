@@ -42,6 +42,14 @@ export function roofShape(rings, h, tileM) {
 	return null
 }
 
+// The flat part on top of a pitched roof, as rings in the outline's frame, or
+// null where the slopes meet in a ridge.
+export function flatTops(roof) {
+	if (roof.kind === 'mansard') return roof.insets
+	const top = roofFaces(roof)[4]
+	return top ? [top] : null
+}
+
 // Triangles of the roof, as flat [x, y, z, …] with z above the eaves, each
 // anticlockwise from above.
 export function roofTriangles(roof, triangulate) {
