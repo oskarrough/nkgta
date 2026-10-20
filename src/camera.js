@@ -2,6 +2,7 @@
 import { PX } from './map-image.js'
 import { gameUpscale } from './ink.js'
 import { T } from './tiles.js'
+import { forwardSpeed } from './car.js'
 
 export function createCamera(world) {
 	let zoom = 11
@@ -12,6 +13,12 @@ export function createCamera(world) {
 	let yaw = 0
 	let pitch = 0.35
 	let distance = 3
+	let looking = false
+	let returnDelay = 0
+	let speedDistance = 0
+	let aheadX = 0
+	let aheadY = 0
+	let boom = null
 
 	const active = () => thirdPerson && !suspended
 
@@ -22,7 +29,13 @@ export function createCamera(world) {
 		toggle(target) {
 			thirdPerson = !thirdPerson
 			if (thirdPerson) yaw = target.dir
+			boom = null
+			speedDistance = aheadX = aheadY = 0
 			return thirdPerson
+		},
+		setLooking(value) {
+			if (looking && !value) returnDelay = 1.2
+			looking = value
 		},
 		look(dx, dy) {
 			if (!active()) return
@@ -45,12 +58,31 @@ export function createCamera(world) {
 		// `closer` zooms in on top of the player's zoom, as inside a shop.
 		update(target, canvas, dt, pixelGrid, closer = 1) {
 			if (active()) {
-				const horizontal = Math.cos(pitch) * distance
+				const vehicle = target.car || target.onBike
+				const moving = vehicle && Math.abs(target.speed) > 0.12
+				returnDelay = Math.max(0, returnDelay - dt)
+				const following = moving && !looking && returnDelay === 0
+				if (following) {
+					// Follow the vehicle's nose, including in reverse; velocity would
+					// whip the view round by 180° as soon as you backed up.
+					const turn = Math.atan2(Math.sin(target.dir - yaw), Math.cos(target.dir - yaw))
+					yaw += turn * (1 - Math.exp(-1.8 * dt))
+				}
+				const ease = 1 - Math.exp(-2.5 * dt)
+				const extra = vehicle ? Math.min(2, Math.abs(target.speed) * 0.14) + (target.car?.model.length ?? 0) * 0.35 : 0
+				speedDistance += (extra - speedDistance) * ease
+				const pace = target.car ? forwardSpeed(target.car) : target.speed
+				const lead = following ? Math.max(-1, Math.min(1.5, pace * 0.16)) : 0
+				aheadX += (Math.cos(target.dir) * lead - aheadX) * ease
+				aheadY += (Math.sin(target.dir) * lead - aheadY) * ease
+				const height = 0.55 + Math.max(0, (target.car?.model.length ?? 0) - 1.5) * 0.15
+				const reach = distance + speedDistance
+				const horizontal = Math.cos(pitch) * reach
 				const dx = -Math.cos(yaw) * horizontal
 				const dy = -Math.sin(yaw) * horizontal
 				// Leave room for the near plane; pull in immediately at walls.
 				let fraction = 1
-				const steps = Math.ceil(distance / 0.08)
+				const steps = Math.ceil(reach / 0.08)
 				for (let i = 1; i <= steps; i++) {
 					const t = i / steps
 					const x = target.x + dx * t
@@ -60,17 +92,22 @@ export function createCamera(world) {
 						break
 					}
 				}
+				// Never ease through a wall. Only the return to open space is soft.
+				const clear = reach * fraction
+				boom = boom === null || clear < boom ? clear : boom + (clear - boom) * (1 - Math.exp(-3 * dt))
+				fraction = boom / reach
 				return {
 					scale: 24 * devicePixelRatio,
 					third: {
 						x: target.x + dx * fraction,
 						y: target.y + dy * fraction,
-						z: 0.55 + Math.sin(pitch) * distance * fraction,
-						target: { x: target.x, y: target.y, z: 0.55 },
+						z: height + Math.sin(pitch) * boom,
+						target: { x: target.x + aheadX, y: target.y + aheadY, z: height },
 					},
 					bounds: { x0: target.x - 64, y0: target.y - 64, x1: target.x + 64, y1: target.y + 64 },
 				}
 			}
+			boom = null
 			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
 			cruise += (Math.abs(target.speed) - cruise) * Math.min(1, dt * 1.5)
 			// Only a touch: flat out you see about a fifth further than on foot.

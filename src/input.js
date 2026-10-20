@@ -37,15 +37,21 @@ export function createInput(actions) {
 	canvas.addEventListener('pointerdown', (e) => {
 		if (e.pointerType !== 'mouse' || e.button !== 2 || !actions.cameraActive()) return
 		looking = true
+		actions.setLooking(true)
 		canvas.setPointerCapture(e.pointerId)
 		e.preventDefault()
 	})
 	canvas.addEventListener('pointermove', (e) => {
 		if (looking) actions.look(e.movementX, e.movementY)
 	})
-	const stopLooking = () => (looking = false)
+	const stopLooking = () => {
+		if (!looking) return
+		looking = false
+		actions.setLooking(false)
+	}
 	canvas.addEventListener('pointerup', stopLooking)
 	canvas.addEventListener('lostpointercapture', stopLooking)
+	canvas.addEventListener('pointercancel', stopLooking)
 	addEventListener('blur', stopLooking)
 	addEventListener('keyup', (e) => keys.delete(norm(e.key)))
 	addEventListener('wheel', (e) => actions.zoom(e.deltaY < 0 ? 1.1 : 0.9), { passive: true })

@@ -54,6 +54,7 @@ const overheadHelp = document.getElementById('help').textContent
 const input = createInput({
 	cameraActive: camera.active,
 	look: camera.look,
+	setLooking: camera.setLooking,
 	move: camera.move,
 	toggleCamera() {
 		const third = camera.toggle(player)
