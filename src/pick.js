@@ -5,7 +5,7 @@ import { BBOX } from './default-area.js'
 import { areaFromUrl, areaUrl } from './area-url.js'
 
 // Bigger areas take long to fetch and the prerendered map gets huge.
-const MAX_KM2 = 12
+const MAX_KM2 = 16
 
 const start = areaFromUrl() ?? BBOX
 const map = L.map('map')
@@ -15,7 +15,10 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map)
 
 const toBounds = (b) => L.latLngBounds([b.south, b.west], [b.north, b.east])
-const rect = L.rectangle(toBounds(start), { color: '#f2d24b', weight: 3, fillOpacity: 0.15 }).addTo(map)
+// Red on a white casing, so the edge shows on any part of the map.
+const RED = '#e0302a'
+const casing = L.rectangle(toBounds(start), { color: '#fff', weight: 7, fill: false, interactive: false }).addTo(map)
+const rect = L.rectangle(toBounds(start), { color: RED, weight: 3, fillColor: RED, fillOpacity: 0.12 }).addTo(map)
 map.fitBounds(rect.getBounds(), { padding: [60, 60] })
 
 // Corner handles to adjust the rectangle.
@@ -24,7 +27,7 @@ const handle = () =>
 		draggable: true,
 		icon: L.divIcon({
 			className: '',
-			html: '<div style="width:16px;height:16px;margin:-8px 0 0 -8px;background:#f2d24b;border:2px solid #222;border-radius:50%"></div>',
+			html: `<div style="width:16px;height:16px;margin:-8px 0 0 -8px;background:${RED};border:3px solid #fff;box-shadow:0 0 0 1px #222;border-radius:50%"></div>`,
 		}),
 	}).addTo(map)
 const nw = handle()
@@ -34,6 +37,8 @@ function placeHandles() {
 	nw.setLatLng(b.getNorthWest())
 	se.setLatLng(b.getSouthEast())
 	update()
+	// The URL follows the rectangle, so a pick can be shared as it stands.
+	history.replaceState(null, '', location.pathname + areaUrl(area()).slice(1))
 }
 for (const m of [nw, se])
 	m.on('drag', () => {
@@ -58,6 +63,7 @@ function km2() {
 const size = document.getElementById('size')
 const play = document.getElementById('play')
 function update() {
+	casing.setBounds(rect.getBounds())
 	const { w, h, km2: a } = km2()
 	size.textContent = `${w.toFixed(1)} × ${h.toFixed(1)} km`
 	const tooBig = a > MAX_KM2 || w > 5 || h > 5
