@@ -38,6 +38,9 @@ const CHIMNEY_SHARE = 0.55
 const SKYLIGHT_SHARE = 0.1
 const CHIMNEY_SOOT = 'rgba(30, 26, 24, 0.25)'
 const SKYLIGHT_COLOR = '#8fa3ae'
+// Shallows along water's edge: colour and how far in from the bank, tiles.
+// The bank's ink covers the outer SHAPE_OUTLINE / 2 of it.
+const SHALLOWS = [['#5f8e8a', 0.9]]
 const PITCH_INSET = 1 // touchline distance from the pitch's edge, tiles
 const PITCH_LINE = 0.25
 const PITCH_CIRCLE = 3 // at most, and a quarter of the pitch's width
@@ -186,6 +189,17 @@ export function renderMapImage(world) {
 				g.restore()
 			}
 			if (s.t === T.PITCH) pitchLines(g, s.rings[0], path)
+			// Paler shallows along the bank.
+			if (s.t === T.WATER) {
+				g.save()
+				g.clip(path, 'evenodd')
+				for (const [color, width] of SHALLOWS) {
+					g.strokeStyle = color
+					g.lineWidth = width * 2
+					g.stroke(path)
+				}
+				g.restore()
+			}
 			// Ink around the shape, clipped so it stays inside the fill.
 			if (OUTLINED.has(s.t)) {
 				g.save()
