@@ -54,6 +54,8 @@ const GROUND_DETAIL = {
 	pavingJoints: 0.09, // and between the pavement slabs
 	asphaltPatches: 0.1, // repaired patches in the tarmac
 }
+// Tiles over which the ground fades into the sky at the map edge.
+const EDGE_FADE = 3
 // One 2048 map over the visible area, so the edges stay hard.
 // normalBias is in shadow texels, so it holds at every zoom.
 const SHADOW = { size: 2048, bias: -0.0003, normalBias: 1.5, pad: 60 }
@@ -92,7 +94,7 @@ export function createScene(canvas, world) {
 		}
 	}
 	crispMaps(false)
-	const plane = new THREE.Mesh(new THREE.PlaneGeometry(world.W, world.H), groundMaterial(ground))
+	const plane = new THREE.Mesh(new THREE.PlaneGeometry(world.W, world.H), groundMaterial(ground, world))
 	plane.position.set(world.W / 2, -world.H / 2, 0)
 	plane.receiveShadow = true
 	scene.add(plane)
@@ -323,11 +325,13 @@ function skidMarks() {
 
 // The map image keeps its own colours: the ground samples the shadow map and
 // multiplies by one fixed shade, so nothing is lit twice.
-function groundMaterial(map) {
+function groundMaterial(map, world) {
 	const uniforms = THREE.UniformsUtils.merge([
 		THREE.UniformsLib.lights,
 		{
 			sun: { value: new THREE.Color(GROUND_SUN) },
+			deck: { value: new THREE.Color(DECK) },
+			size: { value: new THREE.Vector2(world.W, world.H) },
 			shade: { value: new THREE.Color(GROUND_SHADE) },
 		},
 	])
@@ -354,6 +358,8 @@ function groundMaterial(map) {
 		fragmentShader: `
 			uniform sampler2D map;
 			uniform vec3 sun;
+			uniform vec3 deck;
+			uniform vec2 size;
 			uniform vec3 shade;
 			uniform bool receiveShadow;
 			varying vec2 vUv;
@@ -365,7 +371,11 @@ function groundMaterial(map) {
 
 			void main() {
 				vec3 color = groundDetail(texture2D(map, vUv).rgb, vTile);
-				gl_FragColor = vec4(color * mix(shade, sun, getShadowMask()), 1.0);
+				color *= mix(shade, sun, getShadowMask());
+				// The last few tiles fade into the sky under the clouds.
+				vec2 edge = min(vTile * vec2(1.0, -1.0), size - vTile * vec2(1.0, -1.0));
+				color = mix(deck, color, smoothstep(0.0, ${EDGE_FADE.toFixed(1)}, min(edge.x, edge.y)));
+				gl_FragColor = vec4(color, 1.0);
 				#include <colorspace_fragment>
 			}
 		`,

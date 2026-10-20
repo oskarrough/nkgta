@@ -1,18 +1,20 @@
 // The map ends in clouds, not a hard edge: puffy cumulus over a band round
 // the map, over a closed deck of sky colour beyond it. Like the trees, every
 // cloud is a cluster of lumpy blobs in one instanced mesh, so they get the
-// same flat light bands and ink outlines. The front wanders in and out with
-// slow noise, so it runs parallel to nothing, and its clouds are the small ones.
+// same flat light bands and ink outlines. They stay off the map: only the
+// smallest clouds at the front reach a step over its edge. Further out,
+// slow noise decides where they grow big, so the mass runs parallel to nothing.
 import * as THREE from 'three'
 
 export const DECK = '#8d9cb1' // the sky colour past the clouds
 // Cloud tones by light: full sun, the faintest sun, and shade.
 const TONES = ['#ffffff', '#dce3ea', '#b4c1d0']
 const SPACING = 5.5 // tiles between cloud centres
-const INSET = 16 // how far into the map the front reaches, tiles, before the noise
+const REACH = 1.5 // how far a cloud may hang over the map edge, tiles
 const BAND = 44 // how far out the puffs go before only the deck is left
 const PATCH = 48 // tiles of sky per draw call, culled off screen
-const FRONT_NOISE = 10 // how far the front wanders, tiles; less than INSET, so the edge stays hidden
+const FRONT_NOISE = 12 // how far out or in the big clouds start, tiles
+const GROW = 16 // tiles out from the edge where clouds reach full size
 const FRONT_SCALE = 1 / 45 // and how slowly along the edge
 const HEIGHT = 18 // above the tallest roofs, in tiles, while the camera allows
 const LUMPS = 1.5 // how far blobs rise and fall around that, tiles
@@ -67,10 +69,13 @@ export function createClouds(world, gradient) {
 			const y = gy + (hash2(gy, gx) - 0.5) * SPACING
 			// Signed distance out of the map, pushed in and out by the noise.
 			const out = Math.max(-x, x - W, -y, y - H)
-			const front = out + INSET + (noise(x * FRONT_SCALE, y * FRONT_SCALE) - 0.5) * 2 * FRONT_NOISE
-			if (front < 0 || hash(k) > smooth(0, 5, front)) continue
-			const grown = smooth(0, BAND * 0.7, front)
-			clouds.push({ x, y, r: mix(RADIUS[0], RADIUS[1], grown) * mix(0.8, 1.15, hash(k + 1)), seed: k })
+			const front = out + (noise(x * FRONT_SCALE, y * FRONT_SCALE) - 0.5) * 2 * FRONT_NOISE
+			// As big as the noise likes, but no bigger than keeps it off the
+			// map: a cloud's blobs reach about 1.3 radii from its centre.
+			const want = mix(RADIUS[0], RADIUS[1], smooth(-FRONT_NOISE, GROW, front)) * mix(0.8, 1.15, hash(k + 1))
+			const r = Math.min(want, (out + REACH) / 1.3)
+			if (r < RADIUS[0] * 0.6) continue
+			clouds.push({ x, y, r, seed: k })
 		}
 	}
 
