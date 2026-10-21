@@ -10,7 +10,6 @@ import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
-import { DEBUG } from './debug.js'
 import { findShops } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
@@ -100,9 +99,11 @@ const viewOf = (cam, dx = 0, dy = 0) =>
 		y1: (cam.y + canvas.height) / cam.scale + dy,
 	}
 
-// TEMPORARY: fps, worst frame and the GPU, with ?off (see debug.js).
+// With ?fps: fps, the worst frame and the GPU, which is how to tell the
+// browser has fallen back to drawing in software.
+const FPS = new URLSearchParams(location.search).has('fps')
 const meter =
-	DEBUG &&
+	FPS &&
 	document.body.appendChild(
 		Object.assign(document.createElement('pre'), {
 			style: 'position:fixed;top:0;left:0;margin:0;padding:4px;background:#000c;color:#0f0;font:12px monospace;z-index:9',
@@ -118,7 +119,7 @@ function fpsMeter(now) {
 	meterFrames.push(now)
 	if (now - meterFrames[0] < 1000) return
 	const gaps = meterFrames.slice(1).map((t, i) => t - meterFrames[i])
-	meter.textContent = `${gaps.length} fps · worst ${Math.round(Math.max(...gaps))} ms · buffer ${city3d.renderer.domElement.width}x${city3d.renderer.domElement.height} @ dpr ${devicePixelRatio}\noff: ${new URLSearchParams(location.search).get('off') || '-'}\n${gpu}`
+	meter.textContent = `${gaps.length} fps · worst ${Math.round(Math.max(...gaps))} ms · buffer ${city3d.renderer.domElement.width}x${city3d.renderer.domElement.height} @ dpr ${devicePixelRatio}\n${gpu}`
 	meterFrames = [now]
 }
 
@@ -168,7 +169,7 @@ function frame(now) {
 	input.setDriving(!!player.car)
 	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
-	if (DEBUG) fpsMeter(now)
+	if (FPS) fpsMeter(now)
 	last = now
 	if (first) phase('first frame')
 	first = false

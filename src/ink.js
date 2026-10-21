@@ -4,7 +4,6 @@
 // the look asks.
 import * as THREE from 'three'
 import { DEFAULT_LOOK, LOOKS } from './looks.js'
-import { OFF } from './debug.js'
 import { DITHER, LUT_SIZE, PALETTE_SIZE, paletteLut, paletteTexture } from './palette.js'
 
 const INK = '#1A1E1B'
@@ -188,8 +187,7 @@ export function createInk(renderer, hidden = [], decor = []) {
 			ink.quad.material.uniforms.reach.value = look.outline
 			blit.quad.material.uniforms.paletteOn.value = look.palette ? 1 : 0
 			// Cast shadows would read as holes in the plain look.
-			renderer.shadowMap.enabled = !look.plain && !OFF.has('shadows')
-			blit.quad.material.uniforms.tPixels.value = OFF.has('ink') ? color.texture : pixels.texture
+			renderer.shadowMap.enabled = !look.plain
 		},
 		setSize(width, height, upscale) {
 			const w = Math.max(1, Math.ceil(width / upscale))
@@ -219,7 +217,7 @@ export function createInk(renderer, hidden = [], decor = []) {
 			renderer.render(scene, camera)
 			scene.overrideMaterial = null
 
-			if (!OFF.has('ink')) inkPass(scene, camera)
+			inkPass(scene, camera)
 			decor.forEach((object, i) => (object.visible = shown[i]))
 			renderer.setRenderTarget(target)
 			renderer.render(blit.scene, screenCamera)

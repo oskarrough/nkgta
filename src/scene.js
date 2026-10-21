@@ -12,7 +12,6 @@ import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
-import { OFF } from './debug.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
 
@@ -305,14 +304,14 @@ export function createScene(canvas, world, shops = []) {
 	// `view` and `target` draw the city from another camera into a texture,
 	// for the street seen through a shop's portal.
 	function render(cam, carList, { view = aim(cam), target = null } = {}) {
-		cars.update(OFF.has('cars') ? [] : carList)
+		cars.update(carList)
 		for (const c of carList) {
 			for (const m of c.marks) skids.add(...m)
 			c.marks.length = 0
 		}
 		const { width, height } = ink.frame
 		focusSun(view.position.x, view.position.y, cam.third ? 32 : Math.hypot(width, height) / cam.scale / 2)
-		clouds.layer.visible = !cam.third && !OFF.has('clouds')
+		clouds.layer.visible = !cam.third
 		if (!cam.third) clouds.follow(view)
 		time.value = performance.now() / 1000
 		city.update(viewOf(cam), cam.scale)
