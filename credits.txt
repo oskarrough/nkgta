@@ -1,0 +1,45 @@
+NK GTA credits
+==============
+
+Map data
+--------
+OpenStreetMap
+  Streets, buildings, parks, shops, U-Bahn and bus stops.
+  © OpenStreetMap contributors, licensed under the Open Database License (ODbL).
+  https://www.openstreetmap.org/copyright
+
+OpenStreetMap tiles (tile.openstreetmap.org)
+  The background map in the area picker (pick.html).
+  © OpenStreetMap contributors. Thanks to the OpenStreetMap Foundation for the tile service.
+
+Overpass API
+  OSM data is fetched through these public Overpass instances:
+  - overpass-api.de
+  - overpass.private.coffee
+  - overpass.kumi.systems
+
+Terrain
+-------
+Berlin elevation model ATKIS DGM1
+  Geoportal Berlin / Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen.
+  Datenlizenz Deutschland – Zero – Version 2.0 (DL-DE-Zero-2.0).
+  https://gdi.berlin.de/data/dgm1/atom/
+
+Libraries used in the game
+--------------------------
+three.js 0.186.1 by mrdoob and three.js authors (MIT) - https://threejs.org
+Leaflet 1.9.4 by Volodymyr Agafonkin and contributors (BSD-2-Clause) - https://leafletjs.com
+polygon-clipping 0.15.7 by Mike Fogel (MIT) - https://github.com/mfogel/polygon-clipping
+TinyJoin 0.6.0 by James Pearce (MIT) - https://github.com/tinyplex/tinyjoin
+
+Build and development tools
+---------------------------
+Vite 8.3.4 by Evan You and Vite contributors (MIT) - https://vite.dev
+Wrangler 4.149.0 by Cloudflare (MIT OR Apache-2.0) - https://developers.cloudflare.com/workers/wrangler/
+oxlint 1.87.0 and oxfmt 0.72.0 by Boshen and oxc contributors (MIT) - https://oxc.rs
+Bun - https://bun.sh
+
+Inspiration
+-----------
+Grand Theft Auto 1 by DMA Design.
+Car handling after Pat Kerr's notes on GTA 1's 2D vehicles - https://patkerr.co.uk/2d-vehicles/
