@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createCamera } from '../src/camera.js'
 import { MODELS } from '../src/models.js'
 import { T } from '../src/tiles.js'
+import { gameUpscale } from '../src/ink.js'
 
 globalThis.devicePixelRatio = 1
 const canvas = { width: 1280, height: 720 }
@@ -20,6 +21,46 @@ function setup(model = null, tileAt = () => T.ROAD) {
 	}
 	return { camera, player, step }
 }
+
+describe('overhead camera', () => {
+	for (const zoom of [0.1, 0.3, 1, 2]) {
+		test(`smooth panning stays centred at zoom ${zoom}, including during speed zoom`, () => {
+			const camera = createCamera({})
+			const player = { x: 301.123, y: 278.456, speed: 0 }
+			camera.zoomBy(zoom)
+			for (let i = 0; i < 600; i++) camera.update(player, canvas, 1 / 60, false)
+			let previous = camera.update(player, canvas, 1 / 60, false)
+			for (let i = 0; i < 120; i++) {
+				player.x += 0.001
+				player.y -= 0.002
+				const cam = camera.update(player, canvas, 1 / 60, false)
+				expect(cam.x - previous.x).toBeCloseTo(0.001 * cam.scale, 8)
+				expect(cam.y - previous.y).toBeCloseTo(-0.002 * cam.scale, 8)
+				previous = cam
+			}
+			for (let i = 0; i < 240; i++) {
+				player.speed = i < 120 ? 2 : 0
+				player.x += player.speed / 60
+				const cam = camera.update(player, canvas, 1 / 60, false)
+				expect(player.x * cam.scale - cam.x).toBeCloseTo(canvas.width / 2, 8)
+				expect(player.y * cam.scale - cam.y).toBeCloseTo(canvas.height / 2, 8)
+			}
+		})
+	}
+
+	test('pixel art still pans on whole game pixels', () => {
+		const camera = createCamera({})
+		const player = { x: 301.123, y: 278.456, speed: 2 }
+		for (let i = 0; i < 120; i++) {
+			player.x += 0.001
+			player.y -= 0.002
+			const cam = camera.update(player, canvas, 1 / 60, true)
+			const snap = gameUpscale(cam.scale)
+			expect(cam.x / snap).toBeInteger()
+			expect(cam.y / snap).toBeInteger()
+		}
+	})
+})
 
 describe('vehicle orbit camera', () => {
 	for (const model of [null, MODELS.car, MODELS.bus]) {

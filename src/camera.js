@@ -143,13 +143,16 @@ export function createCamera(world) {
 				if (Math.abs(want - zoom) < 0.002) zoom = want
 			}
 			const scale = PX * zoom * devicePixelRatio
-			// Whole game pixels only, so a slow pan shifts the picture a pixel
-			// at a time instead of smearing it between pixels.
-			const snap = pixelGrid ? gameUpscale(scale) : 1
+			// Only pixel art needs whole game pixels. Rounding the smooth looks
+			// makes slow pans alternate between standing still and jumping, and
+			// lets the player wobble around the centre while zoom is changing.
+			const snap = pixelGrid ? gameUpscale(scale) : 0
+			const x = target.x * scale - canvas.width / 2
+			const y = target.y * scale - canvas.height / 2
 			return {
 				scale,
-				x: Math.round((target.x * scale - canvas.width / 2) / snap) * snap,
-				y: Math.round((target.y * scale - canvas.height / 2) / snap) * snap,
+				x: snap ? Math.round(x / snap) * snap : x,
+				y: snap ? Math.round(y / snap) * snap : y,
 			}
 		},
 	}
