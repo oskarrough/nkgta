@@ -1,6 +1,14 @@
 # NK GTA
 
-A little top-down game set in the real streets of Neukölln, in the spirit of GTA 1. Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3 m tile grid that decides where you can walk. The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
+A little game set in the real streets of Neukölln, in the spirit of GTA 1.
+
+Run around, or walk around, get on the bike or steal a car. Visit shops and places, parks. Walk to Tempelhof, bike around.
+
+## How is it made?
+
+Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3m tile grid that decides where you can walk.The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
+
+## How to develop
 
 ```sh
 bun install
