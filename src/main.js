@@ -66,7 +66,10 @@ const input = createInput({
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),
 	toggleWalls: () => (showWalls = !showWalls),
-	cycleLook: () => hud.say(`Look: ${city3d.cycleLook()}`),
+	cycleLook() {
+		hud.say(`Look: ${city3d.cycleLook()}`)
+		showWalls = city3d.showsWalls()
+	},
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 })
 

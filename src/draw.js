@@ -3,6 +3,7 @@
 import { SOLID } from './tiles.js'
 import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 import { DEPTH as AWNING_DEPTH } from './signs.js'
+import { RADIUS } from './player.js'
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
@@ -54,7 +55,8 @@ export function createRenderer(canvas, world, shops = []) {
 		if (cam.third) return
 
 		// K: the walk grid as the game sees it, every solid tile in red, and
-		// the player's footprint.
+		// (on top of everything, at the end) what the player hits walls with.
+		// Drawn at the view centre's ground height, like everything here.
 		if (showWalls) {
 			ctx.fillStyle = 'rgba(255, 40, 40, 0.35)'
 			const x0 = Math.max(0, Math.floor(cam.x / scale))
@@ -63,10 +65,6 @@ export function createRenderer(canvas, world, shops = []) {
 			const y1 = Math.min(world.H, Math.ceil((cam.y + canvas.height) / scale))
 			for (let y = y0; y < y1; y++)
 				for (let x = x0; x < x1; x++) if (SOLID.has(world.tileAt(x, y))) ctx.fillRect(...toScreen(x, y), scale, scale)
-			ctx.strokeStyle = '#fff'
-			ctx.lineWidth = 2
-			const [px, py] = toScreen(player.x - 0.3, player.y - 0.3)
-			ctx.strokeRect(px, py, scale * 0.6, scale * 0.6)
 		}
 
 		for (const b of bottles) {
@@ -138,6 +136,22 @@ export function createRenderer(canvas, world, shops = []) {
 		for (const p of peds) drawPerson(...toScreen(p.x, p.y), p.dir, '#5b8fd6')
 		if (player.down) drawDown(...toScreen(player.x, player.y), player.dir)
 		else if (!player.car) drawPerson(...toScreen(player.x, player.y), player.dir, '#f2d24b')
+
+		// K: a circle on foot, the car's box in one, over the player.
+		if (showWalls) {
+			ctx.strokeStyle = '#fff'
+			ctx.lineWidth = 2
+			const c = player.car
+			ctx.save()
+			ctx.translate(...toScreen(c?.x ?? player.x, c?.y ?? player.y))
+			ctx.beginPath()
+			if (c) {
+				ctx.rotate(c.angle)
+				ctx.rect((-c.model.length / 2) * scale, (-c.model.width / 2) * scale, c.model.length * scale, c.model.width * scale)
+			} else ctx.arc(0, 0, RADIUS * scale, 0, Math.PI * 2)
+			ctx.stroke()
+			ctx.restore()
+		}
 
 		function drawBike(sx, sy, dir) {
 			ctx.save()

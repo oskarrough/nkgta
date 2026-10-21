@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createCamera } from '../src/camera.js'
 import { MODELS } from '../src/models.js'
 import { T } from '../src/tiles.js'
-import { gameUpscale } from '../src/ink.js'
+import { gameUpscale } from '../src/looks.js'
 
 globalThis.devicePixelRatio = 1
 const canvas = { width: 1280, height: 720 }

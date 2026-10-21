@@ -1,6 +1,6 @@
-// The comic palette: tiny.london's sampled tones plus Neukölln terracotta,
-// BVG yellow, signal colours, cloud blues and wave teal. The composite snaps every pixel to one of
-// these, so the frame never shows a colour that isn't on the list.
+// The pixel-art palette: tiny.london's sampled tones plus Neukölln terracotta,
+// BVG yellow, signal colours, cloud blues and wave teal. The pixel look snaps
+// every pixel to one of these, so its frame never shows a colour off the list.
 import * as THREE from 'three'
 
 export const PALETTE = [

@@ -1,23 +1,16 @@
-// The render path: the city is drawn, inked, and optionally drawn small,
-// snapped to the palette, and blown up by whole screen pixels. Ink, sel-out
-// outlines and crisp textures apply in every mode.
+// The render path, for every look (see looks.js): the city is drawn off
+// screen at game resolution, plain grey and unshadowed if the look asks,
+// inked, then blown up by whole device pixels and snapped to the palette if
+// the look asks.
 import * as THREE from 'three'
+import { DEFAULT_LOOK, LOOKS } from './looks.js'
 import { DITHER, LUT_SIZE, PALETTE_SIZE, paletteLut, paletteTexture } from './palette.js'
 
-// One game pixel per PX_PER_TILE tiles: 3 m / 10 = 0.3 m. The upscale to the
-// screen is a whole number of device pixels, so nothing gets smoothed.
-export const PX_PER_TILE = 10
-export const gameUpscale = (scale) => Math.max(1, Math.round(scale / PX_PER_TILE))
-
-// Look knobs, and what the P key starts from. Palette is the default: smooth
-// everywhere, ink on, every colour snapped to the palette. Pixel adds the grid.
-export const PIXEL_GRID = false
-export const PALETTE_SNAP = true
 const INK = '#1A1E1B'
 const INNER_SHADE = 0.55 // inner edges are a darker shade of their own colour
 const DEPTH_EDGE = 0.012 // relative depth step that counts as a silhouette
 const TURN_EDGE = 0.2 // how far a surface has to turn to count as an edge
-const SILHOUETTE_PX = 2 // silhouette line width off the grid; 1 on it
+const PLAIN = '#c8c8c2' // everything in the plain look
 
 // Covers the whole screen for the game-res passes, and the exact game frame
 // for the upscale, which is why the quad's own transform has to apply.
@@ -115,13 +108,14 @@ void main() {
 `
 
 // `hidden` is drawn in colour but not in the normal pass, for flat things
-// with no normals to speak of.
-export function createInk(renderer, hidden = []) {
+// with no normals to speak of. `decor` isn't drawn at all in the plain look.
+export function createInk(renderer, hidden = [], decor = []) {
 	const crisp = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }
 	const color = new THREE.WebGLRenderTarget(1, 1, { ...crisp, depthTexture: new THREE.DepthTexture(1, 1) })
 	const normals = new THREE.WebGLRenderTarget(1, 1, crisp)
 	const pixels = new THREE.WebGLRenderTarget(1, 1, crisp)
 	const normalMaterial = new THREE.MeshNormalMaterial()
+	const plainMaterial = new THREE.MeshLambertMaterial({ color: PLAIN, side: THREE.DoubleSide })
 	const mesh = (material) => {
 		const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
 		quad.frustumCulled = false
@@ -136,7 +130,7 @@ export function createInk(renderer, hidden = []) {
 				res: { value: new THREE.Vector2(1, 1) },
 				camNear: { value: 1 },
 				camFar: { value: 1000 },
-				reach: { value: PIXEL_GRID ? 1 : SILHOUETTE_PX },
+				reach: { value: 1 },
 				ink: { value: new THREE.Color(INK) },
 			},
 			vertexShader,
@@ -151,7 +145,7 @@ export function createInk(renderer, hidden = []) {
 				tPixels: { value: pixels.texture },
 				tPalette: { value: paletteTexture() },
 				tLut: { value: paletteLut() },
-				paletteOn: { value: PALETTE_SNAP ? 1 : 0 },
+				paletteOn: { value: 0 },
 				gameScale: { value: 1 },
 			},
 			vertexShader,
@@ -182,15 +176,18 @@ export function createInk(renderer, hidden = []) {
 
 	// Shadows only need drawing for the colour pass, and once per frame.
 	renderer.shadowMap.autoUpdate = false
+	let look = LOOKS[DEFAULT_LOOK]
 
 	return {
 		// The game frame in device pixels: the canvas rounded up to whole
 		// pixels, so the upscale stays exact and only the overflow is cropped.
 		frame: { width: 1, height: 1 },
-		// Press P: comic (neither), palette only, then the full pixel grid.
-		setLook(snap, grid) {
-			blit.quad.material.uniforms.paletteOn.value = snap ? 1 : 0
-			ink.quad.material.uniforms.reach.value = grid ? 1 : SILHOUETTE_PX
+		setLook(next) {
+			look = next
+			ink.quad.material.uniforms.reach.value = look.outline
+			blit.quad.material.uniforms.paletteOn.value = look.palette ? 1 : 0
+			// Cast shadows would read as holes in the plain look.
+			renderer.shadowMap.enabled = !look.plain
 		},
 		setSize(width, height, upscale) {
 			const w = Math.max(1, Math.ceil(width / upscale))
@@ -209,25 +206,35 @@ export function createInk(renderer, hidden = []) {
 		// Into `target` instead of the screen, for a view through the portal.
 		// A scissored target only gets its patch drawn, in every pass.
 		render(scene, camera, target = null) {
-			clip(target?.scissorTest ? target.scissor : null)
-			ink.quad.material.uniforms.camNear.value = camera.near
-			ink.quad.material.uniforms.camFar.value = camera.far
 			renderer.shadowMap.needsUpdate = true
+			clip(target?.scissorTest ? target.scissor : null)
+			const shown = decor.map((object) => object.visible)
+			if (look.plain) {
+				scene.overrideMaterial = plainMaterial
+				for (const object of decor) object.visible = false
+			}
 			renderer.setRenderTarget(color)
 			renderer.render(scene, camera)
-
-			scene.overrideMaterial = normalMaterial
-			for (const object of hidden) object.visible = false
-			renderer.setRenderTarget(normals)
-			renderer.render(scene, camera)
-			for (const object of hidden) object.visible = true
 			scene.overrideMaterial = null
 
-			renderer.setRenderTarget(pixels)
-			renderer.render(ink.scene, screenCamera)
-
+			inkPass(scene, camera)
+			decor.forEach((object, i) => (object.visible = shown[i]))
 			renderer.setRenderTarget(target)
 			renderer.render(blit.scene, screenCamera)
 		},
+	}
+
+	function inkPass(scene, camera) {
+		ink.quad.material.uniforms.camNear.value = camera.near
+		ink.quad.material.uniforms.camFar.value = camera.far
+		scene.overrideMaterial = normalMaterial
+		for (const object of hidden) object.visible = false
+		renderer.setRenderTarget(normals)
+		renderer.render(scene, camera)
+		for (const object of hidden) object.visible = true
+		scene.overrideMaterial = null
+
+		renderer.setRenderTarget(pixels)
+		renderer.render(ink.scene, screenCamera)
 	}
 }

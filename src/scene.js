@@ -5,7 +5,8 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { roofHash, roofHatches, roofOf, roofSpots } from './map-image.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
-import { createInk, gameUpscale, PALETTE_SNAP, PIXEL_GRID } from './ink.js'
+import { createInk } from './ink.js'
+import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import { createBridges } from './bridges.js'
 import { createTrees } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
@@ -104,7 +105,7 @@ export function createScene(canvas, world, shops = []) {
 	// Tile (x, y) sits at (x, -y), so north stays up and z is height in tiles.
 	// The city comes in chunks (see chunks.js), each with its own ground,
 	// walls, roofs, chimneys and trees, which take their textures as they're
-	// painted. Crisp texels only on the pixel grid; the smooth looks keep
+	// painted. Crisp texels only on the pixel grid; the other looks keep
 	// their filtered, anisotropic textures.
 	const gradient = toonGradient()
 	const time = { value: 0 }
@@ -239,19 +240,17 @@ export function createScene(canvas, world, shops = []) {
 		shadow.updateProjectionMatrix()
 	}
 
-	const ink = createInk(renderer, [skids.mesh])
+	const ink = createInk(renderer, [skids.mesh], [skids.mesh, clouds.layer, ...cars.shadows])
 	timePasses(renderer, ['color', 'normal', 'ink', 'blit'])
 
-	// Three looks, cycled with P: flat comic, palette only, and the full pixel
-	// grid. The render path owns the knobs; this only picks the frame size.
-	const LOOKS = ['comic', 'palette', 'pixel']
-	let look = !PALETTE_SNAP ? 'comic' : PIXEL_GRID ? 'pixel' : 'palette'
+	// The look, cycled with P; see looks.js for what each one does.
+	let look = DEFAULT_LOOK
 
 	// The game frame is the canvas at one texel per game pixel, blown up by a
 	// whole number of device pixels. Resize only when that number changes.
 	let upscale = 0
 	function fit(scale) {
-		const want = look === 'pixel' ? gameUpscale(scale) : 1
+		const want = upscaleOf(LOOKS[look], scale)
 		if (want === upscale) return
 		upscale = want
 		const buffer = renderer.getDrawingBufferSize(new THREE.Vector2())
@@ -269,10 +268,11 @@ export function createScene(canvas, world, shops = []) {
 
 	function setLook(name) {
 		look = name
-		ink.setLook(name !== 'comic', name === 'pixel')
-		city.setCrisp(name === 'pixel')
+		ink.setLook(LOOKS[name])
+		city.setCrisp(LOOKS[name].grid)
 		upscale = 0
 	}
+	setLook(look)
 
 	// Same view as the 2D overlay: `scale` device pixels per tile at street
 	// level, top-left corner at (cam.x, cam.y) in those pixels.
@@ -345,10 +345,12 @@ export function createScene(canvas, world, shops = []) {
 		},
 		chunks: city,
 		// Only the pixel grid needs the camera on whole game pixels.
-		pixelGrid: () => look === 'pixel',
-		// P: comic, palette, pixel, and round again.
+		pixelGrid: () => LOOKS[look].grid,
+		// The plain look comes with the walk grid on.
+		showsWalls: () => LOOKS[look].plain,
+		// P: the next look, by name.
 		cycleLook() {
-			setLook(LOOKS[(LOOKS.indexOf(look) + 1) % LOOKS.length])
+			setLook(nextLook(look))
 			return look
 		},
 	}
@@ -423,6 +425,7 @@ function carMeshes(gradient, world) {
 	const dim = new THREE.Color('#5a0d0a')
 	return {
 		meshes: kinds.flatMap((k) => [...k.parts.map((p) => p.mesh), k.shadow]),
+		shadows: kinds.map((k) => k.shadow),
 		update(cars) {
 			for (const { model, parts, shadow } of kinds) {
 				let n = 0

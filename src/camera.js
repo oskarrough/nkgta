@@ -1,6 +1,6 @@
 // Zoom the player controls, plus GTA 1's zoom-out as you speed up.
 import { PX } from './map-image.js'
-import { gameUpscale } from './ink.js'
+import { gameUpscale } from './looks.js'
 import { T } from './tiles.js'
 import { forwardSpeed } from './car.js'
 

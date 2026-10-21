@@ -13,7 +13,7 @@
 # off the bottom of a full-page screenshot; game-canvas shots need 0.
 set -euo pipefail
 
-PALETTE=48 # src/palette.js
+PALETTE=52 # src/palette.js
 HUD_BOTTOM=${HUD_BOTTOM:-0}
 MAX_SHIFT=12 # game pixels tried either way for a pan
 INSET=4 # pixels ignored at the edge of the pan comparison (roll wraps)

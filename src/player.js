@@ -2,7 +2,7 @@
 import { T, SOLID } from './tiles.js'
 import { driveCar, speedOf, toWorld } from './car.js'
 
-const RADIUS = 0.3 // tiles
+export const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
 const SUBSTEP = 0.1 // most tiles moved between wall checks, well under RADIUS
 const NUDGE = 0.45 // tiles you get eased sideways round a corner you hit head on
