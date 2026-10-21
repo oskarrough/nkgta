@@ -10,6 +10,7 @@ import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
+import { DEBUG } from './debug.js'
 import { findShops } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
@@ -99,6 +100,28 @@ const viewOf = (cam, dx = 0, dy = 0) =>
 		y1: (cam.y + canvas.height) / cam.scale + dy,
 	}
 
+// TEMPORARY: fps, worst frame and the GPU, with ?off (see debug.js).
+const meter =
+	DEBUG &&
+	document.body.appendChild(
+		Object.assign(document.createElement('pre'), {
+			style: 'position:fixed;top:0;left:0;margin:0;padding:4px;background:#000c;color:#0f0;font:12px monospace;z-index:9',
+		}),
+	)
+const gpu = (() => {
+	const gl = city3d.renderer.getContext()
+	const info = gl.getExtension('WEBGL_debug_renderer_info')
+	return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : '?'
+})()
+let meterFrames = []
+function fpsMeter(now) {
+	meterFrames.push(now)
+	if (now - meterFrames[0] < 1000) return
+	const gaps = meterFrames.slice(1).map((t, i) => t - meterFrames[i])
+	meter.textContent = `${gaps.length} fps · worst ${Math.round(Math.max(...gaps))} ms · buffer ${city3d.renderer.domElement.width}x${city3d.renderer.domElement.height} @ dpr ${devicePixelRatio}\noff: ${new URLSearchParams(location.search).get('off') || '-'}\n${gpu}`
+	meterFrames = [now]
+}
+
 let last = performance.now()
 let first = true
 function frame(now) {
@@ -145,6 +168,7 @@ function frame(now) {
 	input.setDriving(!!player.car)
 	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
+	if (DEBUG) fpsMeter(now)
 	last = now
 	if (first) phase('first frame')
 	first = false
