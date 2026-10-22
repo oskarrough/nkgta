@@ -1,0 +1,44 @@
+title    Luftbrücke
+about    A brass chorale for the airlift monument at the edge of the Feld. Slow and proud, strings trembling under it, a choir for the last lap.
+at       feld
+tempo    60
+beats    4
+steps    2
+reverb   0.75
+
+# G minor, turning to D major at the end of each line, as if landing.
+voice brass   brass    vol=0.55 center=Bb3 att=0.25 rel=1
+voice tpt     trumpet  vol=0.55 pan=0.2 att=0.08 rel=0.6
+voice trem    strings  vol=0.3  center=D5 pan=-0.3 gate=0.9
+voice choir   choir    vol=0.45 center=G4 att=1 rel=2
+voice tuba    tuba     vol=0.7
+voice timp    timpani  vol=0.7
+voice snare   snare    vol=0.18 pan=0.25
+voice crash   crash    vol=0.22
+
+pattern intro
+brass | [Gm]?------- | [Eb]?------- | [Cm]?------- | [D]------- |
+tuba  | G1------- | Eb1------- | C2------- | D2------- |
+timp  | G1- ...... | ........ | ........ | D2- D2? D2? D2 D2 D2! . |
+
+pattern A
+brass | [Gm]------- | [Eb]------- | [Bb]------- | [F]------- | [Gm]------- | [Eb]------- | [Cm]------- | [D]------- |
+tuba  | G1------- | Eb1------- | Bb1------- | F1------- | G1------- | Eb1------- | C2------- | D2------- |
+trem  | [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? | [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? | [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? | [F]? [F]? [F]? [F]? [F]? [F]? [F]? [F]? | [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? | [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? | [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? | [D]? [D]? [D]? [D]? [D] [D] [D] [D] |
+tpt   | G4--- Bb4--- | Eb5------- | D5--- C5- Bb4- | C5------- | Bb4--- D5--- | G5--- F5- Eb5- | Eb5--- D5- C5- | D5------- |
+timp  | G1- ...... | Eb2- ...... | Bb1- ...... | F1- ...... | G1- ...... | Eb2- ...... | C2- ...... | D2- D2? D2? D2 D2 D2! . |
+snare | ......x. | ......x. | ......x. | ....x.xx | ......x. | ......x. | ......x. | ..x.x.xX |
+crash | x....... | ........ | ........ | ........ | ........ | ........ | ........ | ........ |
+
+# the choir comes in and the line climbs, landing on D major
+pattern B from A
+brass | [Eb]------- | [Bb]------- | [F]------- | [Gm]------- | [Eb]------- | [Bb]------- | [Cm]------- | [D]------- |
+tuba  | Eb1------- | Bb1------- | F1------- | G1------- | Eb1------- | Bb1------- | C2------- | D2------- |
+trem  | [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? | [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? | [F]? [F]? [F]? [F]? [F]? [F]? [F]? [F]? | [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? [Gm]? | [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? [Eb]? | [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? [Bb]? | [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? [Cm]? | [D] [D] [D] [D] [D] [D] [D] [D] |
+tpt   | G5--- Eb5--- | F5--- D5--- | F5--- C5- A4- | D5------- | Eb5--- G5--- | F5--- D5- Bb4- | C5--- Eb5- G5- | F#5------- |
+choir | [Eb]------- | [Bb]------- | [F]------- | [Gm]------- | [Eb]------- | [Bb]------- | [Cm]------- | [D]------- |
+timp  | Eb2- ...... | Bb1- ...... | F1- ...... | G1- ...... | Eb2- ...... | Bb1- ...... | C2- ...... | D2- D2 D2 D2 D2 D2! . |
+crash | X....... | ........ | ........ | ........ | ........ | ........ | ........ | x....... |
+
+play intro
+loop A B A B
