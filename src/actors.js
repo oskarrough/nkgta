@@ -89,7 +89,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			for (let i = 0; i < Math.max(peds.length, pedestrians.length); i++) {
 				if (!pedestrians[i]) pedestrians.push(person(blue))
 				pedestrians[i].group.visible = i < peds.length
-				if (peds[i]) pose(pedestrians[i], peds[i], peds[i].t * 12)
+				if (peds[i]) pose(pedestrians[i], peds[i], peds[i].stride ?? peds[i].t * 12)
 			}
 			const nearby = bottleList.filter((b) => Math.hypot(b.x - player.x, b.y - player.y) < 60)
 			if (nearby.length > bottles.instanceMatrix.count) {

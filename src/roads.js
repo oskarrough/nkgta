@@ -53,7 +53,7 @@ export function roadGraph(world) {
 
 // A polyline shifted sideways (right of travel is positive), with the distance
 // along it at every point.
-function offsetLine(pts, off) {
+export function offsetLine(pts, off) {
 	const out = []
 	let s = 0
 	for (let i = 0; i < pts.length; i++) {

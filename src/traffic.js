@@ -5,6 +5,7 @@ import { MODELS, pickModel } from './models.js'
 import { SOLID } from './tiles.js'
 import { roadGraph, pointAt, project } from './roads.js'
 import { createJunctions } from './junctions.js'
+import { createPedestrians } from './pedestrians.js'
 
 const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
 const SIGHT = 25 // tiles up the lane a driver watches the car ahead
@@ -21,7 +22,9 @@ export function createTraffic(world) {
 	const cars = []
 	const busStops = (world.transit ?? []).filter((t) => t.kind === 'bus')
 	const busLines = [...new Set(busStops.flatMap((t) => t.lines))]
-	const peds = [] // drivers thrown out of their cars, running off
+	const walkers = createPedestrians(world, junctions)
+	const runners = [] // drivers thrown out of their cars, running off
+	const peds = [] // everyone on foot, for drawing
 	let started = false
 
 	function pick(list, weight) {
@@ -104,6 +107,10 @@ export function createTraffic(world) {
 			if (e?.stop === undefined || !junctions.wait(c, e, gap)) continue
 			worst = Math.min(worst, stopAt(d, fwd, gap))
 		}
+		// People crossing the road we turn into: wait at the line, not in the
+		// middle of the junction.
+		const line = ai.edge.stop - ai.s - longer
+		if (ai.next?.twin?.crosswalk?.busy && line > -0.3) worst = Math.min(worst, stopAt(d, fwd, line))
 
 		// The car ahead in this lane or the next, however far up the road.
 		for (const o of cars) {
@@ -118,7 +125,7 @@ export function createTraffic(world) {
 		let blocked = false
 		let standoff = false // blocked by someone crossing, coming the other way, or not driving at all
 		if (!ai.ignore) {
-			const others = [...cars.filter((o) => o !== c), player.car ? null : player].filter(Boolean)
+			const others = [...cars.filter((o) => o !== c), player.car ? null : player, ...walkers.people].filter(Boolean)
 			for (const o of others) {
 				const [ox, oy] = local(o.x, o.y)
 				// The other one's size seen along our heading and across it.
@@ -132,7 +139,8 @@ export function createTraffic(world) {
 				const towards = (o.vx ?? 0) * cos + (o.vy ?? 0) * sin // its speed along our way
 				worst = Math.min(worst, follow(d, fwd, clear - 0.3, towards))
 				blocked = true
-				if (Math.cos(turned) < 0.7 || (o.model && !o.ai && o !== player.car)) standoff = true
+				// People crossing get all the time they need.
+				if (!o.track && (Math.cos(turned) < 0.7 || (o.model && !o.ai && o !== player.car))) standoff = true
 			}
 		}
 		if (m === MODELS.bus) worst = Math.min(worst, stopAt(d, fwd, busStop(c, local, dt)))
@@ -200,6 +208,7 @@ export function createTraffic(world) {
 	}
 
 	function update(dt, player, view) {
+		const first = !started
 		const ring = {
 			x: player.x,
 			y: player.y,
@@ -241,14 +250,17 @@ export function createTraffic(world) {
 		let hit = 0
 		if (!player.car) for (const c of cars) hit = Math.max(hit, shoveOut(c, player, 0.3))
 
-		for (let i = peds.length - 1; i >= 0; i--) {
-			const p = peds[i]
-			if ((p.t -= dt) < 0) peds.splice(i, 1)
+		for (let i = runners.length - 1; i >= 0; i--) {
+			const p = runners[i]
+			if ((p.t -= dt) < 0) runners.splice(i, 1)
 			const nx = p.x + Math.cos(p.dir) * 2.2 * dt
 			const ny = p.y + Math.sin(p.dir) * 2.2 * dt
 			if (SOLID.has(world.tileAt(nx, ny))) p.dir += 1.5
 			else Object.assign(p, { x: nx, y: ny })
 		}
+		walkers.update(dt, near, cars, (x, y) => first || !inView(view, x, y, 2), ring, first ? 999 : 6)
+		peds.length = 0
+		peds.push(...runners, ...walkers.people)
 		return hit
 	}
 
@@ -267,7 +279,7 @@ export function createTraffic(world) {
 	function steal(c, say) {
 		if (c.ai) {
 			const [x, y] = toWorld(c, 0, -c.model.width / 2 - 0.35)
-			peds.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4 })
+			runners.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4 })
 			say(SHOUTS[Math.floor(Math.random() * SHOUTS.length)].replace('{}', c.model.noun))
 			c.ai = null
 		} else say(c.line ? `${c.model.name} ${c.line}` : c.model.name)

@@ -10,6 +10,7 @@ const CLEAR = 2 // all red, so the junction empties
 const CYCLE = 2 * (GREEN + AMBER + CLEAR)
 const APPROACH = 7 // tiles before its stop line a car counts as arriving
 const PATIENCE = 4 // seconds a car waits before it goes anyway
+const WALK = 6 // seconds at the start of the cross road's green when people may step off
 const WAVE = 4.6 // tiles/s, about 50 km/h: drive this along a main road and catch the greens
 
 export function createJunctions(edges, signals = []) {
@@ -69,6 +70,7 @@ export function createJunctions(edges, signals = []) {
 	function wait(c, e, gap) {
 		const j = entryOf.get(e)
 		if (!j || gap < -0.3) return false
+		if (e.crosswalk?.busy) return true // people on the crossing just past the line
 		if (j.signal) {
 			const state = light(j, e)
 			// On amber, stop if you comfortably can.
@@ -96,7 +98,14 @@ export function createJunctions(edges, signals = []) {
 	// Somewhere in or right next to a junction, where nobody should park.
 	const near = (x, y, pad) => junctions.some((j) => dist({ x, y }, j) < j.r + pad)
 
-	return { update, wait, lights, near }
+	// May people step onto the crossing over lane e's arm? Undefined where no
+	// lights say so.
+	function walk(e) {
+		const j = entryOf.get(e)
+		if (j?.signal) return mayWalk(time + j.offset + ((1 - e.phase) * CYCLE) / 2)
+	}
+
+	return { update, wait, lights, near, walk, list: junctions }
 }
 
 // Every light runs off one clock: green, amber, then red while the cross
@@ -105,6 +114,10 @@ export function signalPhase(t) {
 	const at = ((t % CYCLE) + CYCLE) % CYCLE
 	return at < GREEN ? 'green' : at < GREEN + AMBER ? 'amber' : 'red'
 }
+
+// People walk with the traffic beside them, stepping off only in the first
+// seconds of its green, so they're across before the cars they cross get theirs.
+export const mayWalk = (t) => ((t % CYCLE) + CYCLE) % CYCLE < WALK
 
 // Where a junction's lights sit in the cycle: later the further along its main
 // road, so the greens roll down the street at WAVE. Both directions of a road
