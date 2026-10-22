@@ -119,10 +119,13 @@ export function createChunks(world, renderer, build) {
 	let lastUpdate
 	let crisp = false
 	let bytes = 0
+	const probe = new THREE.PerspectiveCamera() // shaders don't depend on the camera
 
+	// As one string: cloning the shapes object by object costs far more.
+	const shared = JSON.stringify({ shapes: world.shapes, buildings: world.buildings })
 	const workers = Array.from({ length: Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
 		const worker = new Worker(new URL('./paint-worker.js', import.meta.url), { type: 'module' })
-		worker.postMessage({ world: { shapes: world.shapes, buildings: world.buildings } })
+		worker.postMessage({ world: shared })
 		worker.onmessage = ({ data }) => {
 			const entry = worker.job
 			worker.job = null
@@ -247,6 +250,9 @@ export function createChunks(world, renderer, build) {
 		c.building = null
 		c.shown = { ground: undefined, roofs: undefined }
 		group.add(c.parts.group)
+		// Its shaders compile now, alongside the game, rather than stalling
+		// the frame it first shows up in.
+		if (group.parent) renderer.compileAsync(c.parts.group, probe, group.parent)
 	}
 
 	function update(view, scale) {
@@ -257,11 +263,11 @@ export function createChunks(world, renderer, build) {
 		const level = levelFor(scale)
 		const order = chunks.map((c) => [distance(c, view), c]).sort((a, b) => a[0] - b[0])
 
-		// What's near the view is built now; the rest a little each frame,
+		// What's on screen is built now; the rest a little each frame,
 		// nearest first.
 		for (const [d, c] of order) {
 			if (c.parts) continue
-			if (d <= MARGIN) buildChunk(c)
+			if (d === 0) buildChunk(c)
 			else if (performance.now() - t < spare) buildChunk(c, t + spare)
 			else break
 		}
@@ -275,7 +281,9 @@ export function createChunks(world, renderer, build) {
 		for (const [d, c] of order) {
 			if (!c.parts) continue
 			const kinds = c.buildings.length ? KINDS : ['ground']
-			for (const kind of kinds) want(c, kind, FAR, true, d + 0.5)
+			// A chunk's coarse texture before its finer ones, so the first
+			// view shows soon and sharpens after.
+			for (const kind of kinds) want(c, kind, FAR, true, d - 0.5)
 			// The finest level the budget still has room for.
 			c.target = FAR
 			if (d > MARGIN) continue
@@ -317,14 +325,14 @@ export function createChunks(world, renderer, build) {
 	return {
 		group,
 		update,
-		// Resolves once the chunks in view show the textures they want.
+		// Resolves once the chunks in view show a texture, coarse or finer.
 		ready(view, scale) {
 			return new Promise((resolve) => {
 				const start = performance.now()
 				const check = () => {
 					update(view, scale)
 					const done = chunks.every(
-						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown[k]?.px === c.target),
+						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown[k]),
 					)
 					if (done || performance.now() - start > 15000) resolve()
 					else setTimeout(check, 30)

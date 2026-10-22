@@ -7,7 +7,7 @@ let world
 
 onmessage = async ({ data }) => {
 	if (data.world) {
-		world = data.world
+		world = JSON.parse(data.world)
 		return
 	}
 	const { id, kind, area, roofs } = data

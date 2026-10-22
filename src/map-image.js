@@ -141,9 +141,15 @@ function pitchLines(g, ring, path) {
 	g.restore()
 }
 
-// A canvas to paint on, in the page or in a worker.
+// A canvas to paint on, in the page or in a worker. A worker paints on the
+// CPU: on the GPU its drawing queues up with the game's own and holds back
+// its frames.
 function newCanvas(width, height) {
-	if (typeof document === 'undefined') return new OffscreenCanvas(width, height)
+	if (typeof document === 'undefined') {
+		const canvas = new OffscreenCanvas(width, height)
+		canvas.getContext('2d', { willReadFrequently: true })
+		return canvas
+	}
 	const canvas = document.createElement('canvas')
 	canvas.width = width
 	canvas.height = height
