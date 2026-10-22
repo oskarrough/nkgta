@@ -147,7 +147,7 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	music.update(sound.audio(), traffic.cars, street, streetView, !!player.car)
-	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt)
+	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	const help = camera.selected()
 		? cam.third
 			? 'V: Vogelperspektive · Rechte Maus ziehen: umsehen · Rad: Abstand · WASD: bewegen · E: benutzen · Leertaste: Turbo / Handbremse'
@@ -158,7 +158,6 @@ function frame(now) {
 	draw({
 		cam,
 		player,
-		peds: indoors ? [] : traffic.peds,
 		lights: indoors ? [] : traffic.lights(),
 		bottles: indoors ? [] : pfand.bottles,
 		showStreetNames,

@@ -279,7 +279,7 @@ export function createTraffic(world) {
 	function steal(c, say) {
 		if (c.ai) {
 			const [x, y] = toWorld(c, 0, -c.model.width / 2 - 0.35)
-			runners.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4 })
+			runners.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4, seed: Math.random() })
 			say(SHOUTS[Math.floor(Math.random() * SHOUTS.length)].replace('{}', c.model.noun))
 			c.ai = null
 		} else say(c.line ? `${c.model.name} ${c.line}` : c.model.name)

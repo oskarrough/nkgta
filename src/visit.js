@@ -114,6 +114,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		// Once the tear has swallowed most of the view, the street's markers go.
 		indoors: () => inside || (!!warp && warp.t > 0.4),
 		shop: () => (inside ? shop : null),
+		// The shop's room while you're in it, for the player to stand in.
+		room: () => (inside ? interior.scene : null),
 		// The world the player moves in.
 		world: (city) => (inside ? interior.world : city),
 		// Where traffic should centre on: you, or your stand-in at the shop door.

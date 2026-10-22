@@ -38,6 +38,7 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/scene.js`: the 3D city in three.js. Buildings are raised from their outlines, with windows drawn in the wall shader, under a perspective camera looking straight down.
 - `src/map-image.js`: the ground and roof textures, painted from the map's shapes, any part of the map at any sharpness.
 - `src/chunks.js`, `src/paint-worker.js`: the city in square chunks. Each has its own meshes, so only what's near the view gets drawn, and its own ground and roof textures, painted in workers as it comes near, as sharp as the zoom needs, and let go when it's far.
-- `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names, the player) and the text.
+- `src/actors.js`: people and the bike, the same figures from above and in the chase camera. Everyone on foot is dressed from their own seed; the player wears yellow. From above they show over tree crowns and roofs, a bit bigger than life, inked round the outside (see `src/ink.js`).
+- `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names) and the text.
 
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.
