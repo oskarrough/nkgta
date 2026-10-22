@@ -16,13 +16,13 @@
 			body {
 				display: grid;
 				grid-template-columns: 16rem 1fr;
-				grid-template-rows: auto 1fr auto;
+				grid-template-rows: auto auto auto 1fr auto;
 				gap: 0.75rem;
 				padding: 0.75rem;
 				box-sizing: border-box;
 			}
 			aside {
-				grid-row: 1 / 4;
+				grid-row: 1 / 6;
 				overflow: auto;
 			}
 			#scores {
@@ -50,8 +50,18 @@
 				gap: 0.75rem;
 				align-items: center;
 			}
+			header {
+				display: flex;
+				gap: 0.75rem;
+				align-items: center;
+			}
+			h1 {
+				margin: 0 auto 0 0;
+				font-size: 1.3rem;
+			}
 			button,
-			select {
+			select,
+			.button {
 				font: inherit;
 				font-weight: 700;
 				padding: 0.4rem 0.9rem;
@@ -61,6 +71,35 @@
 			}
 			#play {
 				background: #9be86a;
+				min-width: 7rem;
+			}
+			header button,
+			.button {
+				background: #444;
+				color: inherit;
+				text-decoration: none;
+			}
+			.button.game {
+				background: #9be86a;
+				color: #111;
+			}
+			#pos {
+				flex: 1;
+				min-width: 12rem;
+			}
+			#time {
+				font-variant-numeric: tabular-nums;
+				min-width: 9rem;
+			}
+			#unblock {
+				position: fixed;
+				inset: 0;
+				margin: auto;
+				width: 16rem;
+				height: 5rem;
+				font-size: 1.3rem;
+				background: #9be86a;
+				box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.6);
 			}
 			#score {
 				width: 100%;
@@ -126,7 +165,13 @@
 				</p>
 				<p>
 					<code>street Sonnenallee</code> im Kopf macht das Lied zum Lied der Straße: Spätis, Bars, Fenster und Autos dort spielen meistens
-					eins ihrer Lieder.
+					eins ihrer Lieder. <code>at doener cafe</code> tut dasselbe für Arten von Orten: <code>spaeti</code>, <code>bar</code>,
+					<code>doener</code>, <code>imbiss</code>, <code>cafe</code>, und <code>feld</code> für ein großes offenes Feld wie Tempelhof.
+					Konvoi gehört allein dem Hochzeitskonvoi und läuft sonst nirgends.
+				</p>
+				<p>
+					Links spielen gleich los: <code>jukebox.html?song=konvoi&amp;kind=convoy&amp;d=20</code>. Die Adresszeile zeigt immer, was gerade
+					läuft.
 				</p>
 				<p>
 					Instrumente: <code>oud</code>, <code>qanun</code>, <code>ney</code>, <code>808</code>; Trommeln <code>dum</code> und
@@ -134,8 +179,19 @@
 				</p>
 			</details>
 		</aside>
+		<header>
+			<h1>Jukebox</h1>
+			<button id="new">Neuer Song</button>
+			<button id="download">Herunterladen</button>
+			<a class="button game" href="/">Zum Spiel</a>
+		</header>
 		<div class="bar">
 			<button id="play">Abspielen</button>
+			<input id="pos" type="range" min="0" max="1" step="0.1" value="0" list="marks" aria-label="Position" />
+			<datalist id="marks"><option id="loopStart" value="0"></option></datalist>
+			<span id="time"></span>
+		</div>
+		<div class="bar">
 			<label>
 				als
 				<select id="kind">
@@ -150,9 +206,9 @@
 			<label>Entfernung <input id="distance" type="range" min="0" max="45" step="0.5" value="4" /> <output id="metres"></output></label>
 			<label><input id="inCar" type="checkbox" /> im Auto</label>
 			<span id="where"></span>
-			<a href="/">zum Spiel</a>
 		</div>
 		<textarea id="score" spellcheck="false"></textarea>
 		<pre id="errors" data-ok="Spielbar."></pre>
+		<button id="unblock" hidden>▶ Abspielen</button>
 	</body>
 </html>
