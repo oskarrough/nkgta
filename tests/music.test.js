@@ -10,6 +10,8 @@ import {
 	cueAt,
 	join,
 	nearest,
+	nextOnAir,
+	stationPool,
 	openField,
 	pickScore,
 	placeSources,
@@ -145,6 +147,14 @@ describe('music in the street', () => {
 		const stranger = { ai: {}, x: 31, y: 0 }
 		// Standing beside the tail, with the front car 9.6 tiles on.
 		expect(convoyCar([...convoy, stranger], 30.4, 1)).toBe(convoy[4])
+	})
+
+	test('your car radio plays the rock station, one song after another and round again', () => {
+		const homes = Object.fromEntries(SCORES.map((n) => [n, { street: score(n).street, at: score(n).at }]))
+		const pool = stationPool(homes)
+		expect(pool).toEqual(['a100', 'grenzallee', 'buschkrugallee'])
+		expect(nextOnAir(pool, 'a100')).toBe('grenzallee')
+		expect(nextOnAir(pool, 'buschkrugallee')).toBe('a100')
 	})
 
 	test('coming back, a source carries on where its song had got to', () => {

@@ -174,6 +174,14 @@ export function openField(world) {
 	}
 }
 
+// Your own car's radio is a station: the songs that say `at autoradio` (any
+// song, if none do), each played through once, then the next.
+export function stationPool(homes) {
+	const own = SCORES.filter((n) => homes[n]?.at?.includes('autoradio'))
+	return own.length ? own : PLACE_SCORES
+}
+export const nextOnAir = (pool, score) => pool[(pool.indexOf(score) + 1) % pool.length]
+
 // A convoy plays from whichever of its cars is nearest (x, y), so the song
 // carries on until the last one has gone by.
 export function convoyCar(cars, x, y) {
@@ -303,6 +311,8 @@ export function createMusic(world, shops) {
 	let fieldSeed = 9000
 	const radios = new WeakMap()
 	let convoy = null // the convoy's song, while it lasts
+	// Your car radio, on whenever you sit in a car and still on air while you don't.
+	const station = { kind: 'car', x: 0, y: 0, score: null, since: 0 }
 	let carSeed = 0
 	const playing = new Map()
 	let synth = null
@@ -360,6 +370,25 @@ export function createMusic(world, shops) {
 		return field
 	}
 
+	// The station follows you from car to car. Getting in, you join whatever's
+	// on; a song that has played through gives way to the next from the top.
+	function stationIn(car, now) {
+		if (!car) return []
+		const pool = stationPool(homes)
+		const length = (n) => (songs.has(n) ? songs.get(n).intro.dur + songs.get(n).loop.dur : Infinity)
+		if (!station.score) {
+			station.score = pool[Math.floor(hash(7000.5) * pool.length)]
+			station.since = hash(7000.25) * length(station.score)
+		}
+		if (now + station.since >= length(station.score)) {
+			station.score = nextOnAir(pool, station.score)
+			station.since = -now
+		}
+		station.x = car.x
+		station.y = car.y
+		return [station]
+	}
+
 	function convoyOf(cars, listener) {
 		const car = convoyCar(cars, listener.x, listener.y)
 		if (!car) return []
@@ -378,23 +407,24 @@ export function createMusic(world, shops) {
 		}
 		const { context, master } = audio
 		synth ??= synthFor(context, master)
+		const now = context.currentTime
 		const sources = fixed.concat(
 			cars
-				.filter((c) => (c.ai && !c.convoy) || c === listener.car)
+				.filter((c) => c.ai && !c.convoy && c !== listener.car)
 				.map(radioOf)
 				.filter(Boolean),
+			stationIn(listener.car, now),
 			convoyOf(cars, listener),
 			[fieldAt(listener.x, listener.y)].filter(Boolean),
 		)
 		const want = nearest(sources, listener.x, listener.y)
-		for (const p of playing.values()) if (!want.includes(p.src)) stop(p, context)
-		const now = context.currentTime
+		for (const p of playing.values()) if (!want.includes(p.src) || p.song !== songs.get(p.src.score)) stop(p, context)
 		for (const src of want) {
 			const song = songs.get(src.score)
 			if (!song) continue
 			let p = playing.get(src)
 			if (!p) playing.set(src, (p = begin(synth, context, src, song)))
-			const own = src.kind === 'car' && !!listener.car && radios.get(listener.car) === src
+			const own = src === station
 			const d = Math.hypot(src.x - listener.x, src.y - listener.y)
 			const pan = own || src.kind === 'field' ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
 			tune(p, shape(src.kind, d, own, inCar), pan, now)
