@@ -164,6 +164,7 @@ function parse(text) {
 		composer: '',
 		about: '',
 		street: '',
+		at: [],
 		tempo: 120,
 		beats: 4,
 		steps: 4,
@@ -220,6 +221,9 @@ function parse(text) {
 				break
 			case 'street':
 				song.street = restStr
+				break
+			case 'at':
+				song.at = restStr.toLowerCase().split(/\s+/).filter(Boolean)
 				break
 			case 'tempo':
 				target.tempo = num(restStr, 20, 400, 120)
@@ -638,6 +642,7 @@ function compile(text) {
 		composer: song.composer,
 		about: song.about,
 		street: song.street,
+		at: song.at,
 		tempo: song.tempo,
 		beats: song.beats,
 		steps: song.steps,

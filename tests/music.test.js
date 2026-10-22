@@ -2,7 +2,21 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { compile, noteToMidi } from '../src/jukebox/score.js'
 import { mtof } from '../src/jukebox/synth.js'
-import { CONVOY, HEAR, SCORES, convoyCar, cueAt, join, nearest, pickScore, placeSources, shape, streetNear } from '../src/music.js'
+import {
+	CONVOY,
+	HEAR,
+	SCORES,
+	convoyCar,
+	cueAt,
+	join,
+	nearest,
+	openField,
+	pickScore,
+	placeSources,
+	shape,
+	streetNear,
+} from '../src/music.js'
+import { T } from '../src/tiles.js'
 
 const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.song`, import.meta.url), 'utf8'))
 
@@ -43,8 +57,8 @@ oud | D4- Eq4- F4- ~Eq4- D4------- |`)
 })
 
 describe('songs belong to streets', () => {
-	const streets = { sonnenallee: 'Sonnenallee', 'sonnenallee-nacht': 'Sonnenallee' }
-	const picks = (street) => Array.from({ length: 600 }, (_, i) => pickScore(streets, street, i))
+	const streets = { sonnenallee: { street: 'Sonnenallee', at: [] }, 'sonnenallee-nacht': { street: 'Sonnenallee', at: [] } }
+	const picks = (street) => Array.from({ length: 600 }, (_, i) => pickScore(streets, street, '', i))
 	const share = (list, names) => list.filter((n) => names.includes(n)).length / list.length
 
 	test("on its street, a source plays one of that street's songs about two times in three", () => {
@@ -86,13 +100,14 @@ describe('music in the street', () => {
 	const world = { buildings: Array.from({ length: 300 }, (_, i) => ({ rings: [[i * 10, 0, i * 10 + 5, 0]] })) }
 	const shops = Array.from({ length: 300 }, (_, i) => ({ kind: ['spaeti', 'doener', 'bar'][i % 3], x: i * 10, y: 5 }))
 
-	test('some Spätis have a radio on, some bars play through the door, some windows are open', () => {
+	test('some Spätis and döner shops have a radio on, some bars play through the door, some windows are open', () => {
 		const sources = placeSources(world, shops)
 		const count = (kind) => sources.filter((s) => s.kind === kind).length
-		for (const kind of ['radio', 'bar']) {
-			expect(count(kind)).toBeGreaterThan(15)
-			expect(count(kind)).toBeLessThan(60)
-		}
+		// 100 Spätis and 100 döner shops, one in three each
+		expect(count('radio')).toBeGreaterThan(40)
+		expect(count('radio')).toBeLessThan(90)
+		expect(count('bar')).toBeGreaterThan(15)
+		expect(count('bar')).toBeLessThan(60)
 		expect(count('window')).toBeGreaterThan(0)
 		expect(count('window')).toBeLessThan(15)
 		expect(placeSources(world, shops)).toEqual(sources)
@@ -152,5 +167,81 @@ describe('music in the street', () => {
 		const at = (j) => j.cue.offset + song[j.cue.list].events[j.cue.i].t
 		expect(at(again)).toBeGreaterThan(at(first) + 20)
 		expect(first.start + at(first)).toBeGreaterThanOrEqual(5)
+	})
+})
+
+describe('songs belong to kinds of places', () => {
+	const homes = { wriezener: { street: '', at: ['doener'] }, hasenheide: { street: '', at: ['cafe'] } }
+	const share = (list, name) => list.filter((n) => n === name).length / list.length
+
+	test('döner shops mostly play the döner song, cafés the café song, Spätis anything', () => {
+		const shops = Array.from({ length: 1800 }, (_, i) => ({ kind: ['doener', 'cafe', 'spaeti'][i % 3], x: i, y: 0 }))
+		const sources = placeSources({ buildings: [] }, shops, homes)
+		const at = (kind) => sources.filter((s, i) => shops.find((shop) => shop.x === s.x).kind === kind).map((s) => s.score)
+		expect(share(at('doener'), 'wriezener')).toBeGreaterThan(0.6)
+		expect(share(at('doener'), 'wriezener')).toBeLessThan(0.85)
+		expect(share(at('cafe'), 'hasenheide')).toBeGreaterThan(0.6)
+		expect(share(at('spaeti'), 'wriezener')).toBeLessThan(0.25)
+		expect(at('cafe').length).toBeGreaterThan(60)
+	})
+
+	test('a street and a place both count', () => {
+		const both = { ...homes, sonnenallee: { street: 'Sonnenallee', at: [] } }
+		const picks = Array.from({ length: 600 }, (_, i) => pickScore(both, 'Sonnenallee', 'doener', i))
+		expect(share(picks, 'wriezener') + share(picks, 'sonnenallee')).toBeGreaterThan(0.6)
+		expect(share(picks, 'wriezener')).toBeGreaterThan(0.2)
+		expect(share(picks, 'sonnenallee')).toBeGreaterThan(0.2)
+	})
+
+	test("the convoy's song is never a place's, even if it says so", () => {
+		const picks = Array.from({ length: 600 }, (_, i) => pickScore({ konvoi: { street: '', at: ['doener'] } }, '', 'doener', i))
+		expect(picks).not.toContain(CONVOY)
+	})
+
+	test('the songs say where they belong', () => {
+		expect(score('konvoi').at).toEqual([])
+		expect(score('hasenheide').at).toEqual(['cafe'])
+		for (const name of ['tempelhof', 'luftbruecke']) expect(score(name).at).toEqual(['feld'])
+		expect(compile('at Doener  cafe\nvoice a sine\npattern A\na | C4 |').at).toEqual(['doener', 'cafe'])
+	})
+})
+
+describe('the open field', () => {
+	// 600 by 400 tiles of 3 m: a field of 120 by 120 tiles (13 ha) on the left
+	// would be too small; one of 500 by 400 (180 ha) counts.
+	const world = (fieldW) => {
+		const W = 600
+		const H = 400
+		const tiles = new Uint8Array(W * H).fill(T.ROAD)
+		for (let y = 0; y < H; y++) for (let x = 0; x < fieldW; x++) tiles[y * W + x] = T.GRASS
+		return { W, H, tiles, tileM: 3 }
+	}
+
+	test('a big open field is heard from on it and at its edge, not further off', () => {
+		const near = openField(world(500))
+		expect(near(100, 100)).toBe(0)
+		// mapped in cells of 8 tiles, so the edge is a little rough
+		expect(near(504, 100)).toBeGreaterThan(0)
+		expect(near(504, 100)).toBeLessThan(10)
+		expect(near(560, 100)).toBe(18)
+	})
+
+	test('a small park is no field, and nor is a map without tiles', () => {
+		expect(openField(world(120))).toBe(null)
+		expect(openField({ buildings: [] })).toBe(null)
+	})
+
+	test('Tempelhofer Feld is a field; Hasenheide and the streets are not', async () => {
+		const { decodeMap } = await import('../src/map-codec.js')
+		const map = decodeMap(await Bun.file('public/map.json').json())
+		const near = openField({ ...map, W: map.w, H: map.h })
+		const at = (lat, lon) => {
+			const { bbox } = map
+			const x = ((lon - bbox.west) * 111320 * Math.cos((((bbox.north + bbox.south) / 2) * Math.PI) / 180)) / map.tileM
+			return near(x, ((bbox.north - lat) * 111320) / map.tileM)
+		}
+		expect(at(52.4745, 13.4)).toBe(0) // the middle of the Feld
+		expect(at(52.4845, 13.4165)).toBe(18) // Hasenheide
+		expect(at(52.4812, 13.4352)).toBe(18) // Rathaus Neukölln
 	})
 })
