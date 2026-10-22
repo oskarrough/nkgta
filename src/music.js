@@ -6,7 +6,7 @@
 import { compile } from './scrimshaw/score.js'
 import { createSynth } from './scrimshaw/synth.js'
 
-export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi', 'pannierstrasse']
+export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi', 'richardstr']
 export const HEAR = 18 // tiles, how far music carries
 export const CONVOY = 'konvoi' // the wedding convoy's own song, played nowhere else
 const PLACE_SCORES = SCORES.filter((s) => s !== CONVOY)
