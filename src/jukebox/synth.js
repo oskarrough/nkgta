@@ -195,6 +195,18 @@ const PLUCK = {
 	harpsichord: { id: 'hpsi', b: 0.14, decay: 0.994, color: 0, dur: 1.6, hang: 0.12, dampTau: 0.05 },
 	pizz: { id: 'pizz', b: 0.5, decay: 0.982, color: 0.6, dur: 0.8, hang: 0.15, dampTau: 0.05 },
 	upright: { id: 'upr', b: 0.5, decay: 0.996, color: 0.7, dur: 1.7, hang: 0.04, dampTau: 0.07 },
+	oud: { id: 'oud', b: 0.42, decay: 0.993, color: 0.5, dur: 1.4, hang: 0.12, dampTau: 0.07 },
+	qanun: { id: 'qanun', b: 0.22, decay: 0.9965, color: 0.2, dur: 2.2, hang: 0.5, dampTau: 0.15 },
+}
+// a soft clip, for the 808
+function saturate(S) {
+	if (!S.curve) {
+		S.curve = new Float32Array(1024)
+		for (let i = 0; i < 1024; i++) S.curve[i] = Math.tanh(((i / 1023) * 2 - 1) * 2.2)
+	}
+	const w = S.ctx.createWaveShaper()
+	w.curve = S.curve
+	return w
 }
 
 /* ------------------------------------------------------------ instruments */
@@ -608,6 +620,80 @@ const INST = {
 			noise(S, out, t, { type: 'lowpass', f: 900, q: 0.5, tau: 0.01, peak: v * 0.12 })
 		},
 	},
+	// Fretless lute with paired strings and a round bowl: two plucks a hair
+	// apart, the body around 250 Hz, a dark plectrum tick.
+	oud: {
+		rev: 0.22,
+		level: 1.5,
+		play(S, out, t, d, f, v, p) {
+			const chain = () => [F(S, 'lowpass', 2600 * p.bright, 0.6), F(S, 'peaking', 250, 1.2, 5), F(S, 'peaking', 1300, 1.5, 2)]
+			pluck(S, out, t, d, f, v * 0.45, PLUCK.oud, chain())
+			pluck(S, out, t + 0.006, d, f * 1.0025, v * 0.3, PLUCK.oud, chain())
+			noise(S, out, t, { f: 1800, q: 1.2, tau: 0.006, peak: v * 0.1 })
+		},
+	},
+	// Plucked zither: three strings to a course, bright and ringing.
+	qanun: {
+		rev: 0.35,
+		level: 1.3,
+		play(S, out, t, d, f, v, p) {
+			for (const [r, dt, a] of [
+				[1, 0, 0.3],
+				[1.0018, 0.004, 0.2],
+				[0.9983, 0.009, 0.2],
+			])
+				pluck(S, out, t + dt, d, f * r, v * a, PLUCK.qanun, [F(S, 'highpass', 220, 0.5), F(S, 'peaking', 3200, 1.2, 4 * p.bright)])
+		},
+	},
+	// End-blown reed flute: more breath than tone, each note scooped up into pitch.
+	ney: {
+		rev: 0.45,
+		level: 1.15,
+		play(S, out, t, d, f, v, p) {
+			const g = G(S)
+			g.connect(out)
+			const end = adsr(g.gain, t, d, { a: p.att || 0.09, dc: 0.2, s: 0.85, r: p.rel || 0.16, peak: v * 0.42 })
+			const o1 = O(S, 'sine', f, t, end, p)
+			const o2 = O(S, 'triangle', f, t, end, p)
+			const g2 = G(S, 0.18 * p.bright)
+			o1.connect(g)
+			o2.connect(g2).connect(g)
+			if (!p.from)
+				for (const o of [o1, o2]) {
+					o.detune.setValueAtTime(-45, t)
+					o.detune.setTargetAtTime(0, t, 0.035)
+				}
+			vibrato(S, t, end, [o1, o2], { rate: 4.4, depth: 16, delay: 0.3, rise: 0.5 })
+			const n = noiseSrc(S, t, end)
+			const bp = F(S, 'bandpass', Math.min(f * 1.8, 9000), 1.3)
+			const ng = G(S)
+			ng.gain.setValueAtTime(0, t)
+			ng.gain.linearRampToValueAtTime(v * 0.16, t + 0.04)
+			ng.gain.setTargetAtTime(v * 0.06, t + 0.04, 0.1)
+			ng.gain.setTargetAtTime(0, Math.max(t + d, t + 0.05), 0.05)
+			n.connect(bp).connect(ng).connect(out)
+		},
+	},
+	// Sine bass with a long tail, a thump at the front and a little grit.
+	808: {
+		rev: 0.04,
+		level: 1.1,
+		play(S, out, t, d, f, v, p) {
+			const g = G(S)
+			const sat = saturate(S)
+			sat
+				.connect(F(S, 'lowpass', 1800 * p.bright, 0.5))
+				.connect(g)
+				.connect(out)
+			const end = adsr(g.gain, t, d, { a: p.att || 0.003, dc: 1.2, s: 0.55, r: p.rel || 0.12, peak: v * 0.55 })
+			const o = O(S, 'sine', f, t, end, p)
+			if (!p.from) {
+				o.frequency.setValueAtTime(f * 2.2, t)
+				o.frequency.exponentialRampToValueAtTime(f, t + 0.04)
+			}
+			o.connect(sat)
+		},
+	},
 	fretless: {
 		rev: 0.12,
 		level: 0.69,
@@ -912,6 +998,41 @@ const DRUM = {
 		hit(S, out, t, v) {
 			;[0, 0.011, 0.022].forEach((o) => noise(S, out, t + o, { f: 1300, q: 1, tau: 0.006, peak: v * 0.5 }))
 			noise(S, out, t + 0.03, { f: 1200, q: 0.8, tau: 0.07, peak: v * 0.4 })
+		},
+	},
+	// darbuka: dum is the deep centre stroke, tek the sharp rim, o-strokes a soft ka
+	dum: {
+		rev: 0.18,
+		level: 0.95,
+		hit(S, out, t, v) {
+			partial(S, out, t, 92, { a: 0.002, tau: 0.2, peak: v * 0.9, bend: 1.35, bendTau: 0.018 })
+			partial(S, out, t, 184, { a: 0.002, tau: 0.07, peak: v * 0.25 })
+			noise(S, out, t, { type: 'lowpass', f: 700, q: 0.6, tau: 0.012, peak: v * 0.35 })
+		},
+	},
+	tek: {
+		rev: 0.2,
+		level: 1.2,
+		hit(S, out, t, v) {
+			partial(S, out, t, 2150, { a: 0.001, tau: 0.035, peak: v * 0.4 })
+			partial(S, out, t, 1240, { a: 0.001, tau: 0.05, peak: v * 0.3 })
+			noise(S, out, t, { f: 3600, q: 1.4, tau: 0.012, peak: v * 0.45 })
+		},
+	},
+	// riq: a small frame drum with jingles
+	riq: {
+		rev: 0.2,
+		level: 1.0,
+		hit(S, out, t, v) {
+			partial(S, out, t, 360, { a: 0.001, tau: 0.03, peak: v * 0.3 })
+			for (const [f, tau] of [
+				[5300, 0.06],
+				[6900, 0.05],
+				[8400, 0.04],
+			])
+				partial(S, out, t + Math.random() * 0.004, f, { a: 0.001, tau, peak: v * 0.06 })
+			noise(S, out, t, { type: 'highpass', f: 6500, q: 0.7, a: 0.002, tau: 0.07, peak: v * 0.35 })
+			noise(S, out, t + 0.012, { f: 9000, q: 2, a: 0.001, tau: 0.05, peak: v * 0.15 })
 		},
 	},
 	gong: {

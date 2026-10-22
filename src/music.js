@@ -1,12 +1,23 @@
 // Music from places: a Späti radio, a bar door, an open window, a passing car,
-// a wedding convoy. Each plays one of the scores in public/music, plain text
-// the Scrimshaw synth plays live, quieter and duller the further away it is.
-// Only the nearest few play at all, and each one carries on where it had got
-// to while you were away.
-import { compile } from './scrimshaw/score.js'
-import { createSynth } from './scrimshaw/synth.js'
+// a wedding convoy. Each plays one of the songs in public/music, plain text the
+// jukebox synth plays live, quieter and duller the further away it is. Only the
+// nearest few play at all, and each one carries on where it had got to while
+// you were away. A song can belong to a street; sources on that street mostly
+// play its songs.
+import { compile } from './jukebox/score.js'
+import { createSynth } from './jukebox/synth.js'
 
-export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi', 'richardstr']
+export const SCORES = [
+	'hermannplatz',
+	'weserstrasse',
+	'sonnenallee',
+	'sonnenallee-nacht',
+	'wriezener',
+	'hasenheide',
+	'ringbahn',
+	'konvoi',
+	'richardstr',
+]
 export const HEAR = 18 // tiles, how far music carries
 export const CONVOY = 'konvoi' // the wedding convoy's own song, played nowhere else
 const PLACE_SCORES = SCORES.filter((s) => s !== CONVOY)
@@ -14,6 +25,8 @@ const PLAYING = 2 // sources sounding at once
 const SHOP_EVERY = 3 // one Späti or bar in this many has music on
 const WINDOW_EVERY = 80 // one building in this many has a window open
 const RADIO_EVERY = 5 // one moving car in this many has the radio on
+const LOCAL = 2 / 3 // how often a source on a street with its own songs plays one
+const REACH = 8 // tiles, how far from a source to look for its street
 export const AHEAD = 0.3 // seconds of notes scheduled ahead
 // How each kind of source sounds: level, brightest cutoff in Hz, reverb send,
 // and how many tiles it carries if further than HEAR.
@@ -32,24 +45,48 @@ const hash = (n) => {
 	return s - Math.floor(s)
 }
 
-// Spätis, bars and the odd open window, each with its score and how long ago
-// its song started.
-export function placeSources(world, shops) {
+// The name of the street nearest (x, y), within REACH tiles, or ''.
+export function streetNear(world, x, y) {
+	if (!world.streetAt) return ''
+	let best = ''
+	let bestD = Infinity
+	for (let r = 0; r <= REACH && !best; r++)
+		for (let dy = -r; dy <= r; dy++)
+			for (let dx = -r; dx <= r; dx++) {
+				if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+				const name = world.streetAt(x + dx, y + dy)
+				const d = dx * dx + dy * dy
+				if (name && d < bestD) [best, bestD] = [name, d]
+			}
+	return best
+}
+
+// Which song a source plays: on a street with songs of its own, one of those
+// LOCAL of the time; otherwise any song. `streets` maps a song to its street.
+export function pickScore(streets, street, seed) {
+	const local = street ? PLACE_SCORES.filter((n) => streets[n] === street) : []
+	const pool = local.length && hash(seed + 0.75) < LOCAL ? local : PLACE_SCORES
+	return pool[Math.floor(hash(seed + 0.5) * pool.length)]
+}
+
+// Spätis, bars and the odd open window, each with its song and how long ago
+// it started.
+export function placeSources(world, shops, streets = {}) {
 	const sources = []
 	for (const [i, shop] of shops.entries()) {
 		const kind = shop.kind === 'spaeti' ? 'radio' : shop.kind === 'bar' ? 'bar' : null
-		if (kind && hash(1000 + i) * SHOP_EVERY < 1) sources.push(source(kind, shop.x, shop.y, 1000 + i))
+		if (kind && hash(1000 + i) * SHOP_EVERY < 1) sources.push(source(world, streets, kind, shop.x, shop.y, 1000 + i))
 	}
 	for (const [i, b] of world.buildings.entries()) {
 		if (hash(i) * WINDOW_EVERY >= 1) continue
 		const r = b.rings[0]
-		sources.push(source('window', r[0], r[1], i))
+		sources.push(source(world, streets, 'window', r[0], r[1], i))
 	}
 	return sources
 }
 
-function source(kind, x, y, seed, score = PLACE_SCORES[Math.floor(hash(seed + 0.5) * PLACE_SCORES.length)]) {
-	return { kind, x, y, score, since: hash(seed + 0.25) * 600 }
+function source(world, streets, kind, x, y, seed) {
+	return { kind, x, y, score: pickScore(streets, streetNear(world, x, y), seed), since: hash(seed + 0.25) * 600 }
 }
 
 // A convoy plays from whichever of its cars is nearest (x, y), so the song
@@ -171,39 +208,40 @@ export function end(p, context) {
 }
 
 export function createMusic(world, shops) {
-	const fixed = placeSources(world, shops)
+	const songs = new Map()
+	// Sources are placed once every song is in, since a song says its street.
+	let fixed = null
+	let streets = {}
 	const radios = new WeakMap()
 	let convoy = null // the convoy's song, while it lasts
 	let carSeed = 0
-	const texts = new Map()
-	const songs = new Map()
 	const playing = new Map()
 	let synth = null
+	Promise.all(
+		SCORES.map((name) =>
+			fetch(`/music/${name}.song`)
+				.then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${name}: ${r.status}`))))
+				.then((text) => {
+					const song = compile(text)
+					if (song.errors.length) console.warn(`Song ${name}:`, song.errors)
+					songs.set(name, song)
+				})
+				.catch((error) => console.warn('Music unavailable:', error)),
+		),
+	).then(() => {
+		streets = Object.fromEntries([...songs].map(([name, song]) => [name, song.street]))
+		fixed = placeSources(world, shops, streets)
+	})
 
 	function stop(p, context) {
 		playing.delete(p.src)
 		end(p, context)
 	}
 
-	function load(name) {
-		if (!texts.has(name)) {
-			texts.set(name, null)
-			fetch(`/music/${name}.scrim`)
-				.then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${name}: ${r.status}`))))
-				.then((text) => {
-					const song = compile(text)
-					if (song.errors.length) console.warn(`Score ${name}:`, song.errors)
-					songs.set(name, song)
-				})
-				.catch((error) => console.warn('Music unavailable:', error))
-		}
-		return songs.get(name)
-	}
-
 	function radioOf(car) {
 		if (!radios.has(car)) {
 			const seed = 5000 + carSeed++
-			radios.set(car, hash(seed) * RADIO_EVERY < 1 ? source('car', car.x, car.y, seed) : null)
+			radios.set(car, hash(seed) * RADIO_EVERY < 1 ? source(world, streets, 'car', car.x, car.y, seed) : null)
 		}
 		const r = radios.get(car)
 		if (r) {
@@ -216,7 +254,7 @@ export function createMusic(world, shops) {
 	function convoyOf(cars, listener) {
 		const car = convoyCar(cars, listener.x, listener.y)
 		if (!car) return []
-		if (convoy?.group !== car.convoy) convoy = { ...source('convoy', 0, 0, 9000 + carSeed++, CONVOY), group: car.convoy }
+		if (convoy?.group !== car.convoy) convoy = { kind: 'convoy', x: 0, y: 0, score: CONVOY, since: hash(9000 + carSeed++) * 600, group: car.convoy }
 		convoy.x = car.x
 		convoy.y = car.y
 		return [convoy]
@@ -224,7 +262,7 @@ export function createMusic(world, shops) {
 
 	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
 	function update(audio, cars, listener, view, inCar) {
-		if (!audio || audio.muted) {
+		if (!fixed || !audio || audio.muted) {
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
@@ -241,7 +279,7 @@ export function createMusic(world, shops) {
 		for (const p of playing.values()) if (!want.includes(p.src)) stop(p, context)
 		const now = context.currentTime
 		for (const src of want) {
-			const song = load(src.score)
+			const song = songs.get(src.score)
 			if (!song) continue
 			let p = playing.get(src)
 			if (!p) playing.set(src, (p = begin(synth, context, src, song)))
@@ -259,6 +297,7 @@ export function createMusic(world, shops) {
 			[...playing.values()].map((p) => ({
 				kind: p.src.kind,
 				score: p.src.score,
+				street: streetNear(world, p.src.x, p.src.y),
 				gain: p.level.gain.value,
 				cutoff: p.tone.frequency.value,
 			})),

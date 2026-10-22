@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { compile } from '../src/scrimshaw/score.js'
-import { CONVOY, HEAR, SCORES, convoyCar, cueAt, join, nearest, placeSources, shape } from '../src/music.js'
+import { compile, noteToMidi } from '../src/jukebox/score.js'
+import { mtof } from '../src/jukebox/synth.js'
+import { CONVOY, HEAR, SCORES, convoyCar, cueAt, join, nearest, pickScore, placeSources, shape, streetNear } from '../src/music.js'
 
-const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.scrim`, import.meta.url), 'utf8'))
+const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.song`, import.meta.url), 'utf8'))
 
 describe('scores', () => {
 	for (const name of SCORES) {
@@ -13,6 +14,72 @@ describe('scores', () => {
 			expect(song.loop.dur).toBeGreaterThan(10)
 		})
 	}
+})
+
+describe('quarter tones', () => {
+	test('q is a half-flat, a quarter tone under the note', () => {
+		expect(noteToMidi('Eq4')).toBe(63.5)
+		expect(noteToMidi('Bq3')).toBe(58.5)
+		expect(mtof(63.5) / mtof(63)).toBeCloseTo(2 ** (1 / 24))
+	})
+
+	test('half-flats play, in melodies and glides', () => {
+		const song = compile(`voice oud oud
+pattern A
+oud | D4- Eq4- F4- ~Eq4- D4------- |`)
+		expect(song.errors).toEqual([])
+		const notes = song.loop.events.map((e) => e.m[0])
+		expect(notes).toEqual([62, 63.5, 65, 63.5, 62])
+		expect(song.loop.events[3].g).toBe(65)
+	})
+
+	test('the Sonnenallee songs are in a maqam with quarter tones', () => {
+		for (const name of ['sonnenallee', 'sonnenallee-nacht']) {
+			const song = score(name)
+			expect(song.street).toBe('Sonnenallee')
+			expect(song.loop.events.some((e) => e.m?.some((m) => m % 1))).toBe(true)
+		}
+	})
+})
+
+describe('songs belong to streets', () => {
+	const streets = { sonnenallee: 'Sonnenallee', 'sonnenallee-nacht': 'Sonnenallee' }
+	const picks = (street) => Array.from({ length: 600 }, (_, i) => pickScore(streets, street, i))
+	const share = (list, names) => list.filter((n) => names.includes(n)).length / list.length
+
+	test("on its street, a source plays one of that street's songs about two times in three", () => {
+		const there = picks('Sonnenallee')
+		// two in three by choice, plus the odd one from the whole pool
+		expect(share(there, ['sonnenallee', 'sonnenallee-nacht'])).toBeGreaterThan(0.6)
+		expect(share(there, ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.85)
+		expect(new Set(there).size).toBe(SCORES.length - 1) // all but the convoy's
+	})
+
+	test('everywhere else, any song', () => {
+		for (const street of ['Weserstraße', '']) {
+			const elsewhere = picks(street)
+			expect(share(elsewhere, ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.4)
+			expect(new Set(elsewhere).size).toBe(SCORES.length - 1)
+		}
+	})
+
+	test('a source belongs to the nearest street, if one is near', () => {
+		// Sonnenallee along y = 0, Weserstraße along y = 6
+		const world = { streetAt: (x, y) => ((y | 0) === 0 ? 'Sonnenallee' : (y | 0) === 6 ? 'Weserstraße' : '') }
+		expect(streetNear(world, 10, 2)).toBe('Sonnenallee')
+		expect(streetNear(world, 10, 5)).toBe('Weserstraße')
+		expect(streetNear(world, 10, 40)).toBe('')
+		expect(streetNear({}, 10, 2)).toBe('')
+	})
+
+	test('the Spätis on Sonnenallee mostly play its songs; picked areas without it play anything', () => {
+		const shops = Array.from({ length: 900 }, (_, i) => ({ kind: 'spaeti', x: i, y: 2 }))
+		const onIt = { buildings: [], streetAt: (x, y) => ((y | 0) === 0 ? 'Sonnenallee' : '') }
+		const elsewhere = { buildings: [], streetAt: (x, y) => ((y | 0) === 0 ? 'Karl-Marx-Straße' : '') }
+		const scores = (world) => placeSources(world, shops, streets).map((s) => s.score)
+		expect(share(scores(onIt), ['sonnenallee', 'sonnenallee-nacht'])).toBeGreaterThan(0.6)
+		expect(share(scores(elsewhere), ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.4)
+	})
 })
 
 describe('music in the street', () => {

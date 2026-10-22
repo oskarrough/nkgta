@@ -1,7 +1,7 @@
-// Every score in public/music, to hear, edit and replay as each kind of source
+// The jukebox: every song in public/music, to hear, edit and replay as each kind of source
 // at any distance, through the same synth and muffling as the street.
-import { compile } from './scrimshaw/score.js'
-import { AHEAD, SCORES, begin, end, feed, shape, synthFor, tune } from './music.js'
+import { compile } from './score.js'
+import { AHEAD, SCORES, begin, end, feed, shape, synthFor, tune } from '../music.js'
 
 const $ = (id) => document.getElementById(id)
 const texts = new Map()
@@ -16,7 +16,7 @@ let since = 0
 
 async function text(n) {
 	if (!texts.has(n)) {
-		const r = await fetch(`/music/${n}.scrim`)
+		const r = await fetch(`/music/${n}.song`)
 		texts.set(n, await r.text())
 	}
 	return texts.get(n)
@@ -29,7 +29,7 @@ function listScores() {
 			const song = songs.get(n)
 			button.className = n === name ? 'on' : ''
 			const small = document.createElement('small')
-			small.textContent = `${n}.scrim${song?.about ? ` · ${song.about}` : ''}`
+			small.textContent = [`${n}.song`, song?.street, song?.about].filter(Boolean).join(' · ')
 			button.append(song?.title ?? n, small)
 			button.onclick = () => pick(n)
 			return button

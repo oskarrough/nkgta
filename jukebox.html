@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>NK GTA · Musik</title>
+		<title>NK GTA · Jukebox</title>
 		<style>
 			html,
 			body {
@@ -21,12 +21,14 @@
 				padding: 0.75rem;
 				box-sizing: border-box;
 			}
-			#scores {
+			aside {
 				grid-row: 1 / 4;
+				overflow: auto;
+			}
+			#scores {
 				display: flex;
 				flex-direction: column;
 				gap: 0.4rem;
-				overflow: auto;
 			}
 			#scores button {
 				text-align: left;
@@ -92,11 +94,46 @@
 			a {
 				color: #9be86a;
 			}
+			details {
+				margin-top: 1rem;
+				font-size: 0.85rem;
+				line-height: 1.45;
+			}
+			summary {
+				cursor: pointer;
+				font-weight: 700;
+			}
+			code {
+				font-family: ui-monospace, monospace;
+				color: #9be86a;
+			}
 		</style>
-		<script type="module" src="/src/jukebox.js"></script>
+		<script type="module" src="/src/jukebox/page.js"></script>
 	</head>
 	<body>
-		<nav id="scores"></nav>
+		<aside>
+			<nav id="scores"></nav>
+			<details>
+				<summary>Anleitung</summary>
+				<p>
+					Das Format ist Simon Willisons
+					<a href="https://tools.simonwillison.net/scrimshaw-jukebox">Scrimshaw</a>; seine Anleitung erklärt Stimmen, Patterns und
+					Schlagzeugspuren. Dazu kommt bei uns:
+				</p>
+				<p>
+					<code>q</code> ist ein halbes b, einen Viertelton tiefer: <code>Eq4</code> ist das E der Maqamat Rast und Bayati,
+					<code>Bq3</code> das B von Rast. Glissandi mit <code>~</code> gleiten auch in Vierteltöne.
+				</p>
+				<p>
+					<code>street Sonnenallee</code> im Kopf macht das Lied zum Lied der Straße: Spätis, Bars, Fenster und Autos dort spielen meistens
+					eins ihrer Lieder.
+				</p>
+				<p>
+					Instrumente: <code>oud</code>, <code>qanun</code>, <code>ney</code>, <code>808</code>; Trommeln <code>dum</code> und
+					<code>tek</code> für die Darbuka, <code>riq</code> für das Tamburin.
+				</p>
+			</details>
+		</aside>
 		<div class="bar">
 			<button id="play">Abspielen</button>
 			<label>
