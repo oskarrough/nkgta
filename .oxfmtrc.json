@@ -1,6 +1,6 @@
 {
 	"$schema": "./node_modules/oxfmt/configuration_schema.json",
-	"ignorePatterns": ["public/map.json", "public/terrain.json", "src/scrimshaw/*.js"],
+	"ignorePatterns": ["public/map.json", "public/terrain.json"],
 	"semi": false,
 	"singleQuote": true,
 	"useTabs": true,

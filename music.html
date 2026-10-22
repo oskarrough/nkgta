@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>NK GTA · Musik</title>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				background: #222;
+				color: #eee;
+				font-family: system-ui, sans-serif;
+			}
+			body {
+				display: grid;
+				grid-template-columns: 16rem 1fr;
+				grid-template-rows: auto 1fr auto;
+				gap: 0.75rem;
+				padding: 0.75rem;
+				box-sizing: border-box;
+			}
+			#scores {
+				grid-row: 1 / 4;
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+				overflow: auto;
+			}
+			#scores button {
+				text-align: left;
+				background: #333;
+				color: inherit;
+				font-weight: 400;
+			}
+			#scores button.on {
+				background: #9be86a;
+				color: #111;
+			}
+			#scores small {
+				display: block;
+				opacity: 0.7;
+			}
+			.bar {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.75rem;
+				align-items: center;
+			}
+			button,
+			select {
+				font: inherit;
+				font-weight: 700;
+				padding: 0.4rem 0.9rem;
+				border: 0;
+				border-radius: 0.3rem;
+				cursor: pointer;
+			}
+			#play {
+				background: #9be86a;
+			}
+			#score {
+				width: 100%;
+				height: 100%;
+				box-sizing: border-box;
+				resize: none;
+				background: #111;
+				color: #eee;
+				border: 1px solid #444;
+				border-radius: 0.3rem;
+				padding: 0.6rem;
+				font:
+					13px/1.45 ui-monospace,
+					monospace;
+				tab-size: 4;
+				white-space: pre;
+			}
+			#errors {
+				margin: 0;
+				min-height: 1.4em;
+				color: #ff8a7a;
+				font:
+					13px ui-monospace,
+					monospace;
+				white-space: pre-wrap;
+			}
+			#errors:empty::before {
+				content: attr(data-ok);
+				color: #9be86a;
+			}
+			a {
+				color: #9be86a;
+			}
+		</style>
+		<script type="module" src="/src/jukebox.js"></script>
+	</head>
+	<body>
+		<nav id="scores"></nav>
+		<div class="bar">
+			<button id="play">Abspielen</button>
+			<label>
+				als
+				<select id="kind">
+					<option value="radio">Späti-Radio</option>
+					<option value="bar">Bartür</option>
+					<option value="window">offenes Fenster</option>
+					<option value="car">vorbeifahrendes Auto</option>
+					<option value="own">eigenes Autoradio</option>
+				</select>
+			</label>
+			<label>Entfernung <input id="distance" type="range" min="0" max="18" step="0.5" value="4" /> <output id="metres"></output></label>
+			<label><input id="inCar" type="checkbox" /> im Auto</label>
+			<span id="where"></span>
+			<a href="/">zum Spiel</a>
+		</div>
+		<textarea id="score" spellcheck="false"></textarea>
+		<pre id="errors" data-ok="Spielbar."></pre>
+	</body>
+</html>
