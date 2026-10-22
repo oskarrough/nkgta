@@ -2,6 +2,7 @@
 // at any distance, through the same synth and muffling as the street. The address bar
 // always links to what's playing: ?song=sonnenallee&kind=bar&d=6.
 import { compile } from './score.js'
+import { drawRoll, voiceColors } from './roll.js'
 import { AHEAD, SCORES, begin, end, feed, shape, synthFor, tune } from '../music.js'
 
 // What "Neuer Song" opens: short, and it plays as it is.
@@ -44,6 +45,9 @@ let since = 0
 // Where the next Abspielen starts, in seconds into the song.
 let from = 0
 let seeking = false
+// Voices switched off, per song, by name.
+const muted = new Map()
+const mutedIn = (n) => muted.get(n) ?? muted.set(n, new Set()).get(n)
 
 async function text(n) {
 	if (!texts.has(n)) {
@@ -94,6 +98,7 @@ function edited() {
 	if (song.errors.length) return
 	songs.set(name, song)
 	listScores()
+	listVoices(song)
 	$('pos').max = length(song)
 	$('loopStart').value = song.intro.dur
 	if (playing) start(song)
@@ -121,6 +126,44 @@ function showPosition(at) {
 function start(song) {
 	if (playing) end(playing, context)
 	playing = begin(synth, context, { kind: kind().kind, since }, song)
+	hush(playing)
+}
+
+// Turns the muted voices of what's playing down and the others back up.
+function hush(p) {
+	const off = mutedIn(name)
+	for (const c of p.session.ch) c.input.gain.setTargetAtTime(off.has(c.v.name) ? 0 : c.v.vol * c.def.level, context.currentTime, 0.02)
+}
+
+// A button per voice in its colour, to switch it off and on while it plays.
+function listVoices(song) {
+	const off = mutedIn(name)
+	const colors = voiceColors(song)
+	$('voices').replaceChildren(
+		...song.voices.map((v, i) => {
+			const button = document.createElement('button')
+			const dot = document.createElement('i')
+			const inst = document.createElement('small')
+			dot.style.background = colors[i]
+			inst.textContent = v.inst
+			button.append(dot, v.name, inst)
+			button.setAttribute('aria-pressed', String(!off.has(v.name)))
+			button.title = off.has(v.name) ? `${v.name} an` : `${v.name} aus`
+			button.onclick = () => {
+				if (off.has(v.name)) off.delete(v.name)
+				else off.add(v.name)
+				if (playing) hush(playing)
+				listVoices(song)
+			}
+			return button
+		}),
+	)
+}
+
+function draw() {
+	requestAnimationFrame(draw)
+	const song = playing?.song ?? songs.get(name)
+	if (song) drawRoll($('roll'), song, playing ? context.currentTime - playing.start : from, mutedIn(name))
 }
 
 function play() {
@@ -218,3 +261,4 @@ for (const n of SCORES)
 	})
 pick(wanted ?? name).then(() => wanted && play())
 setInterval(tick, 50)
+requestAnimationFrame(draw)

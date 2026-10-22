@@ -16,13 +16,13 @@
 			body {
 				display: grid;
 				grid-template-columns: 16rem 1fr;
-				grid-template-rows: auto auto auto 1fr auto;
+				grid-template-rows: auto auto auto auto auto 1fr auto;
 				gap: 0.75rem;
 				padding: 0.75rem;
 				box-sizing: border-box;
 			}
 			aside {
-				grid-row: 1 / 6;
+				grid-row: 1 / 8;
 				overflow: auto;
 			}
 			#scores {
@@ -101,8 +101,42 @@
 				background: #9be86a;
 				box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.6);
 			}
+			#roll {
+				display: block;
+				width: 100%;
+				height: 220px;
+				border-radius: 0.3rem;
+			}
+			#voices {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.4rem;
+			}
+			#voices button {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				padding: 0.25rem 0.6rem;
+				background: #333;
+				color: inherit;
+				font:
+					12px ui-monospace,
+					monospace;
+			}
+			#voices i {
+				width: 0.65rem;
+				height: 0.65rem;
+			}
+			#voices small {
+				opacity: 0.6;
+			}
+			#voices button[aria-pressed='false'] {
+				opacity: 0.45;
+				text-decoration: line-through;
+			}
 			#score {
 				width: 100%;
+				min-height: 12rem;
 				height: 100%;
 				box-sizing: border-box;
 				resize: none;
@@ -207,6 +241,8 @@
 			<label><input id="inCar" type="checkbox" /> im Auto</label>
 			<span id="where"></span>
 		</div>
+		<canvas id="roll" aria-label="Die Noten, wie sie gerade spielen"></canvas>
+		<div id="voices" aria-label="Stimmen: klicken schaltet sie aus und an"></div>
 		<textarea id="score" spellcheck="false"></textarea>
 		<pre id="errors" data-ok="Spielbar."></pre>
 		<button id="unblock" hidden>▶ Abspielen</button>
