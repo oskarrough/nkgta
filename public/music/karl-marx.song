@@ -1,0 +1,58 @@
+title    Karl-Marx-Str.
+about    Lebanese dabke for the grill houses. An oud gallop in maqam Bayati, a mijwiz chattering on three notes, the qanun an octave up for the chorus, tabl stomping underneath.
+tempo    124
+beats    4
+steps    4
+reverb   0.25
+
+# Bayati on D: D Eq F G A Bb C. The riff moves D, G, C, D, two bars each.
+voice mijwiz oboe      vol=0.6  pan=-0.1
+voice qanun  qanun     vol=0.7  pan=0.2 oct=1
+voice oud    oud       vol=0.8  pan=0.15
+voice org    accordion vol=0.3  pan=-0.3 gate=0.5
+voice bass   fretless  vol=0.75
+voice dum    dum       vol=0.9
+voice tek    tek       vol=0.5  pan=-0.2
+voice riq    riq       vol=0.3  pan=0.3
+voice clap   clap      vol=0.45 pan=-0.25
+
+pattern base
+oud   | D3- D3 A2 D3- Eq3 D3 F3- Eq3 D3 C3- A2- | D3- D3 A2 D3- Eq3 D3 F3- G3 F3 Eq3- C3- | G2- G2 D2 G2- A2 G2 Bb2- A2 G2 F2- D2- | G2- G2 D2 G2- A2 G2 Bb2- C3 Bb2 A2- F2- |
+oud   | C3- C3 G2 C3- D3 C3 Eq3- D3 C3 Bb2- G2- | C3- C3 G2 C3- D3 C3 Eq3- F3 Eq3 D3- C3- | D3- D3 A2 D3- Eq3 D3 F3- Eq3 D3 C3- A2- | D3- D3 A2 D3- Eq3 F3 Eq3- D3 C3 D3--- |
+org   | .. D4+A4- .. D4+A4- .. D4+A4- .. D4+A4- | % | .. G3+D4- .. G3+D4- .. G3+D4- .. G3+D4- | % | .. C4+G4- .. C4+G4- .. C4+G4- .. C4+G4- | % | .. D4+A4- .. D4+A4- .. D4+A4- .. D4+A4- | % |
+bass  | D2-- D2 . D2 D2- D2-- D2 . D2 D2- | % | G1-- G1 . G1 G1- G1-- G1 . G1 G1- | % |
+bass  | C2-- C2 . C2 C2- C2-- C2 . C2 C2- | % | D2-- D2 . D2 D2- D2-- D2 . D2 D2- | % |
+dum   | X... x... X... x... | % | % | % | % | % | % | X... x... X.x. X... |
+tek   | ...x ..x. ...x ..x. | % | % | % | % | % | % | ...x ..x. ...x xxxx |
+riq   | x.xx x.xx x.xx x.xx | % | % | % | % | % | % | % |
+
+# The oud alone; the mijwiz picks up on the last bar.
+pattern intro from base
+mute org bass dum tek riq
+mijwiz | _ | _ | _ | _ |
+mijwiz | _ | _ | _ | ........ .. D4- Eq4- F4- |
+
+pattern A from base
+mijwiz | G4--- F4- Eq4- F4- F4- F4- Eq4- | D4--- .. Eq4 F4 .. .. D4- Eq4- | F4- F4- F4- Eq4- F4- G4- F4- Eq4- | D4--- Eq4----- .. D4- F4- |
+mijwiz | G4- G4- G4- A4- G4--- F4- Eq4- | F4 G4 .. C4--- .... D4- Eq4- | F4--- Eq4- D4- Eq4- F4- A4- F4- | Eq4 F4 D4------- ...... |
+
+pattern A2 from A
+mijwiz | G4--- F4- Eq4- F4- F4- F4- Eq4- | D4--- .. Eq4 F4 .. .. D4- Eq4- | F4- F4- F4- Eq4- F4- G4- F4- Eq4- | D4--- Eq4----- .. D4- F4- |
+mijwiz | G4- G4- G4- A4- Bb4--- A4- G4- | A4 Bb4 .. A4--- .... G4- A4- | Bb4--- A4- G4- F4- G4- A4- G4- | F4 Eq4 D4------- ...... |
+
+# Up the octave on the qanun, everyone clapping on the stomps.
+pattern B from base
+mijwiz | _ | _ | _ | _ | _ | _ | _ | _ |
+qanun  | A4 A4 A4 A4 A4- G4- A4- Bb4- A4- G4- | F4 G4 .. A4--- .... G4- F4- | G4 G4 G4 G4 G4- F4- G4- A4- G4- F4- | Eq4 F4 .. G4--- .... F4- Eq4- |
+qanun  | F4 F4 F4 F4 F4- Eq4- F4- G4- F4- Eq4- | D4 Eq4 .. C4--- .... D4- Eq4- | F4- G4- A4- G4- F4- Eq4- F4- G4- | Eq4 F4 D4----------- .. |
+clap   | .... x... .... x... | % | % | % | % | % | % | .... x... x.x. x... |
+
+pattern B2 from B
+qanun  | A4 A4 A4 A4 A4- G4- A4- Bb4- A4- G4- | F4 G4 .. A4--- .... G4- F4- | G4 G4 G4 G4 G4- F4- G4- A4- G4- F4- | Eq4 F4 .. G4--- .... F4- Eq4- |
+qanun  | F4 F4 F4 F4 F4- Eq4- F4- G4- F4- Eq4- | D4 Eq4 .. C4--- .... D4- Eq4- | F4- G4- A4- G4- F4- Eq4- F4- G4- | Eq4 F4 D4------- .. D4- F4- |
+
+# The mijwiz on its own over the drum.
+pattern D from A
+mute oud org bass tek riq
+
+loop intro A A2 B B2 A2 D

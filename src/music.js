@@ -20,6 +20,8 @@ export const SCORES = [
 	'ringbahn',
 	'konvoi',
 	'richardstr',
+	'weichselplatz',
+	'karl-marx',
 	'tempelhof',
 	'luftbruecke',
 ]
