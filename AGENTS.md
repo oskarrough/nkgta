@@ -16,6 +16,8 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 - Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers, run `chromium-browser --headless=new --enable-gpu --ignore-gpu-blocklist --use-angle=gl --remote-debugging-port=<port> --user-data-dir=/tmp/<name> about:blank &` and `agent-browser connect <port>`; the GPU string should say Radeon. `?perf` has the timings.
 - After adding a dependency, restart the dev server, or Vite keeps serving stale optimized deps and the page hangs on "Lade Karte…".
 
+PLEASE, do not verify and visually screenshot everything single thing.
+
 ## Map data
 
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.
