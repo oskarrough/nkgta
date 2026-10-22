@@ -133,6 +133,7 @@ export function createPedestrians(world, junctions) {
 					pause: 0,
 					kerb: !!track.edge,
 					spot: (Math.random() - 0.5) * 0.7,
+					seed: Math.random(), // what they look like
 				}),
 			)
 			return

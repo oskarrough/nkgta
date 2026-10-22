@@ -26,6 +26,8 @@ void main() {
 // Ink at render resolution: one texel per pixel, so every decision is per
 // pixel. Silhouettes go to the ink colour, inner edges to a darker shade of
 // the pixel's own colour; the palette snap happens later, in the upscale.
+// People (see inkOutside) are inked round their outside instead, so a figure
+// a few pixels wide keeps its colours: their normals come with alpha 0.
 const inkShader = `
 uniform sampler2D tColor;
 uniform sampler2D tDepth;
@@ -42,13 +44,27 @@ float depthAt(vec2 uv) {
 	return (2.0 * camNear * camFar) / (camFar + camNear - d * (camFar - camNear));
 }
 
-vec3 normalAt(vec2 uv) {
-	return texture2D(tNormal, uv).xyz * 2.0 - 1.0;
+bool personAt(vec2 uv) {
+	return texture2D(tNormal, uv).a < 0.5;
+}
+
+// A person at uv, in front of depth z.
+bool personBefore(vec2 uv, float z) {
+	return personAt(uv) && depthAt(uv) < z;
+}
+
+// How far two surfaces turn from each other; on a person, only against
+// another bit of person.
+float turnTo(vec4 a, vec4 b) {
+	if (a.a < 0.5 && b.a > 0.5) return 0.0;
+	return 1.0 - dot(a.xyz * 2.0 - 1.0, b.xyz * 2.0 - 1.0);
 }
 
 void main() {
 	vec2 px = 1.0 / res;
 	vec3 color = texture2D(tColor, vUv).rgb;
+	vec4 n = texture2D(tNormal, vUv);
+	bool person = n.a < 0.5;
 
 	// Silhouettes: a second difference in depth, so level ground stays quiet.
 	// Only the near side of a jump is inked; reach sets how many pixels wide.
@@ -57,16 +73,38 @@ void main() {
 	float jx = (depthAt(vUv - vec2(ox.x, 0.0)) + depthAt(vUv + vec2(ox.x, 0.0)) - 2.0 * z) / z;
 	float jy = (depthAt(vUv - vec2(0.0, ox.y)) + depthAt(vUv + vec2(0.0, ox.y)) - 2.0 * z) / z;
 
-	// Inner edges: a crease to the right or below marks this pixel.
-	vec3 n = normalAt(vUv);
-	float turn = max(1.0 - dot(n, normalAt(vUv + vec2(px.x, 0.0))), 1.0 - dot(n, normalAt(vUv + vec2(0.0, px.y))));
+	// Round a person, the far side is inked, as far as reach.
+	bool beside = !person && (
+		personBefore(vUv - vec2(px.x, 0.0), z) || personBefore(vUv + vec2(px.x, 0.0), z) ||
+		personBefore(vUv - vec2(0.0, px.y), z) || personBefore(vUv + vec2(0.0, px.y), z) ||
+		personBefore(vUv - vec2(ox.x, 0.0), z) || personBefore(vUv + vec2(ox.x, 0.0), z) ||
+		personBefore(vUv - vec2(0.0, ox.y), z) || personBefore(vUv + vec2(0.0, ox.y), z));
 
-	if (max(jx, jy) > ${DEPTH_EDGE.toFixed(3)}) color = ink;
+	// Inner edges: a crease to the right or below marks this pixel.
+	float turn = max(turnTo(n, texture2D(tNormal, vUv + vec2(px.x, 0.0))), turnTo(n, texture2D(tNormal, vUv + vec2(0.0, px.y))));
+
+	if (beside || (!person && max(jx, jy) > ${DEPTH_EDGE.toFixed(3)})) color = ink;
 	else if (turn > ${TURN_EDGE.toFixed(2)}) color *= ${INNER_SHADE.toFixed(2)};
 
 	gl_FragColor = vec4(color, 1.0);
 }
 `
+
+// Ink a material's meshes round the outside, for people: in the normal pass
+// it draws its own normals, marked, instead of giving way to the pass's
+// material.
+const normalPass = { value: 0 }
+export function inkOutside(material) {
+	material.allowOverride = false
+	material.onBeforeCompile = (shader) => {
+		shader.uniforms.inkNormals = normalPass
+		shader.fragmentShader = `uniform float inkNormals;\n${shader.fragmentShader}`.replace(
+			/}\s*$/,
+			'\tif (inkNormals > 0.5) gl_FragColor = vec4(normalize(normal) * 0.5 + 0.5, 0.0);\n}',
+		)
+	}
+	return material
+}
 
 // Blow the frame up by whole pixels, and snap to the palette if it's on.
 const blitShader = `
@@ -236,8 +274,10 @@ export function createInk(renderer, hidden = [], decor = []) {
 		ink.quad.material.uniforms.camFar.value = camera.far
 		scene.overrideMaterial = normalMaterial
 		for (const object of hidden) object.visible = false
+		normalPass.value = 1
 		renderer.setRenderTarget(normals)
 		renderer.render(scene, camera)
+		normalPass.value = 0
 		for (const object of hidden) object.visible = true
 		scene.overrideMaterial = null
 

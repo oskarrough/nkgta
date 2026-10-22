@@ -1,5 +1,6 @@
 // The flat layer over the 3D city, once per frame: Pfand, places, stops,
-// traffic lights, street names, the player and anyone fleeing their car.
+// traffic lights and street names. People and the bike are in 3D, see
+// actors.js.
 import { SOLID } from './tiles.js'
 import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 import { DEPTH as AWNING_DEPTH } from './signs.js'
@@ -46,7 +47,7 @@ export function createRenderer(canvas, world, shops = []) {
 
 	// `inside` a shop, only the player: the map's places, stops, names, walls
 	// and the parked bike are all out on the street.
-	return function draw({ cam, player, peds, lights, bottles, showStreetNames, showTransit, showWalls, inside }) {
+	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
@@ -131,12 +132,6 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.setTransform(1, 0, 0, 1, 0, 0)
 		}
 
-		if (player.onBike) drawBike(...toScreen(player.x, player.y), player.dir)
-		else if (!inside) drawBike(...toScreen(player.bike.x, player.bike.y), 0)
-		for (const p of peds) drawPerson(...toScreen(p.x, p.y), p.dir, '#5b8fd6')
-		if (player.down) drawDown(...toScreen(player.x, player.y), player.dir)
-		else if (!player.car) drawPerson(...toScreen(player.x, player.y), player.dir, '#f2d24b')
-
 		// K: a circle on foot, the car's box in one, over the player.
 		if (showWalls) {
 			ctx.strokeStyle = '#fff'
@@ -151,55 +146,6 @@ export function createRenderer(canvas, world, shops = []) {
 			} else ctx.arc(0, 0, RADIUS * scale, 0, Math.PI * 2)
 			ctx.stroke()
 			ctx.restore()
-		}
-
-		function drawBike(sx, sy, dir) {
-			ctx.save()
-			ctx.translate(sx, sy)
-			ctx.rotate(dir)
-			ctx.fillStyle = '#d23c3c'
-			ctx.fillRect(-scale * 0.6, -scale * 0.12, scale * 1.2, scale * 0.24)
-			ctx.fillStyle = '#111'
-			ctx.fillRect(-scale * 0.7, -scale * 0.08, scale * 0.25, scale * 0.16)
-			ctx.fillRect(scale * 0.45, -scale * 0.08, scale * 0.25, scale * 0.16)
-			ctx.restore()
-		}
-
-		// Flat on the tarmac, arms out.
-		function drawDown(sx, sy, dir) {
-			ctx.save()
-			ctx.translate(sx, sy)
-			ctx.rotate(dir)
-			ctx.fillStyle = '#7a1414'
-			ctx.beginPath()
-			ctx.ellipse(0, 0, scale * 0.75, scale * 0.6, 0, 0, Math.PI * 2)
-			ctx.globalAlpha = 0.5
-			ctx.fill()
-			ctx.globalAlpha = 1
-			ctx.fillStyle = '#f2d24b'
-			ctx.strokeStyle = '#222'
-			ctx.lineWidth = scale * 0.08
-			ctx.fillRect(-scale * 0.45, -scale * 0.1, scale * 0.9, scale * 0.2)
-			ctx.fillRect(-scale * 0.1, -scale * 0.45, scale * 0.2, scale * 0.9)
-			ctx.beginPath()
-			ctx.arc(scale * 0.5, 0, scale * 0.16, 0, Math.PI * 2)
-			ctx.fill()
-			ctx.stroke()
-			ctx.restore()
-		}
-
-		function drawPerson(sx, sy, dir, shirt) {
-			ctx.fillStyle = shirt
-			ctx.strokeStyle = '#222'
-			ctx.lineWidth = scale * 0.08
-			ctx.beginPath()
-			ctx.arc(sx, sy, scale * 0.38, 0, Math.PI * 2)
-			ctx.fill()
-			ctx.stroke()
-			ctx.fillStyle = '#222'
-			ctx.beginPath()
-			ctx.arc(sx + Math.cos(dir) * scale * 0.2, sy + Math.sin(dir) * scale * 0.2, scale * 0.08, 0, Math.PI * 2)
-			ctx.fill()
 		}
 	}
 }
