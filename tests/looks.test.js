@@ -37,7 +37,14 @@ describe('looks', () => {
 	})
 
 	test('only pixel art draws coarse pixels', () => {
-		for (const [name, look] of Object.entries(LOOKS)) expect(upscaleOf(look, 120)).toBe(name === 'pixel' ? 12 : 1)
+		for (const [name, look] of Object.entries(LOOKS)) expect(upscaleOf(look, 120, 1)).toBe(name === 'pixel' ? 12 : 1)
+	})
+
+	test('on HiDPI screens the smooth looks draw one pixel per CSS pixel', () => {
+		expect(upscaleOf(LOOKS.default, 48, 2)).toBe(2)
+		expect(upscaleOf(LOOKS.raw, 72, 3)).toBe(3)
+		expect(upscaleOf(LOOKS.default, 36, 1.5)).toBe(1)
+		expect(upscaleOf(LOOKS.pixel, 120, 2)).toBe(12)
 	})
 
 	test('default draws the city as painted, then normals, ink and the composite', () => {

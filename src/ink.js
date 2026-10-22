@@ -184,7 +184,7 @@ export function createInk(renderer, hidden = [], decor = []) {
 		frame: { width: 1, height: 1 },
 		setLook(next) {
 			look = next
-			ink.quad.material.uniforms.reach.value = look.outline
+			inkReach()
 			blit.quad.material.uniforms.paletteOn.value = look.palette ? 1 : 0
 			// Cast shadows would read as holes in the plain look.
 			renderer.shadowMap.enabled = !look.plain
@@ -202,6 +202,7 @@ export function createInk(renderer, hidden = [], decor = []) {
 			blit.quad.scale.set(this.frame.width / width, this.frame.height / height, 1)
 			blit.quad.position.set(blit.quad.scale.x - 1, 1 - blit.quad.scale.y, 0)
 			size = { upscale, overflow: h * upscale - height }
+			inkReach()
 		},
 		// Into `target` instead of the screen, for a view through the portal.
 		// A scissored target only gets its patch drawn, in every pass.
@@ -222,6 +223,12 @@ export function createInk(renderer, hidden = [], decor = []) {
 			renderer.setRenderTarget(target)
 			renderer.render(blit.scene, screenCamera)
 		},
+	}
+
+	// Off the grid the outline is in device pixels, so it keeps its width
+	// however coarse the passes are drawn.
+	function inkReach() {
+		ink.quad.material.uniforms.reach.value = look.grid ? look.outline : Math.max(1, Math.round(look.outline / size.upscale))
 	}
 
 	function inkPass(scene, camera) {

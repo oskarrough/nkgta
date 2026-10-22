@@ -1,7 +1,8 @@
 // The looks P cycles through, and every choice that makes them differ. All
 // three draw the same city; a look only says how it's finished.
 //
-// outline: ink silhouette width in game pixels, with creases shaded darker.
+// outline: ink silhouette width in game pixels (device pixels off the grid),
+//   with creases shaded darker.
 // palette: snap every pixel to the fixed palette in palette.js.
 // grid: draw at one game pixel per PX_PER_TILE tiles, blown up by whole
 //   device pixels, with crisp textures, zoom in steps and the camera on
@@ -30,5 +31,8 @@ export const nextLook = (name) => {
 export const PX_PER_TILE = 10
 export const gameUpscale = (scale) => Math.max(1, Math.round(scale / PX_PER_TILE))
 
-// Device pixels per drawn pixel at `scale` device pixels per tile.
-export const upscaleOf = (look, scale) => (look.grid ? gameUpscale(scale) : 1)
+// Device pixels per drawn pixel at `scale` device pixels per tile. The other
+// looks draw one pixel per CSS pixel, so a HiDPI screen doesn't pay four times
+// over for a frame that looks the same.
+export const upscaleOf = (look, scale, dpr = globalThis.devicePixelRatio ?? 1) =>
+	look.grid ? gameUpscale(scale) : Math.max(1, Math.floor(dpr))
