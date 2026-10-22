@@ -3,8 +3,9 @@
 // are each tyre's resistance per second, drag is air resistance growing with
 // the square of speed and sets the top speed. Mass only matters in crashes.
 //
-// `look` is the car from above in boxes: [length, width, height, x, z] as
-// fractions of the car's length and width, with heights in tiles. Paint is
+// `look` is the car from above in boxes: [length, width, height, x, z, y] as
+// fractions of the car's length and width, with heights in tiles; y, to the
+// side, is optional. Paint is
 // the car's colour, glass is dark, tyres stick out a little past the body.
 // The front is +x. Brake lights, headlights and the rim are added for you.
 //
@@ -19,8 +20,8 @@ export const MODELS = {
 		noun: 'Auto',
 		pace: 1, // how fast its drivers like to go
 		driver: { a: 0.8, b: 1.1, T: 1.2, s0: 0.6 },
-		length: 1.5,
-		width: 0.66,
+		length: 1.3,
+		width: 0.64,
 		mass: 1,
 		engine: 5,
 		brake: 6,
@@ -31,11 +32,12 @@ export const MODELS = {
 		steerFade: 0.15,
 		colors: ['#b8bcc2', '#1d1f22', '#e8e8e4', '#6b6f75', '#23365c', '#a3231f', '#2f4a3a', '#ede6c8'],
 		look: [
-			['paint', 1, 0.9, 0.22, 0, 0.07],
-			['tyre', 0.2, 1.12, 0.15, 0.3, 0],
-			['tyre', 0.2, 1.12, 0.15, -0.3, 0],
-			['glass', 0.62, 0.84, 0.15, -0.04, 0.29],
-			['paint', 0.3, 0.8, 0.03, -0.08, 0.44],
+			// Short and tall, the roof running right to the hatch.
+			['paint', 1, 0.92, 0.25, 0, 0.07],
+			['tyre', 0.2, 1.1, 0.16, 0.31, 0],
+			['tyre', 0.2, 1.1, 0.16, -0.31, 0],
+			['glass', 0.66, 0.88, 0.22, -0.15, 0.32],
+			['paint', 0.5, 0.9, 0.03, -0.22, 0.54],
 		],
 	},
 	suv: {
@@ -43,8 +45,8 @@ export const MODELS = {
 		noun: 'Auto',
 		pace: 1.15,
 		driver: { a: 0.8, b: 1.1, T: 1, s0: 0.6 },
-		length: 1.65,
-		width: 0.74,
+		length: 1.75,
+		width: 0.8,
 		mass: 1.7,
 		engine: 5.5,
 		brake: 5,
@@ -55,11 +57,14 @@ export const MODELS = {
 		steerFade: 0.2,
 		colors: ['#111214', '#111214', '#e9e9e6', '#4a4e54'],
 		look: [
-			['paint', 1, 0.9, 0.32, 0, 0.09],
-			['tyre', 0.2, 1.12, 0.2, 0.3, 0],
-			['tyre', 0.2, 1.12, 0.2, -0.3, 0],
-			['glass', 0.68, 0.86, 0.19, -0.06, 0.41],
-			['paint', 0.46, 0.82, 0.03, -0.1, 0.6],
+			// A tall square box on big wheels, flat roof with rails.
+			['paint', 1, 0.94, 0.36, 0, 0.11],
+			['tyre', 0.2, 1.1, 0.25, 0.31, 0],
+			['tyre', 0.2, 1.1, 0.25, -0.31, 0],
+			['glass', 0.68, 0.92, 0.22, -0.13, 0.47],
+			['paint', 0.6, 0.93, 0.03, -0.16, 0.69],
+			['roofbox', 0.56, 0.06, 0.05, -0.16, 0.72, 0.4],
+			['roofbox', 0.56, 0.06, 0.05, -0.16, 0.72, -0.4],
 		],
 	},
 	lambo: {
@@ -67,8 +72,8 @@ export const MODELS = {
 		noun: 'Lambo',
 		pace: 1.4,
 		driver: { a: 1.3, b: 1.4, T: 0.8, s0: 0.5 },
-		length: 1.5,
-		width: 0.7,
+		length: 1.65,
+		width: 0.8,
 		mass: 0.9,
 		engine: 9,
 		brake: 8,
@@ -79,12 +84,20 @@ export const MODELS = {
 		steerFade: 0.12,
 		colors: ['#9be22d', '#ff7a00', '#ffd400', '#1a1a1a', '#8a1fd1'],
 		look: [
-			['paint', 1, 0.92, 0.16, 0, 0.05],
-			['tyre', 0.2, 1.12, 0.13, 0.32, 0],
-			['tyre', 0.22, 1.12, 0.15, -0.3, 0],
-			['glass', 0.42, 0.78, 0.1, -0.04, 0.21],
-			['paint', 0.16, 0.66, 0.02, -0.1, 0.31],
-			['paint', 0.06, 0.95, 0.03, -0.47, 0.3], // spoiler
+			// Flat and wide: a long low nose rising to a small cabin and
+			// broad haunches, the wing up on struts behind.
+			['paint', 1, 0.9, 0.08, 0, 0.04],
+			['tyre', 0.2, 1.08, 0.12, 0.32, 0],
+			['tyre', 0.26, 1.14, 0.15, -0.3, 0],
+			['paint', 0.55, 1, 0.08, -0.22, 0.12], // haunches
+			['paint', 0.4, 0.8, 0.03, 0.29, 0.12], // bonnet
+			['glass', 0.12, 0.62, 0.04, 0.12, 0.15], // windscreen
+			['glass', 0.3, 0.6, 0.08, -0.05, 0.2],
+			['paint', 0.18, 0.56, 0.02, -0.08, 0.28],
+			['glass', 0.2, 0.5, 0.01, -0.32, 0.2], // engine cover
+			['glass', 0.03, 0.05, 0.1, -0.46, 0.2, 0.3],
+			['glass', 0.03, 0.05, 0.1, -0.46, 0.2, -0.3],
+			['glass', 0.08, 1, 0.025, -0.46, 0.3], // wing
 		],
 	},
 	bus: {

@@ -393,7 +393,7 @@ const CAR_HEADLIGHT = '#fff3c8'
 // dark rim this much wider than the body, in tiles. Tyres poke out past it.
 const CAR_RIM = { color: '#1a1e1b', width: 0.045 }
 function carMeshes(gradient, world) {
-	const box = (l, w, h, x, z) => new THREE.BoxGeometry(l, w, h).translate(x, 0, z + h / 2)
+	const box = (l, w, h, x, z, y = 0) => new THREE.BoxGeometry(l, w, h).translate(x, y, z + h / 2)
 	// Away from the sun, in scene units, and a flat quad to cast it.
 	const away = new THREE.Vector2(-SUN.direction[0], -SUN.direction[1]).normalize().multiplyScalar(CAR_SHADOW.offset)
 	const shadowMaterial = new THREE.MeshBasicMaterial({
@@ -405,7 +405,7 @@ function carMeshes(gradient, world) {
 	const kinds = Object.values(MODELS).map((m) => {
 		const boxes = new Map()
 		const add = (kind, geo) => boxes.set(kind, [...(boxes.get(kind) ?? []), geo])
-		for (const [kind, l, w, h, x, z] of m.look) add(kind, box(l * m.length, w * m.width, h, x * m.length, z))
+		for (const [kind, l, w, h, x, z, y = 0] of m.look) add(kind, box(l * m.length, w * m.width, h, x * m.length, z, y * m.width))
 		const [, , , h, , z] = m.look[0]
 		const lamp = (x, s) => box(0.04, 0.12, 0.06, x, z + h * 0.55).translate(0, (s * m.width) / 3, 0)
 		for (const s of [-1, 1]) {
