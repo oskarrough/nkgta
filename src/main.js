@@ -52,6 +52,21 @@ let showStreetNames = true
 let showTransit = true
 let showWalls = false
 
+const muteButton = document.getElementById('mute')
+function showMute(muted) {
+	muteButton.textContent = muted ? '🔇' : '🔊'
+	muteButton.ariaLabel = muteButton.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
+}
+function toggleMute() {
+	const muted = sound.toggleMute()
+	showMute(muted)
+	hud.say(muted ? 'Leise: Ton aus' : 'Ton an')
+}
+showMute(sound.isMuted())
+muteButton.addEventListener('click', () => {
+	toggleMute()
+	muteButton.blur()
+})
 const overheadHelp = document.getElementById('help').textContent
 const input = createInput({
 	cameraActive: camera.active,
@@ -63,7 +78,7 @@ const input = createInput({
 		hud.say(third ? 'Verfolgerkamera · Rechte Maustaste halten und ziehen' : 'Vogelperspektive')
 	},
 	use,
-	toggleMute: () => hud.say(sound.toggleMute() ? 'Leise: Ton aus' : 'Ton an'),
+	toggleMute,
 	zoom: camera.zoomBy,
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),

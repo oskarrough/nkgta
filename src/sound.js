@@ -340,6 +340,7 @@ export const sound = {
 		cue('glass', 0.09, 1.1 + Math.random() * 0.15)
 	},
 	till: () => cue('till', 0.13),
+	isMuted: () => muted,
 	toggleMute() {
 		muted = !muted
 		if (master) {

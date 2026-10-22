@@ -65,6 +65,21 @@
 				background: var(--bottle) center / contain no-repeat;
 				vertical-align: -0.15em;
 			}
+			#mute {
+				position: fixed;
+				top: calc(6rem + env(safe-area-inset-top));
+				right: calc(1.25rem + env(safe-area-inset-right));
+				z-index: 11;
+				width: 2.6rem;
+				height: 2.6rem;
+				padding: 0;
+				border: 2px solid rgba(255, 255, 255, 0.4);
+				border-radius: 50%;
+				background: rgba(0, 0, 0, 0.35);
+				color: #fff;
+				font-size: 1.2rem;
+				cursor: pointer;
+			}
 			#place {
 				bottom: calc(2.5rem + env(safe-area-inset-bottom));
 				left: 0;
@@ -229,6 +244,7 @@
 		<div class="hud" id="bag"></div>
 		<div class="hud" id="place"></div>
 		<div class="hud" id="wasted"></div>
+		<button id="mute" type="button" aria-label="Ton aus" title="Ton aus (L)">🔊</button>
 		<div class="hud" id="help">
 			V: Kamera · WASD: laufen, fahren · E: Rad, Auto klauen, aussteigen, Laden · Leertaste: Turbo, Handbremse · +/−: Zoom · N: Straßen · T:
 			Haltestellen · K: Wände · P: Look · L: Leise · M: Gegend · Pfand zum Späti
