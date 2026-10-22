@@ -23,6 +23,39 @@ void main() {
 }
 `
 
+// The ink needs each pixel's normal beside its colour, so the colour pass
+// writes both, into two textures at once. Every material gets the second
+// output through three's shader chunks: lit ones write their normal, unlit
+// built-ins the normal of the face, worked out from how their position
+// changes across the pixel. A custom shader without either writes nothing,
+// which blending turns into "keep what's behind"; an opaque one has to
+// define INK_NORMAL (see the ground in scene.js). INK_SKIP keeps what's
+// behind on purpose, for transparent things with no normals to speak of.
+const chunks = THREE.ShaderChunk
+const addTo = (name, glsl) => !chunks[name].includes(glsl) && (chunks[name] += glsl)
+addTo('colorspace_pars_fragment', '\nlayout(location = 1) out highp vec4 inkNormal;\n')
+addTo('normal_fragment_begin', '\n#define INK_NORMAL nonPerturbedNormal\n')
+addTo('clipping_planes_pars_vertex', '\nvarying vec3 vInkView;\n')
+addTo('clipping_planes_vertex', '\nvInkView = mvPosition.xyz;\n')
+addTo('clipping_planes_pars_fragment', '\n#define INK_VIEW\nvarying vec3 vInkView;\n')
+addTo(
+	'colorspace_fragment',
+	`
+#if defined(INK_SKIP)
+	inkNormal = vec4(0.0);
+#elif defined(INK_NORMAL)
+	inkNormal = vec4(normalize(INK_NORMAL) * 0.5 + 0.5, 1.0);
+#elif defined(INK_VIEW)
+	inkNormal = vec4(normalize(cross(dFdx(vInkView), dFdy(vInkView))) * 0.5 + 0.5, 1.0);
+#else
+	inkNormal = vec4(0.0);
+#endif
+#ifdef INK_OUTSIDE
+	inkNormal.a = 0.0;
+#endif
+`,
+)
+
 // Ink at render resolution: one texel per pixel, so every decision is per
 // pixel. Silhouettes go to the ink colour, inner edges to a darker shade of
 // the pixel's own colour; the palette snap happens later, in the upscale.
@@ -90,19 +123,11 @@ void main() {
 }
 `
 
-// Ink a material's meshes round the outside, for people: in the normal pass
-// it draws its own normals, marked, instead of giving way to the pass's
-// material.
-const normalPass = { value: 0 }
+// Ink a material's meshes round the outside, for people: their normals are
+// marked. They keep their own colours in the plain look too.
 export function inkOutside(material) {
 	material.allowOverride = false
-	material.onBeforeCompile = (shader) => {
-		shader.uniforms.inkNormals = normalPass
-		shader.fragmentShader = `uniform float inkNormals;\n${shader.fragmentShader}`.replace(
-			/}\s*$/,
-			'\tif (inkNormals > 0.5) gl_FragColor = vec4(normalize(normal) * 0.5 + 0.5, 0.0);\n}',
-		)
-	}
+	material.defines = { ...material.defines, INK_OUTSIDE: '' }
 	return material
 }
 
@@ -145,14 +170,13 @@ void main() {
 }
 `
 
-// `hidden` is drawn in colour but not in the normal pass, for flat things
+// `hidden` leaves the normals behind it be, for transparent flat things
 // with no normals to speak of. `decor` isn't drawn at all in the plain look.
 export function createInk(renderer, hidden = [], decor = []) {
 	const crisp = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }
-	const color = new THREE.WebGLRenderTarget(1, 1, { ...crisp, depthTexture: new THREE.DepthTexture(1, 1) })
-	const normals = new THREE.WebGLRenderTarget(1, 1, crisp)
+	const color = new THREE.WebGLRenderTarget(1, 1, { ...crisp, count: 2, depthTexture: new THREE.DepthTexture(1, 1) })
 	const pixels = new THREE.WebGLRenderTarget(1, 1, crisp)
-	const normalMaterial = new THREE.MeshNormalMaterial()
+	for (const object of hidden) object.material.defines = { ...object.material.defines, INK_SKIP: '' }
 	const plainMaterial = new THREE.MeshLambertMaterial({ color: PLAIN, side: THREE.DoubleSide })
 	const mesh = (material) => {
 		const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
@@ -164,7 +188,7 @@ export function createInk(renderer, hidden = [], decor = []) {
 			uniforms: {
 				tColor: { value: color.texture },
 				tDepth: { value: color.depthTexture },
-				tNormal: { value: normals.texture },
+				tNormal: { value: color.textures[1] },
 				res: { value: new THREE.Vector2(1, 1) },
 				camNear: { value: 1 },
 				camFar: { value: 1000 },
@@ -201,7 +225,6 @@ export function createInk(renderer, hidden = [], decor = []) {
 	function clip(rect) {
 		for (const [t, pad] of [
 			[color, 4],
-			[normals, 4],
 			[pixels, 2],
 		]) {
 			t.scissorTest = !!rect
@@ -231,7 +254,6 @@ export function createInk(renderer, hidden = [], decor = []) {
 			const w = Math.max(1, Math.ceil(width / upscale))
 			const h = Math.max(1, Math.ceil(height / upscale))
 			color.setSize(w, h)
-			normals.setSize(w, h)
 			pixels.setSize(w, h)
 			ink.quad.material.uniforms.res.value.set(w, h)
 			blit.quad.material.uniforms.gameScale.value = upscale
@@ -255,9 +277,12 @@ export function createInk(renderer, hidden = [], decor = []) {
 			renderer.setRenderTarget(color)
 			renderer.render(scene, camera)
 			scene.overrideMaterial = null
-
-			inkPass(scene, camera)
 			decor.forEach((object, i) => (object.visible = shown[i]))
+
+			ink.quad.material.uniforms.camNear.value = camera.near
+			ink.quad.material.uniforms.camFar.value = camera.far
+			renderer.setRenderTarget(pixels)
+			renderer.render(ink.scene, screenCamera)
 			renderer.setRenderTarget(target)
 			renderer.render(blit.scene, screenCamera)
 		},
@@ -267,21 +292,5 @@ export function createInk(renderer, hidden = [], decor = []) {
 	// however coarse the passes are drawn.
 	function inkReach() {
 		ink.quad.material.uniforms.reach.value = look.grid ? look.outline : Math.max(1, Math.round(look.outline / size.upscale))
-	}
-
-	function inkPass(scene, camera) {
-		ink.quad.material.uniforms.camNear.value = camera.near
-		ink.quad.material.uniforms.camFar.value = camera.far
-		scene.overrideMaterial = normalMaterial
-		for (const object of hidden) object.visible = false
-		normalPass.value = 1
-		renderer.setRenderTarget(normals)
-		renderer.render(scene, camera)
-		normalPass.value = 0
-		for (const object of hidden) object.visible = true
-		scene.overrideMaterial = null
-
-		renderer.setRenderTarget(pixels)
-		renderer.render(ink.scene, screenCamera)
 	}
 }

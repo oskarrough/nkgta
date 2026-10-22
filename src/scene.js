@@ -258,7 +258,7 @@ export function createScene(canvas, world, shops = []) {
 	}
 
 	const ink = createInk(renderer, [skids.mesh], [skids.mesh, clouds.layer, ...cars.shadows])
-	timePasses(renderer, ['color', 'normal', 'ink', 'blit'])
+	timePasses(renderer, ['color', 'ink', 'blit'])
 
 	// The look, cycled with P; see looks.js for what each one does.
 	let look = DEFAULT_LOOK
@@ -564,6 +564,7 @@ function groundMaterial(map, world) {
 			varying vec2 vUv;
 			varying vec2 vTile;
 			varying float vHill;
+			varying vec3 vNormal;
 			#include <common>
 			#include <shadowmap_pars_vertex>
 
@@ -574,6 +575,7 @@ function groundMaterial(map, world) {
 				vHill = 1.0 + (dot(normal, toSun) / toSun.z - 1.0) * ${d(HILLSHADE)};
 				#include <beginnormal_vertex>
 				#include <defaultnormal_vertex>
+				vNormal = transformedNormal;
 				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
 				vTile = worldPosition.xy;
 				#include <shadowmap_vertex>
@@ -591,6 +593,9 @@ function groundMaterial(map, world) {
 			varying vec2 vUv;
 			varying vec2 vTile;
 			varying float vHill;
+			varying vec3 vNormal;
+			// For the ink, see ink.js.
+			#define INK_NORMAL vNormal
 			#include <common>
 			#include <shadowmap_pars_fragment>
 			#include <shadowmask_pars_fragment>

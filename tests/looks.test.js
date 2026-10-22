@@ -47,11 +47,10 @@ describe('looks', () => {
 		expect(upscaleOf(LOOKS.pixel, 120, 2)).toBe(12)
 	})
 
-	test('default draws the city as painted, then normals, ink and the composite', () => {
+	test('default draws the city once, as painted, then the ink and the composite', () => {
 		const { calls } = frame(LOOKS.default)
 		expect(calls.map((c) => [c.city, c.out, c.material])).toEqual([
 			[true, false, null],
-			[true, false, 'MeshNormalMaterial'],
 			[false, false, null],
 			[false, true, null],
 		])
@@ -62,7 +61,7 @@ describe('looks', () => {
 	test('raw draws everything plain, without the decor, and puts it back after', () => {
 		const { calls, clouds } = frame(LOOKS.raw)
 		expect(calls[0]).toMatchObject({ city: true, material: 'MeshLambertMaterial', clouds: false })
-		expect(calls[1]).toMatchObject({ city: true, material: 'MeshNormalMaterial' })
+		expect(calls.filter((c) => c.city)).toHaveLength(1)
 		expect(clouds.visible).toBe(true)
 	})
 
