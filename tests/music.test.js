@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { compile } from '../src/scrimshaw/score.js'
-import { CONVOY, HEAR, SCORES, convoyCars, cueAt, join, nearest, placeSources, shape } from '../src/music.js'
+import { CONVOY, HEAR, SCORES, convoyCar, cueAt, join, nearest, placeSources, shape } from '../src/music.js'
 
 const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.scrim`, import.meta.url), 'utf8'))
 
@@ -58,13 +58,11 @@ describe('music in the street', () => {
 	})
 
 	test('a passing convoy keeps playing until its last car has gone by', () => {
-		const group = {}
-		const convoy = [0, 1, 2, 3, 4].map((k) => ({ ai: {}, convoy: group, x: 40 - k * 2.4, y: 0 }))
-		const others = [{ ai: {}, x: 31, y: 0 }]
+		const turns = new Map()
+		const convoy = [0, 1, 2, 3, 4].map((k) => ({ ai: {}, convoy: turns, x: 40 - k * 2.4, y: 0 }))
+		const stranger = { ai: {}, x: 31, y: 0 }
 		// Standing beside the tail, with the front car 9.6 tiles on.
-		const at = convoyCars([...convoy, ...others], 30.4, 1)
-		expect([...at]).toEqual([[group, convoy[4]]])
-		expect(Math.hypot(at.get(group).x - 30.4, at.get(group).y - 1)).toBe(1)
+		expect(convoyCar([...convoy, stranger], 30.4, 1)).toBe(convoy[4])
 	})
 
 	test('coming back, a source carries on where its song had got to', () => {

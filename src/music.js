@@ -1,7 +1,8 @@
 // Music from places: a Späti radio, a bar door, an open window, a passing car,
-// a wedding convoy. Each plays one of the scores in public/music, plain text the Scrimshaw synth
-// plays live, quieter and duller the further away it is. Only the nearest few
-// play at all, and each one carries on where it had got to while you were away.
+// a wedding convoy. Each plays one of the scores in public/music, plain text
+// the Scrimshaw synth plays live, quieter and duller the further away it is.
+// Only the nearest few play at all, and each one carries on where it had got
+// to while you were away.
 import { compile } from './scrimshaw/score.js'
 import { createSynth } from './scrimshaw/synth.js'
 
@@ -47,19 +48,18 @@ export function placeSources(world, shops) {
 	return sources
 }
 
-function source(kind, x, y, seed) {
-	const score = kind === 'convoy' ? CONVOY : PLACE_SCORES[Math.floor(hash(seed + 0.5) * PLACE_SCORES.length)]
+function source(kind, x, y, seed, score = PLACE_SCORES[Math.floor(hash(seed + 0.5) * PLACE_SCORES.length)]) {
 	return { kind, x, y, score, since: hash(seed + 0.25) * 600 }
 }
 
-// A convoy plays as one, from whichever of its cars is nearest (x, y), so the
-// song carries on until the last car has gone by. Each convoy and that car.
-export function convoyCars(cars, x, y) {
-	const best = new Map()
+// A convoy plays from whichever of its cars is nearest (x, y), so the song
+// carries on until the last one has gone by.
+export function convoyCar(cars, x, y) {
+	let best = null
+	let bestD = Infinity
 	for (const c of cars) {
-		if (!c.ai || !c.convoy) continue
-		const b = best.get(c.convoy)
-		if (!b || Math.hypot(c.x - x, c.y - y) < Math.hypot(b.x - x, b.y - y)) best.set(c.convoy, c)
+		const d = c.convoy && c.ai ? (c.x - x) ** 2 + (c.y - y) ** 2 : Infinity
+		if (d < bestD) [best, bestD] = [c, d]
 	}
 	return best
 }
@@ -173,7 +173,7 @@ export function end(p, context) {
 export function createMusic(world, shops) {
 	const fixed = placeSources(world, shops)
 	const radios = new WeakMap()
-	const convoys = new WeakMap()
+	let convoy = null // the convoy's song, while it lasts
 	let carSeed = 0
 	const texts = new Map()
 	const songs = new Map()
@@ -213,14 +213,13 @@ export function createMusic(world, shops) {
 		return r
 	}
 
-	function convoySources(cars, listener) {
-		return [...convoyCars(cars, listener.x, listener.y)].map(([group, car]) => {
-			if (!convoys.has(group)) convoys.set(group, source('convoy', 0, 0, 9000 + carSeed++))
-			const s = convoys.get(group)
-			s.x = car.x
-			s.y = car.y
-			return s
-		})
+	function convoyOf(cars, listener) {
+		const car = convoyCar(cars, listener.x, listener.y)
+		if (!car) return []
+		if (convoy?.group !== car.convoy) convoy = { ...source('convoy', 0, 0, 9000 + carSeed++, CONVOY), group: car.convoy }
+		convoy.x = car.x
+		convoy.y = car.y
+		return [convoy]
 	}
 
 	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
@@ -236,7 +235,7 @@ export function createMusic(world, shops) {
 				.filter((c) => (c.ai && !c.convoy) || c === listener.car)
 				.map(radioOf)
 				.filter(Boolean),
-			convoySources(cars, listener),
+			convoyOf(cars, listener),
 		)
 		const want = nearest(sources, listener.x, listener.y)
 		for (const p of playing.values()) if (!want.includes(p.src)) stop(p, context)
