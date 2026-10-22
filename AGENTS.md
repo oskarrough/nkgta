@@ -16,7 +16,7 @@ See README.md for what the game is and where the code lives.
 ## Map data
 
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.
-- When `src/build-map.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
+- When `src/build-map.js` or `src/map-codec.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
 - Overpass is a shared public service. Fetch once and work from `data/osm.json`; never call it in a loop.
 
 ## Ground height
