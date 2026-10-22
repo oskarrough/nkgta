@@ -9,8 +9,11 @@ See README.md for what the game is and where the code lives.
 
 ## Testing
 
+Oskar values speed over certainty. Verify once and stop: one check that the change works, one before/after if you're measuring. Never re-run a check to firm up a result, re-check views you didn't change, or chase noise. Rough numbers are fine. If you catch yourself verifying a second time, stop and report what you have.
+
 - `bun run check` lints and checks formatting; `bun run format` fixes formatting.
 - Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
+- Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers, run `chromium-browser --headless=new --enable-gpu --ignore-gpu-blocklist --use-angle=gl --remote-debugging-port=<port> --user-data-dir=/tmp/<name> about:blank &` and `agent-browser connect <port>`; the GPU string should say Radeon. `?perf` has the timings.
 - After adding a dependency, restart the dev server, or Vite keeps serving stale optimized deps and the page hangs on "Lade Karte…".
 
 ## Map data
