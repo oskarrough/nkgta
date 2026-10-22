@@ -30,6 +30,23 @@ const WALL = {
 	awnings: 0.45, // share of shopfronts with an awning
 }
 const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
+// The flats behind the upper windows, only in the chase camera: depth in
+// tiles, the share of rooms with the lamp on, how dark the others are by
+// day, and what they're papered, floored and hung with.
+const ROOMS = {
+	depth: 1.4,
+	lit: 0.3,
+	lamp: '#ffd59a',
+	glow: 0.5, // how much of a lit room shines by itself
+	dim: 0.35,
+	glass: 0.15, // the pane's own dark tint over the room
+	glint: 0.35, // the reflection across the pane, fainter so the room shows
+	papers: ['#d8cdb5', '#c4cfc0', '#e0c6b4', '#bcc4cf'],
+	floor: '#6b4b34',
+	picture: '#3d4a5c',
+	curtains: 0.45, // share of windows with curtains
+	cloths: ['#9c4a42', '#d9cfae', '#45607f', '#76804f'],
+}
 
 // Tile courses on pitched roofs: height between them in tiles of the map,
 // the share of each that is dark line, and how dark.
@@ -305,6 +322,7 @@ export function createScene(canvas, world, shops = []) {
 	// for the street seen through a shop's portal.
 	function render(cam, carList, { view = aim(cam), target = null } = {}) {
 		cars.update(carList)
+		wallLook.userData.rooms.value = cam.third ? 1 : 0
 		for (const c of carList) {
 			for (const m of c.marks) skids.add(...m)
 			c.marks.length = 0
@@ -702,6 +720,13 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 }
 `
 
+// The average of some colours.
+function mean(hexes) {
+	const c = new THREE.Color(0, 0, 0)
+	for (const hex of hexes) c.add(new THREE.Color(hex))
+	return c.multiplyScalar(1 / hexes.length)
+}
+
 // A colour as a linear GLSL vec3, for baking into shader source.
 function glsl(hex) {
 	const c = new THREE.Color(hex)
@@ -1014,12 +1039,22 @@ float pulse(float x, float a, float b, float w) {
 
 // Walls draw their own windows: one per 3 m along the wall and per storey up
 // it, wider shop windows on the ground floor, a ledge between storeys and now
-// and then a lit window. Sheds and garages stay blank.
+// and then a lit window. Sheds and garages stay blank. In the chase camera
+// (`material.userData.rooms`) each upper window looks into a room.
 function wallMaterial(tileM, gradient) {
 	const material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradient })
 	const storey = (3.2 / tileM).toFixed(3)
+	const rooms = { value: 0 }
+	material.userData.rooms = rooms
+	// What a room averages out to once its window is under a pixel.
+	const paper = mean(ROOMS.papers)
+	const farRoom = paper
+		.clone()
+		.multiplyScalar(ROOMS.dim)
+		.lerp(paper.clone().multiply(new THREE.Color(ROOMS.lamp)), ROOMS.lit)
 	material.onBeforeCompile = (shader) => {
-		const decl = 'varying vec3 vWall;\nvarying float vZ;\n'
+		shader.uniforms.rooms = rooms
+		const decl = 'varying vec3 vWall;\nvarying float vZ;\nvarying vec3 vRoomP;\nvarying vec2 vTan;\n'
 		shader.vertexShader =
 			'attribute vec3 wall;\nattribute float foot;\n' +
 			decl +
@@ -1027,9 +1062,12 @@ function wallMaterial(tileM, gradient) {
 				'#include <project_vertex>',
 				`#include <project_vertex>
 				vWall = wall;
-				vZ = position.z - foot;`,
+				vZ = position.z - foot;
+				vRoomP = (modelMatrix * vec4(transformed, 1.0)).xyz;
+				vTan = normalize(vec2(-normal.y, normal.x));`,
 			)
 		shader.fragmentShader =
+			'uniform float rooms;\n' +
 			decl +
 			pulse +
 			shader.fragmentShader.replace(
@@ -1059,9 +1097,59 @@ function wallMaterial(tileM, gradient) {
 					float wu = (u - 0.5 + halfW) / (2.0 * halfW);
 					float wv = (fz - lo) / (hi - lo);
 					float glint = step(abs(wu - wv - 0.15), 0.12) * (1.0 - shop);
-					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : mix(${glsl(WALL.glass)}, ${glsl(WALL.glint)}, glint * near);
-					glass = mix(mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, 0.06), glass, near);
+					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : ${glsl(WALL.glass)};
+					vec3 far = mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, 0.06);
+					float glow = 0.0;
+					if (rooms > 0.5 && shop < 0.5) {
+						// Follow the view ray into a box behind the wall: a room two or
+						// three windows wide, so its walls stand behind the piers.
+						float fh = fract(sin(f * 41.3 + wallId * 7.13) * 43758.5453);
+						float span = fh < 0.5 ? 2.0 : 3.0;
+						float phase = floor(fract(fh * 13.7) * span);
+						float x0 = floor((along + phase) / span) * span - phase;
+						vec3 ray = normalize(vRoomP - cameraPosition);
+						vec3 d = vec3(dot(ray.xy, vTan), ray.z, max(abs(dot(ray.xy, vec2(vTan.y, -vTan.x))), 0.05));
+						vec2 o = vec2(along, fz * ${storey});
+						float tx = (d.x > 0.0 ? x0 + span - o.x : o.x - x0) / max(abs(d.x), 0.0001);
+						float ty = (d.y > 0.0 ? ${storey} - o.y : o.y) / max(abs(d.y), 0.0001);
+						float tz = ${ROOMS.depth.toFixed(2)} / d.z;
+						float t = min(tz, min(tx, ty));
+						float room = fract(sin(dot(vec3(x0, f, wallId), vec3(12.9898, 78.233, 37.719)) + 1.7) * 43758.5453);
+						float pick = fract(room * 7.31);
+						vec3 paper = pick < 0.25 ? ${glsl(ROOMS.papers[0])} : pick < 0.5 ? ${glsl(ROOMS.papers[1])} : pick < 0.75 ? ${glsl(ROOMS.papers[2])} : ${glsl(ROOMS.papers[3])};
+						vec3 hit = vec3(o + d.xy * t, d.z * t);
+						// Where on the room's wall or ceiling the ray lands, 0 to 1.
+						vec2 back = vec2((hit.x - x0) / span, hit.y / ${storey});
+						vec2 up = vec2((hit.x - x0) / span, hit.z / ${ROOMS.depth.toFixed(2)});
+						float on = step(${(1 - ROOMS.lit).toFixed(2)}, fract(room * 5.37));
+						vec3 c = t == tz ? paper : t == tx ? paper * 0.62 : d.y > 0.0 ? paper * 1.08 : ${glsl(ROOMS.floor)};
+						if (t == tz) {
+							// A door to the hall on one side, a picture on the other.
+							float side = fract(room * 3.1) < 0.5 ? 0.22 : 0.78;
+							c = abs(back.x - side) < 0.1 / span && back.y < 0.72 ? c * 0.45 : c;
+							vec2 pic = vec2(back.x - (1.0 - side), back.y - 0.55);
+							c = abs(pic.x) < 0.12 / span && abs(pic.y) < 0.09 ? ${glsl(ROOMS.picture)} : c;
+						}
+						// Darker away from the window, with a lamp in the middle of the
+						// ceiling in the lit ones.
+						c *= 1.0 - 0.55 * hit.z / ${ROOMS.depth.toFixed(2)};
+						if (t == ty && d.y > 0.0) c = mix(c, vec3(1.0), on * step(length((up - 0.5) * vec2(span, 1.4)), 0.16));
+						c *= on > 0.5 ? ${glsl(ROOMS.lamp)} : vec3(${ROOMS.dim.toFixed(2)});
+						// Curtains hang at the pane, drawn on the glass, some to the sides.
+						float cw = 0.14 + 0.2 * fract(bay * 17.9);
+						float curtain = step(fract(bay * 11.3), ${ROOMS.curtains.toFixed(2)}) * (step(wu, cw) + step(1.0 - cw, wu));
+						float cp = fract(bay * 23.1);
+						vec3 cloth = cp < 0.25 ? ${glsl(ROOMS.cloths[0])} : cp < 0.5 ? ${glsl(ROOMS.cloths[1])} : cp < 0.75 ? ${glsl(ROOMS.cloths[2])} : ${glsl(ROOMS.cloths[3])};
+						c = mix(c, cloth * (on > 0.5 ? 0.9 : 0.5), min(curtain, 1.0));
+						glass = mix(c, ${glsl(WALL.glass)}, ${ROOMS.glass.toFixed(2)});
+						glow = on * ${ROOMS.glow.toFixed(2)};
+						glint *= ${ROOMS.glint.toFixed(2)};
+						far = mix(${glsl(farRoom)}, ${glsl(WALL.glass)}, ${ROOMS.glass.toFixed(2)});
+					}
+					glass = mix(glass, ${glsl(WALL.glint)}, glint * near);
+					glass = mix(far, glass, near);
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
+					totalEmissiveRadiance += glass * glow * near * wx * wz;
 					// A pale sill under each upper window.
 					float sill = step(lo - ${WALL.sill.toFixed(3)}, fz) * step(fz, lo) * step(abs(u - 0.5), halfW + 0.04) * (1.0 - shop);
 					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8 * near);
