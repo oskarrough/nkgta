@@ -9,6 +9,7 @@ const STAND = [0.35, 0.6, 0.9, 1.2] // where you might stand at the door, out fr
 const MARGIN = 0.6 // door at least this far from a corner, tiles
 const SPACING = 1.8 // doors on one facade at least this far apart, tiles
 const AT_DOOR = { along: 0.75, out: 0.8 } // how close to where you stand counts as at the door
+const CELL = 16 // tiles: walls are filed in a grid of these, so a place only checks the ones near it
 
 export function findShops(world) {
 	const free = (x, y) => !SOLID.has(world.tileAt(x, y))
@@ -35,12 +36,32 @@ export function findShops(world) {
 		}
 		return { segs, x0, y0, x1, y1 }
 	})
+	const cells = new Map()
+	walls.forEach((w, i) => {
+		for (let cy = Math.floor(w.y0 / CELL); cy <= Math.floor(w.y1 / CELL); cy++) {
+			for (let cx = Math.floor(w.x0 / CELL); cx <= Math.floor(w.x1 / CELL); cx++) {
+				const key = cy * 65536 + cx
+				if (!cells.has(key)) cells.set(key, [])
+				cells.get(key).push(i)
+			}
+		}
+	})
+	// The walls within reach of (x, y), in the order they were mapped.
+	function wallsNear(x, y) {
+		const near = new Set()
+		for (let cy = Math.floor((y - REACH) / CELL); cy <= Math.floor((y + REACH) / CELL); cy++) {
+			for (let cx = Math.floor((x - REACH) / CELL); cx <= Math.floor((x + REACH) / CELL); cx++) {
+				for (const i of cells.get(cy * 65536 + cx) ?? []) near.add(i)
+			}
+		}
+		return [...near].sort((a, b) => a - b).map((i) => walls[i])
+	}
 
 	const shops = []
 	for (const p of world.pois) {
 		if (!KINDS.has(p.kind)) continue
 		let best = null
-		for (const w of walls) {
+		for (const w of wallsNear(p.x, p.y)) {
 			if (p.x < w.x0 - REACH || p.x > w.x1 + REACH || p.y < w.y0 - REACH || p.y > w.y1 + REACH) continue
 			for (const [ax, ay, bx, by] of w.segs) {
 				const len = Math.hypot(bx - ax, by - ay)
@@ -77,6 +98,8 @@ export function findShops(world) {
 	// there's still somewhere to stand.
 	for (let i = 0; i < shops.length; i++) {
 		for (let j = i + 1; j < shops.length; j++) {
+			// Doors on one facade within SPACING are under 2 tiles apart.
+			if (Math.abs(shops[i].x - shops[j].x) > 2 || Math.abs(shops[i].y - shops[j].y) > 2) continue
 			const t = alongFacade(shops[i], shops[j])
 			if (t === null || Math.abs(t) >= SPACING) continue
 			// Along the first one's wall, which may run the other way to the second's.
@@ -91,6 +114,26 @@ export function findShops(world) {
 				Object.assign(s, { x: s.x + ex * k, y: s.y + ey * k, stand })
 			}
 		}
+	}
+	return shops
+}
+
+// Shops as plain numbers for map.json, worked out once when the map is
+// built: per shop its place's index, then x, y, nx, ny, ex, ey, out and room.
+export function packShops(shops, pois) {
+	const index = new Map(pois.map((p, i) => [p, i]))
+	const round = (v) => Math.round(v * 1e4) / 1e4
+	return shops.flatMap((s) => [index.get(s.place), ...[s.x, s.y, s.nx, s.ny, s.ex, s.ey, s.out, s.room].map(round)])
+}
+
+// The map's shops, packed when it was built, or found now for older maps.
+export function shopsOf(world) {
+	if (!world.shops) return findShops(world)
+	const shops = []
+	for (let i = 0; i < world.shops.length; i += 9) {
+		const [n, x, y, nx, ny, ex, ey, out, room] = world.shops.slice(i, i + 9)
+		const p = world.pois[n]
+		shops.push({ place: p, name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
 	}
 	return shops
 }

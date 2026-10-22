@@ -1,6 +1,8 @@
 // Rasterise raw Overpass JSON onto a tile grid. Runs in Bun and the browser.
 import polygonClipping from 'polygon-clipping'
 import { T } from './tiles.js'
+import { createWorld } from './world.js'
+import { findShops, packShops } from './shops.js'
 
 // Road widths in metres, kerb to kerb.
 const ROADS = {
@@ -152,7 +154,7 @@ export function buildMap(osm, bbox, tileM) {
 		const t = w.tags
 		return isPassage(t) && (PATHS.includes(t.highway) || t.highway === 'service') && !underground(t) && !t.area
 	})
-	const corridors = passages.map((w) => corridor(geom(w.geometry), PASSAGE_M / tileM / 2))
+	const corridors = overlapping(passages.map((w) => corridor(geom(w.geometry), PASSAGE_M / tileM / 2)))
 
 	// 4. Buildings, onto the tiles for walking into, and as outlines with a
 	// height in metres for the 3D city. Passages are cut out of the outlines,
@@ -322,7 +324,9 @@ export function buildMap(osm, bbox, tileM) {
 	}
 
 	shapes.sort((a, b) => a.layer - b.layer)
-	return { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees, roadNodes, roads, signals }
+	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees }
+	// Where the doors are depends only on the map, so it's worked out here, once.
+	return { ...map, roadNodes, roads, signals, shops: packShops(findShops(createWorld(map)), pois) }
 }
 
 const round = (n) => Math.round(n * 10) / 10
@@ -376,13 +380,38 @@ function corridor(pts, r) {
 	return { polys, box: [Math.min(...xs) - r, Math.min(...ys) - r, Math.max(...xs) + r, Math.max(...ys) + r] }
 }
 
-// Building rings minus any corridors crossing them. Rings are even-odd, so
-// courtyards stay holes.
+// A lookup of the items whose box overlaps a rectangle, in their order.
+// Items are filed in a grid first, so each lookup only sees its neighbours.
+function overlapping(items, size = 32) {
+	const cells = new Map()
+	items.forEach(({ box }, i) => {
+		for (let y = Math.floor(box[1] / size); y <= Math.floor(box[3] / size); y++) {
+			for (let x = Math.floor(box[0] / size); x <= Math.floor(box[2] / size); x++) {
+				const key = y * 65536 + x
+				if (!cells.has(key)) cells.set(key, [])
+				cells.get(key).push(i)
+			}
+		}
+	})
+	return (x0, y0, x1, y1) => {
+		const near = new Set()
+		for (let y = Math.floor(y0 / size); y <= Math.floor(y1 / size); y++) {
+			for (let x = Math.floor(x0 / size); x <= Math.floor(x1 / size); x++) for (const i of cells.get(y * 65536 + x) ?? []) near.add(i)
+		}
+		return [...near]
+			.sort((a, b) => a - b)
+			.map((i) => items[i])
+			.filter(({ box }) => box[0] < x1 && box[2] > x0 && box[1] < y1 && box[3] > y0)
+	}
+}
+
+// Building rings minus any corridors crossing them, `corridors(x0, y0, x1,
+// y1)` being those whose box overlaps. Rings are even-odd, so courtyards stay holes.
 function cutPassages(rings, corridors) {
 	const xs = rings.flat().map((p) => p.x)
 	const ys = rings.flat().map((p) => p.y)
 	const [x0, y0, x1, y1] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
-	const hits = corridors.filter(({ box }) => box[0] < x1 && box[2] > x0 && box[1] < y1 && box[3] > y0)
+	const hits = corridors(x0, y0, x1, y1)
 	if (!hits.length) return rings
 	const area = polygonClipping.xor(...rings.map((r) => [r.map((p) => [p.x, p.y])]))
 	const cut = polygonClipping.difference(area, ...hits.flatMap((c) => c.polys))

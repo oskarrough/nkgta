@@ -10,7 +10,7 @@ import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
-import { findShops } from './shops.js'
+import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
 
@@ -31,7 +31,7 @@ const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
 const camera = createCamera(world)
 const canvas = document.getElementById('overlay')
-const shops = findShops(world)
+const shops = shopsOf(world)
 phase('shops')
 const city3d = createScene(document.getElementById('city'), world, shops)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)

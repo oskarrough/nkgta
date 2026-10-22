@@ -16,8 +16,10 @@ const WAVE = 4.6 // tiles/s, about 50 km/h: drive this along a main road and cat
 export function createJunctions(edges, signals = []) {
 	const junctions = cluster(edges.map((e) => e.to).filter(isJunction))
 	const entryOf = new Map() // lane → the junction it runs into
+	const known = new Set(edges)
+	const signalNear = nearAny(signals)
 	for (const j of junctions) {
-		j.entries = [...j.nodes].flatMap((n) => n.in).filter((e) => !j.nodes.has(e.from) && edges.includes(e))
+		j.entries = [...j.nodes].flatMap((n) => n.in).filter((e) => !j.nodes.has(e.from) && known.has(e))
 		const heading = (e) => pointAt(e.lane, e.len).dir
 		const across = (a, b) => Math.abs(Math.cos(heading(a) - heading(b))) < 0.7
 		for (const e of j.entries) {
@@ -34,7 +36,7 @@ export function createJunctions(edges, signals = []) {
 		const main = j.entries.reduce((a, b) => (b.w > a.w ? b : a), j.entries[0])
 		for (const e of j.entries) e.phase = across(e, main) ? 1 : 0
 		j.r = j.spread + Math.max(...j.entries.map((e) => e.w)) / 2
-		j.signal = signals.some((p) => dist(p, j) < j.r + 5)
+		j.signal = signalNear(j, j.r + 5)
 		j.offset = main ? waveOffset(j, main.heading) : 0
 	}
 
@@ -141,19 +143,54 @@ function isJunction(n) {
 }
 
 // Junction nodes close together become one junction, centred between them.
+// Nodes are filed in a grid of MERGE-sized cells, so each only looks at its
+// neighbours; groups keep the order they were last merged in.
 function cluster(nodes) {
-	const groups = []
+	const groupOf = new Map() // node → its group, { nodes, stamp }
+	const cells = new Map()
+	const cell = (x, y) => Math.floor(y / MERGE) * 65536 + Math.floor(x / MERGE)
+	let stamp = 0
 	for (const n of new Set(nodes)) {
-		const near = groups.filter((g) => [...g].some((m) => dist(m, n) < MERGE))
-		const merged = new Set([n, ...near.flatMap((g) => [...g])])
-		for (const g of near) groups.splice(groups.indexOf(g), 1)
-		groups.push(merged)
+		const near = new Set()
+		const cx = Math.floor(n.x / MERGE)
+		const cy = Math.floor(n.y / MERGE)
+		for (let y = cy - 1; y <= cy + 1; y++) {
+			for (let x = cx - 1; x <= cx + 1; x++) {
+				for (const m of cells.get(y * 65536 + x) ?? []) if (dist(m, n) < MERGE) near.add(groupOf.get(m))
+			}
+		}
+		const before = [...near].sort((a, b) => a.stamp - b.stamp)
+		const merged = { nodes: new Set([n, ...before.flatMap((g) => [...g.nodes])]), stamp: stamp++ }
+		for (const m of merged.nodes) groupOf.set(m, merged)
+		const key = cell(n.x, n.y)
+		if (!cells.has(key)) cells.set(key, [])
+		cells.get(key).push(n)
 	}
+	const groups = [...new Set(groupOf.values())].sort((a, b) => a.stamp - b.stamp).map((g) => g.nodes)
 	return groups.map((g) => {
 		const x = [...g].reduce((s, n) => s + n.x, 0) / g.size
 		const y = [...g].reduce((s, n) => s + n.y, 0) / g.size
 		return { x, y, nodes: g, spread: Math.max(...[...g].map((n) => dist(n, { x, y }))) }
 	})
+}
+
+// Is any of `points` closer than r to p? Points are filed in a grid first.
+function nearAny(points) {
+	const SIZE = 16
+	const cells = new Map()
+	for (const p of points) {
+		const key = Math.floor(p.y / SIZE) * 65536 + Math.floor(p.x / SIZE)
+		if (!cells.has(key)) cells.set(key, [])
+		cells.get(key).push(p)
+	}
+	return (p, r) => {
+		for (let y = Math.floor((p.y - r) / SIZE); y <= Math.floor((p.y + r) / SIZE); y++) {
+			for (let x = Math.floor((p.x - r) / SIZE); x <= Math.floor((p.x + r) / SIZE); x++) {
+				if (cells.get(y * 65536 + x)?.some((q) => dist(q, p) < r)) return true
+			}
+		}
+		return false
+	}
 }
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)

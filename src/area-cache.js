@@ -2,7 +2,7 @@
 // skips Overpass. Rows max out at 1 MB, so each map is gzipped and split.
 // OPFS needs a secure context (https or localhost); elsewhere this is a no-op.
 import { create } from 'tinyjoin'
-import { encodeMap, decodeMap, toBase64, fromBase64 } from './map-codec.js'
+import { decodeMap, toBase64, fromBase64 } from './map-codec.js'
 
 const CHUNK = 900_000
 
@@ -33,9 +33,10 @@ export async function getArea(key) {
 	return decodeMap(JSON.parse(await gunzip(rows.map((r) => r.data).join(''))))
 }
 
-export async function putArea(key, map) {
+// `text` is the map as encodeMap's JSON.
+export async function putArea(key, text) {
 	if (!usable()) return
-	const packed = await gzip(JSON.stringify(encodeMap(map)))
+	const packed = await gzip(text)
 	const store = await db()
 	await store.transaction(async (tx) => {
 		await tx.query('DELETE FROM area_chunks WHERE area = $1', [key])
