@@ -197,6 +197,7 @@ const PLUCK = {
 	upright: { id: 'upr', b: 0.5, decay: 0.996, color: 0.7, dur: 1.7, hang: 0.04, dampTau: 0.07 },
 	oud: { id: 'oud', b: 0.42, decay: 0.993, color: 0.5, dur: 1.4, hang: 0.12, dampTau: 0.07 },
 	qanun: { id: 'qanun', b: 0.22, decay: 0.9965, color: 0.2, dur: 2.2, hang: 0.5, dampTau: 0.15 },
+	ebass: { id: 'ebass', b: 0.3, decay: 0.998, color: 0.35, dur: 2.2, hang: 0.03, dampTau: 0.05 },
 }
 // a soft clip, for the 808
 function saturate(S) {
@@ -587,6 +588,42 @@ const INST = {
 			pluck(S, out, t, d, f, v * 0.55, PLUCK.guitar, [F(S, 'lowpass', 4200 * p.bright, 0.5), F(S, 'peaking', 220, 1, 3)])
 		},
 	},
+	// Electric guitar through a cranked amp: two saws a few cents apart and a
+	// square an octave down, clipped hard, then a speaker cabinet that scoops
+	// the mud at 400 Hz, pushes the bite at 1.8 kHz and cuts the fizz above.
+	// Held notes sing with vibrato; short ones chug.
+	drive: {
+		rev: 0.2,
+		level: 1.3,
+		play(S, out, t, d, f, v, p) {
+			if (!S.drive) {
+				S.drive = new Float32Array(2048)
+				for (let i = 0; i < 2048; i++) S.drive[i] = Math.tanh(((i / 2047) * 2 - 1) * 6)
+			}
+			const clip = S.ctx.createWaveShaper()
+			clip.curve = S.drive
+			clip.oversample = '4x'
+			const pre = G(S, 1.2)
+			const g = G(S)
+			pre
+				.connect(F(S, 'highpass', 90, 0.7))
+				.connect(clip)
+				.connect(F(S, 'peaking', 400, 1, -6))
+				.connect(F(S, 'peaking', 1800, 0.9, 4))
+				.connect(F(S, 'lowpass', 4200 * p.bright, 0.8))
+				.connect(g)
+				.connect(out)
+			const end = adsr(g.gain, t, d, { a: p.att || 0.004, dc: 0.4, s: 0.7, r: p.rel || 0.09, peak: v * 0.3 })
+			const o1 = O(S, 'sawtooth', f, t, end, p, 1, -7)
+			const o2 = O(S, 'sawtooth', f, t, end, p, 1, 7)
+			const o3 = O(S, 'square', f, t, end, p, 0.5)
+			o1.connect(pre)
+			o2.connect(pre)
+			o3.connect(G(S, 0.4)).connect(pre)
+			noise(S, pre, t, { type: 'highpass', f: 2500, q: 0.7, tau: 0.008, peak: v * 0.3 })
+			if (d > 0.3) vibrato(S, t, end, [o1, o2, o3], { rate: 5.5, depth: 14, delay: 0.25, rise: 0.25 })
+		},
+	},
 	banjo: {
 		rev: 0.18,
 		level: 1.18,
@@ -618,6 +655,17 @@ const INST = {
 			pluck(S, out, t, d, f, v * 0.5, PLUCK.upright, [F(S, 'lowpass', 1400 * p.bright, 0.6)])
 			partial(S, out, t, f, { a: 0.004, tau: 0.5, peak: v * 0.45, damp: t + d + 0.04, dampTau: 0.07 })
 			noise(S, out, t, { type: 'lowpass', f: 900, q: 0.5, tau: 0.01, peak: v * 0.12 })
+		},
+	},
+	// Electric bass played with a pick: a bright string, a round sine under it
+	// for the weight, and the click of the plectrum.
+	ebass: {
+		rev: 0.06,
+		level: 0.9,
+		play(S, out, t, d, f, v, p) {
+			pluck(S, out, t, d, f, v * 0.5, PLUCK.ebass, [F(S, 'lowpass', 2400 * p.bright, 0.6), F(S, 'peaking', 800, 1, 4)])
+			partial(S, out, t, f, { a: 0.004, tau: 0.8, peak: v * 0.45, damp: t + d + 0.03, dampTau: 0.05 })
+			noise(S, out, t, { type: 'highpass', f: 1500, q: 0.7, tau: 0.006, peak: v * 0.1 })
 		},
 	},
 	// Fretless lute with paired strings and a round bowl: two plucks a hair

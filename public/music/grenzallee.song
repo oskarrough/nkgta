@@ -1,0 +1,82 @@
+title    Grenzallee
+about    Arena rock for the drive out to the Ringbahn. A palm-muted chug in B minor, a synth lead singing the verse, a chorus that opens out into big chords and organ, and a guitar solo on top.
+tempo    116
+beats    4
+steps    4
+reverb   0.3
+
+# Verse Bm, G, D, A; the climb Em, G, A; chorus D, A over C#, Bm, G.
+voice lead  saw      vol=0.4  pan=0.05 glide=0.08 gate=0.95 bright=0.7
+voice solo  drive    vol=0.6  pan=0.1  glide=0.07
+voice chug  drive    vol=0.45 pan=-0.4 gate=0.45 bright=0.6
+voice crunch drive   vol=0.45 pan=0.4  gate=0.95
+voice brass brass    vol=0.4  pan=-0.1 center=F#4
+voice pad   organ    vol=0.28 pan=0.25 center=F#4
+voice bass  ebass    vol=0.9
+voice kick  kick     vol=0.85
+voice snare snare    vol=0.65
+voice hat   hat      vol=0.35 pan=0.2
+voice ride  ride     vol=0.3  pan=0.25
+voice crash crash    vol=0.35 pan=-0.25
+voice tomh  tomhi    vol=0.5  pan=-0.2
+voice toml  tomlo    vol=0.55 pan=0.2
+
+pattern intro
+brass  | [D]-- [D]-- [D]- .... [D]--- | [A/C#]-- [A/C#]-- [A/C#]- .... [A/C#]--- | [Bm]-- [Bm]-- [Bm]- .... [Bm]--- | [G]--- [G]--- [A]------- |
+bass   | D2- D2- D2- D2- D2- D2- D2- D2- | C#2- C#2- C#2- C#2- C#2- C#2- C#2- C#2- | B1- B1- B1- B1- B1- B1- B1- B1- | G1- G1- G1- G1- A1- A1- A1- A1- |
+kick   | x... ..x. x... .... | % | % | x... ..x. x... x... |
+snare  | .... x... .... x... | % | % | .... x... xxxx xxxx |
+hat    | x.x. x.x. x.x. x.x. | % | % | x.x. x.x. .... .... |
+crash  | x... .... .... .... | _ | _ | _ |
+
+pattern verse
+chug   | B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- | G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- | D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- | A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- |
+chug   | B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- | G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- | D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- | A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- |
+bass   | B1- B1- B1- B1- B1- B1- B1- B1- | G1- G1- G1- G1- G1- G1- G1- G1- | D2- D2- D2- D2- D2- D2- D2- D2- | A1- A1- A1- A1- A1- A1- A1- A1- |
+bass   | B1- B1- B1- B1- B1- B1- B1- B1- | G1- G1- G1- G1- G1- G1- G1- G1- | D2- D2- D2- D2- D2- D2- D2- D2- | A1- A1- A1- A1- A1- A1- A1- A1- |
+lead   | .... F#4- F#4- F#4- E4- D4- E4- | F#4--- D4--- .... .. B3- | .... F#4- F#4- A4- F#4- E4- D4- | E4----------- .... |
+lead   | .... F#4- F#4- F#4- E4- D4- E4- | F#4--- G4--- .... .. G4- | A4--- F#4- E4- D4--- E4- F#4- | E4----------- .... |
+kick   | x... ..x. x... .... | % | % | % | % | % | % | x... ..x. x... x... |
+snare  | .... x... .... x... | % | % | % | % | % | % | .... x... .... xxxx |
+hat    | x.x. x.x. x.x. x.x. | % | % | % | % | % | % | % |
+crash  | x... .... .... .... | _ | _ | _ | _ | _ | _ | _ |
+
+pattern pre
+chug   | E2+B2- E2+B2- E2+B2- E2+B2- E2+B2- E2+B2- E2+B2- E2+B2- | G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- G2+D3- | A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- | A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- |
+bass   | E2- E2- E2- E2- E2- E2- E2- E2- | G2- G2- G2- G2- G2- G2- G2- G2- | A2- A2- A2- A2- A2- A2- A2- A2- | A2- A2- A2- A2- A2- A2- A2- A2- |
+lead   | G4- G4- G4- G4- G4- F#4- E4- D4- | B3- B3- D4- E4- ~G4------- | A4- A4- A4- A4- B4- A4- G4- E4- | ~A4----------- .... |
+pad    | [Em]--------------- | [G]--------------- | [A]--------------- | = |
+kick   | x... ..x. x... .... | % | x... x... x... x... | x.x. x.x. x.x. x.x. |
+snare  | .... x... .... x... | % | .... x... .... x... | xxxx xxxx xxxx xxxx |
+hat    | x.x. x.x. x.x. x.x. | % | % | _ |
+
+pattern chorus
+crunch | D3+A3+D4------- D3+A3+D4--- D3+A3+D4- D3+A3+D4- | C#3+A3+E4------- C#3+A3+E4--- C#3+A3+E4- C#3+A3+E4- | B2+F#3+B3------- B2+F#3+B3--- B2+F#3+B3- B2+F#3+B3- | G2+D3+G3------- G2+D3+G3--- G2+D3+G3- G2+D3+G3- |
+crunch | D3+A3+D4------- D3+A3+D4--- D3+A3+D4- D3+A3+D4- | C#3+A3+E4------- C#3+A3+E4--- C#3+A3+E4- C#3+A3+E4- | B2+F#3+B3------- B2+F#3+B3--- B2+F#3+B3- B2+F#3+B3- | A2+E3+A3------- A2+E3+A3--- A2+E3+A3- A2+E3+A3- |
+bass   | D2- D2- D2- D2- D2- D2- D2- D2- | C#2- C#2- C#2- C#2- C#2- C#2- C#2- C#2- | B1- B1- B1- B1- B1- B1- B1- B1- | G1- G1- G1- G1- G1- G1- G1- G1- |
+bass   | D2- D2- D2- D2- D2- D2- D2- D2- | C#2- C#2- C#2- C#2- C#2- C#2- C#2- C#2- | B1- B1- B1- B1- B1- B1- B1- B1- | A1- A1- A1- A1- A1- A1- A1- A1- |
+pad    | [D]--------------- | [A/C#]--------------- | [Bm]--------------- | [G]--------------- |
+pad    | [D]--------------- | [A/C#]--------------- | [Bm]--------------- | [A]--------------- |
+lead   | D5------- A4- D5- E5- F#5- | E5--- C#5- A4--- .... .. | D5------- C#5- D5- E5- F#5- | G5--- F#5- D5--- .... .. |
+lead   | F#5------- E5- D5- E5- F#5- | E5--- C#5- A4------- .. | B4- C#5- D5- E5- F#5--- E5- D5- | ~E5----------- .... |
+brass  | .... .... .... .. [D]- | _ | .... .... .... .. [Bm]- | _ | .... .... .... .. [D]- | _ | _ | _ |
+kick   | x... ..x. x... .... | % | % | % | % | % | % | x... ..x. x.x. x... |
+snare  | .... x... .... x... | % | % | % | % | % | % | .... x... .... .... |
+ride   | x.x. x.x. x.x. x.x. | % | % | % | % | % | % | x.x. x.x. .... .... |
+crash  | x... .... .... .... | _ | _ | _ | x... .... .... .... | _ | _ | _ |
+tomh   | _ | _ | _ | _ | _ | _ | _ | .... .... xx.. .... |
+toml   | _ | _ | _ | _ | _ | _ | _ | .... .... ..xx xx.. |
+
+pattern solo from chorus
+mute lead
+solo   | A4- D5- F#5- A5--- F#5- E5- D5- | C#5- E5- ~A5--------- .. | B5- A5- F#5- D5- B4- D5- F#5- A5- | G5 A5 G5 F#5 G5------- .... |
+solo   | F#5 F#5 F#5 F#5 F#5- E5- D5- E5- F#5- A5- | ~B5------- A5- E5- C#5- A4- | B4- D5- F#5- B5- A5- F#5- E5- D5- | E5 F#5 E5 C#5 ~E5----------- |
+
+pattern outro
+crunch | D3+A3+D4--------------- | = |
+brass  | [D]--------------- | = |
+bass   | D2--------------- | = |
+crash  | x... .... .... .... | _ |
+kick   | x... .... .... .... | _ |
+
+loop intro verse pre chorus verse pre chorus solo chorus outro
