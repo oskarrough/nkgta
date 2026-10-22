@@ -6,14 +6,14 @@ import { compile } from './scrimshaw/score.js'
 import { createSynth } from './scrimshaw/synth.js'
 
 export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi']
-const HEAR = 18 // tiles, how far music carries
+export const HEAR = 18 // tiles, how far music carries
 const PLAYING = 2 // sources sounding at once
 const SHOP_EVERY = 3 // one Späti or bar in this many has music on
 const WINDOW_EVERY = 80 // one building in this many has a window open
 const RADIO_EVERY = 5 // one moving car in this many has the radio on
-const AHEAD = 0.3 // seconds of notes scheduled ahead
+export const AHEAD = 0.3 // seconds of notes scheduled ahead
 // How each kind of source sounds: level, brightest cutoff in Hz, reverb send.
-const KINDS = {
+export const KINDS = {
 	radio: { level: 0.55, cutoff: 3200, wet: 0.25 },
 	bar: { level: 0.8, cutoff: 1400, wet: 0.5 },
 	window: { level: 0.7, cutoff: 2200, wet: 0.6 },
@@ -79,7 +79,7 @@ export function join(song, since, now) {
 }
 
 // Schedules a session's notes up to `horizon`, looping forever.
-function feed(p, horizon, now) {
+export function feed(p, horizon, now) {
 	const song = p.song
 	for (let guard = 0; guard < 5000; guard++) {
 		const events = song[p.cue.list].events
@@ -98,6 +98,59 @@ function feed(p, horizon, now) {
 	}
 }
 
+// One synth for all the music, into `master`.
+export function synthFor(context, master) {
+	const synth = createSynth(context, master)
+	synth.out.gain.value = 0.6
+	return synth
+}
+
+// How a source of `kind` sounds `d` tiles away: level, reverb send and
+// lowpass cutoff. Your own car's radio plays clear; sitting in a car muffles
+// everyone else's.
+export function shape(kind, d, own = false, inCar = false) {
+	const k = KINDS[kind]
+	const near = 1 - Math.min(1, d / HEAR)
+	const shut = inCar && !own ? 0.45 : 1
+	return { level: k.level * near * near * shut, wet: k.wet * near * shut, cutoff: own ? 6000 : k.cutoff * (0.35 + 0.65 * near) * shut }
+}
+
+// Starts a source's song through its own level, lowpass and pan, silent until
+// tuned, picking it up wherever it has got to.
+export function begin(synth, context, src, song) {
+	const kind = KINDS[src.kind]
+	const level = context.createGain()
+	level.gain.value = 0
+	const tone = context.createBiquadFilter()
+	tone.type = 'lowpass'
+	tone.frequency.value = kind.cutoff
+	const pan = context.createStereoPanner()
+	level.connect(tone).connect(pan).connect(synth.master)
+	const wet = context.createGain()
+	wet.gain.value = 0
+	wet.connect(synth.verbIn)
+	synth.warm(song)
+	const now = context.currentTime
+	return { src, song, level, tone, pan, wet, session: synth.session(song, level, wet), ...join(song, src.since, now + 0.05) }
+}
+
+export function tune(p, { level, wet, cutoff }, pan, now) {
+	p.level.gain.setTargetAtTime(level, now, 0.15)
+	p.wet.gain.setTargetAtTime(wet, now, 0.15)
+	p.tone.frequency.setTargetAtTime(cutoff, now, 0.15)
+	p.pan.pan.setTargetAtTime(pan, now, 0.1)
+}
+
+// Fades a source out and lets go of its nodes.
+export function end(p, context) {
+	p.level.gain.setTargetAtTime(0, context.currentTime, 0.3)
+	p.wet.gain.setTargetAtTime(0, context.currentTime, 0.3)
+	setTimeout(() => {
+		p.session.stop(0.01)
+		for (const node of [p.level, p.tone, p.pan, p.wet]) node.disconnect()
+	}, 2000)
+}
+
 export function createMusic(world, shops) {
 	const fixed = placeSources(world, shops)
 	const radios = new WeakMap()
@@ -106,6 +159,11 @@ export function createMusic(world, shops) {
 	const songs = new Map()
 	const playing = new Map()
 	let synth = null
+
+	function stop(p, context) {
+		playing.delete(p.src)
+		end(p, context)
+	}
 
 	function load(name) {
 		if (!texts.has(name)) {
@@ -135,47 +193,14 @@ export function createMusic(world, shops) {
 		return r
 	}
 
-	function begin(src, song, audio) {
-		const { context } = audio
-		const kind = KINDS[src.kind]
-		const level = context.createGain()
-		level.gain.value = 0
-		const tone = context.createBiquadFilter()
-		tone.type = 'lowpass'
-		tone.frequency.value = kind.cutoff
-		const pan = context.createStereoPanner()
-		level.connect(tone).connect(pan).connect(synth.master)
-		const wet = context.createGain()
-		wet.gain.value = 0
-		wet.connect(synth.verbIn)
-		synth.warm(song)
-		const now = context.currentTime
-		const p = { src, song, level, tone, pan, wet, session: synth.session(song, level, wet), ...join(song, src.since, now + 0.05) }
-		playing.set(src, p)
-		return p
-	}
-
-	function end(p, context) {
-		p.level.gain.setTargetAtTime(0, context.currentTime, 0.3)
-		p.wet.gain.setTargetAtTime(0, context.currentTime, 0.3)
-		playing.delete(p.src)
-		setTimeout(() => {
-			p.session.stop(0.01)
-			for (const node of [p.level, p.tone, p.pan, p.wet]) node.disconnect()
-		}, 2000)
-	}
-
 	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
 	function update(audio, cars, listener, view, inCar) {
 		if (!audio || audio.muted) {
-			for (const p of playing.values()) if (audio) end(p, audio.context)
+			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
 		const { context, master } = audio
-		if (!synth) {
-			synth = createSynth(context, master)
-			synth.out.gain.value = 0.6
-		}
+		synth ??= synthFor(context, master)
 		const sources = fixed.concat(
 			cars
 				.filter((c) => c.ai || c === listener.car)
@@ -183,20 +208,17 @@ export function createMusic(world, shops) {
 				.filter(Boolean),
 		)
 		const want = nearest(sources, listener.x, listener.y)
-		for (const p of playing.values()) if (!want.includes(p.src)) end(p, context)
+		for (const p of playing.values()) if (!want.includes(p.src)) stop(p, context)
 		const now = context.currentTime
 		for (const src of want) {
 			const song = load(src.score)
 			if (!song) continue
-			const p = playing.get(src) ?? begin(src, song, audio)
-			const kind = KINDS[src.kind]
-			const near = 1 - Math.min(1, Math.hypot(src.x - listener.x, src.y - listener.y) / HEAR)
-			const own = src.kind === 'car' && listener.car && radios.get(listener.car) === src
-			const shut = inCar && !own ? 0.45 : 1
-			p.level.gain.setTargetAtTime(kind.level * near * near * shut, now, 0.15)
-			p.wet.gain.setTargetAtTime(kind.wet * near * shut, now, 0.15)
-			p.tone.frequency.setTargetAtTime(own ? 6000 : kind.cutoff * (0.35 + 0.65 * near) * shut, now, 0.15)
-			p.pan.pan.setTargetAtTime(own ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1)), now, 0.1)
+			let p = playing.get(src)
+			if (!p) playing.set(src, (p = begin(synth, context, src, song)))
+			const own = src.kind === 'car' && !!listener.car && radios.get(listener.car) === src
+			const d = Math.hypot(src.x - listener.x, src.y - listener.y)
+			const pan = own ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
+			tune(p, shape(src.kind, d, own, inCar), pan, now)
 			feed(p, now + AHEAD, now)
 		}
 	}
