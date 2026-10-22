@@ -7,6 +7,7 @@ import { roadGraph, pointAt, project } from './roads.js'
 import { createJunctions } from './junctions.js'
 
 const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
+const SIGHT = 25 // tiles up the lane a driver watches the car ahead
 const PER_CAR = 15 // tiles of lane per moving car
 const PER_PARKED = 12 // tiles of kerb per parked car
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
@@ -83,23 +84,36 @@ export function createTraffic(world) {
 		const [tx, ty] = local(target.x, target.y)
 		const aim = Math.atan2(ty, tx)
 
-		// Slow for bends ahead, and for anything in the way.
+		// The speed this driver likes here, less for bends ahead.
 		const bend = along(ai, 3 + fwd)
 		const turnAhead = Math.abs(Math.atan2(Math.sin(bend.dir - c.angle), Math.cos(bend.dir - c.angle)))
-		let want = ai.edge.speed * m.pace * Math.max(0.35, 1 - turnAhead / 1.6)
-		if (Math.abs(aim) > 1) want = Math.min(want, 1.2)
+		let v0 = ai.edge.speed * m.pace * Math.max(0.35, 1 - turnAhead / 1.6)
+		if (Math.abs(aim) > 1) v0 = Math.min(v0, 1.2)
 
-		// Red lights and right of way, at this lane's stop line or the next one's.
-		// Stop lines are drawn for an ordinary car; anything longer stops sooner.
+		// Then brake for whatever's ahead, the hardest of them wins.
+		const d = m.driver
+		let worst = 0
+		// Red lights and right of way, at this lane's stop line or the next one's:
+		// a stopped car at the line. Stop lines are drawn for an ordinary car;
+		// anything longer stops sooner.
 		const longer = (m.length - LENGTH) / 2
 		for (const [e, gap] of [
 			[ai.edge, ai.edge.stop - ai.s - longer],
 			[ai.next, ai.edge.len - ai.s + (ai.next?.stop ?? 0) - longer],
 		]) {
 			if (e?.stop === undefined || !junctions.wait(c, e, gap)) continue
-			want = Math.min(want, gap > 0.1 ? Math.sqrt(4 * (gap - 0.1)) : 0)
+			worst = Math.min(worst, stopAt(d, fwd, gap))
 		}
 
+		// The car ahead in this lane or the next, however far up the road.
+		for (const o of cars) {
+			if (!o.ai || o === c) continue
+			const ahead = o.ai.edge === ai.edge ? o.ai.s - ai.s : o.ai.edge === ai.next ? ai.edge.len - ai.s + o.ai.s : 0
+			if (ahead <= 0 || ahead > SIGHT) continue
+			worst = Math.min(worst, follow(d, fwd, ahead - (m.length + o.model.length) / 2, forwardSpeed(o)))
+		}
+
+		// And anything right in front: crossing, oncoming, parked badly, on foot.
 		ai.ignore = Math.max(0, ai.ignore - dt)
 		let blocked = false
 		let standoff = false // blocked by someone crossing, coming the other way, or not driving at all
@@ -115,34 +129,39 @@ export function createTraffic(world) {
 				const wide = Math.abs(Math.sin(turned)) * ol + Math.abs(Math.cos(turned)) * ow
 				const clear = ox - m.length / 2 - deep
 				if (ox <= 0 || clear > 2 + fwd * 1.2 || Math.abs(oy) > m.width / 2 + wide + 0.1) continue
-				want = Math.min(want, Math.max(0, (clear - 0.3) * 1.2))
+				const towards = (o.vx ?? 0) * cos + (o.vy ?? 0) * sin // its speed along our way
+				worst = Math.min(worst, follow(d, fwd, clear - 0.3, towards))
 				blocked = true
 				if (Math.cos(turned) < 0.7 || (o.model && !o.ai && o !== player.car)) standoff = true
 			}
 		}
-		if (m === MODELS.bus) want = Math.min(want, busStop(c, local, dt))
+		if (m === MODELS.bus) worst = Math.min(worst, stopAt(d, fwd, busStop(c, local, dt)))
+		const acc = freeRoad(d, fwd, v0) + worst
+
 		// Two cars waiting on each other: after a while one just goes. A queue
 		// is not a standoff; that just waits.
 		ai.blocked = standoff && fwd < 0.2 ? ai.blocked + dt : 0
 		if (ai.blocked > 3 + Math.random()) ai.ignore = 1.5
 
 		// Wedged against something: back up a little.
-		ai.stuck = !blocked && want > 1 && Math.abs(fwd) < 0.2 ? ai.stuck + dt : 0
+		ai.stuck = !blocked && acc > d.a / 2 && Math.abs(fwd) < 0.2 ? ai.stuck + dt : 0
 		if (ai.stuck > 1.5) ai.reversing = 1.2
 		if (ai.reversing > 0) {
 			ai.reversing -= dt
 			return { throttle: -1, turn: -Math.sign(aim) }
 		}
 
+		// Standing and meaning to stay: foot on the brake.
+		const hold = fwd < 0.3 && acc < d.a * 0.1
 		return {
-			throttle: Math.max(-1, Math.min(1, (want - fwd) * 1.5)),
-			hold: want < 0.3,
+			throttle: hold ? Math.max(-1, Math.min(1, -fwd * 1.5)) : pedal(m, acc, fwd),
+			hold,
 			turn: Math.max(-1, Math.min(1, aim * 2.5)),
 		}
 	}
 
 	// Buses pull in at each stop on their side of the road, open up for a
-	// few seconds, and go on.
+	// few seconds, and go on. How far to the next place to stop.
 	function busStop(c, local, dt) {
 		const ai = c.ai
 		if (ai.dwell > 0) {
@@ -157,7 +176,7 @@ export function createTraffic(world) {
 				ai.dwell = 4
 				ai.served = stop
 			}
-			return ox > 0.3 ? Math.sqrt(3 * (ox - 0.3)) : 0
+			return ox - 0.3
 		}
 		return Infinity
 	}
@@ -256,6 +275,28 @@ export function createTraffic(world) {
 	}
 
 	return { cars, peds, update, enterable, steal, lights: junctions.lights }
+}
+
+// The Intelligent Driver Model (Treiber, 2000) decides how hard to press gas
+// and brake; the tyres still do the driving. `d` is the driver (see models.js),
+// v our speed. On an empty road, ease up to the speed v0:
+export const freeRoad = (d, v, v0) => d.a * (1 - (Math.max(0, v) / Math.max(v0, 0.1)) ** 4)
+
+// ...and brake for something `gap` tiles ahead, bumper to bumper, going at `lead`:
+// keep s0 standing and T seconds moving, more when closing in fast.
+export function follow(d, v, gap, lead, s0 = d.s0, T = d.T) {
+	const want = s0 + Math.max(0, v * T + (v * (v - lead)) / (2 * Math.sqrt(d.a * d.b)))
+	return -d.a * (want / Math.max(gap, 0.05)) ** 2
+}
+
+// A line to stop at is a car standing there, with no time gap to keep.
+export const stopAt = (d, v, gap) => follow(d, v, gap, 0, 0.1, 0)
+
+// From the acceleration wanted to the pedal: overcome drag and rolling
+// resistance on top (see car.js), then gas or brake.
+export function pedal(m, acc, v) {
+	const need = acc + m.drag * v * Math.abs(v) + 4 * m.rolling * v
+	return Math.max(-1, Math.min(1, need / (need > 0 ? m.engine : m.brake)))
 }
 
 const inView = (v, x, y, pad) => x > v.x0 - pad && x < v.x1 + pad && y > v.y0 - pad && y < v.y1 + pad

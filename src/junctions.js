@@ -10,6 +10,7 @@ const CLEAR = 2 // all red, so the junction empties
 const CYCLE = 2 * (GREEN + AMBER + CLEAR)
 const APPROACH = 7 // tiles before its stop line a car counts as arriving
 const PATIENCE = 4 // seconds a car waits before it goes anyway
+const WAVE = 4.6 // tiles/s, about 50 km/h: drive this along a main road and catch the greens
 
 export function createJunctions(edges, signals = []) {
 	const junctions = cluster(edges.map((e) => e.to).filter(isJunction))
@@ -25,13 +26,15 @@ export function createJunctions(edges, signals = []) {
 			let s = e.len
 			while (s > 0 && dist(pointAt(e.lane, s), j) < r) s -= 0.25
 			e.stop = Math.max(0, s - LENGTH / 2)
-			e.phase = across(e, j.entries[0]) ? 1 : 0
 			e.heading = heading(e)
 			entryOf.set(e, j)
 		}
+		// The widest road through gets the first green, its cross roads the second.
+		const main = j.entries.reduce((a, b) => (b.w > a.w ? b : a), j.entries[0])
+		for (const e of j.entries) e.phase = across(e, main) ? 1 : 0
 		j.r = j.spread + Math.max(...j.entries.map((e) => e.w)) / 2
 		j.signal = signals.some((p) => dist(p, j) < j.r + 5)
-		j.offset = Math.random() * CYCLE
+		j.offset = main ? waveOffset(j, main.heading) : 0
 	}
 
 	let time = 0
@@ -60,10 +63,7 @@ export function createJunctions(edges, signals = []) {
 		}
 	}
 
-	function light(j, e) {
-		const t = (time + j.offset + (e.phase * CYCLE) / 2) % CYCLE
-		return t < GREEN ? 'green' : t < GREEN + AMBER ? 'amber' : 'red'
-	}
+	const light = (j, e) => signalPhase(time + j.offset + (e.phase * CYCLE) / 2)
 
 	// Should car c stop at the line where lane e meets a junction, `gap` tiles ahead?
 	function wait(c, e, gap) {
@@ -71,7 +71,9 @@ export function createJunctions(edges, signals = []) {
 		if (!j || gap < -0.3) return false
 		if (j.signal) {
 			const state = light(j, e)
-			return state === 'red' || (state === 'amber' && gap > 1.5)
+			// On amber, stop if you comfortably can.
+			const v = Math.hypot(c.vx, c.vy)
+			return state === 'red' || (state === 'amber' && gap > (v * v) / (2 * (c.model?.driver?.b ?? 1)))
 		}
 		if ((waited.get(c) ?? 0) > PATIENCE) return false
 		// Something crossing in the middle.
@@ -95,6 +97,21 @@ export function createJunctions(edges, signals = []) {
 	const near = (x, y, pad) => junctions.some((j) => dist({ x, y }, j) < j.r + pad)
 
 	return { update, wait, lights, near }
+}
+
+// Every light runs off one clock: green, amber, then red while the cross
+// road has its turn, at t seconds into the cycle.
+export function signalPhase(t) {
+	const at = ((t % CYCLE) + CYCLE) % CYCLE
+	return at < GREEN ? 'green' : at < GREEN + AMBER ? 'amber' : 'red'
+}
+
+// Where a junction's lights sit in the cycle: later the further along its main
+// road, so the greens roll down the street at WAVE. Both directions of a road
+// share one axis, so neighbouring junctions on it agree.
+export function waveOffset(p, heading) {
+	const axis = ((heading % Math.PI) + Math.PI) % Math.PI
+	return -(p.x * Math.cos(axis) + p.y * Math.sin(axis)) / WAVE
 }
 
 // Bigger road first. Between equals, whoever comes from the right: their

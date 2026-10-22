@@ -7,12 +7,18 @@
 // fractions of the car's length and width, with heights in tiles. Paint is
 // the car's colour, glass is dark, tyres stick out a little past the body.
 // The front is +x. Brake lights, headlights and the rim are added for you.
+//
+// `driver` is how whoever's at the wheel drives in traffic (the Intelligent
+// Driver Model, in tiles and seconds): the acceleration they pull away with,
+// the braking they find comfortable, the time gap they keep to the car ahead,
+// and the gap they leave standing in a queue.
 
 export const MODELS = {
 	car: {
 		name: 'Kleinwagen',
 		noun: 'Auto',
 		pace: 1, // how fast its drivers like to go
+		driver: { a: 0.8, b: 1.1, T: 1.2, s0: 0.6 },
 		length: 1.5,
 		width: 0.66,
 		mass: 1,
@@ -36,6 +42,7 @@ export const MODELS = {
 		name: 'SUV',
 		noun: 'Auto',
 		pace: 1.15,
+		driver: { a: 0.8, b: 1.1, T: 1, s0: 0.6 },
 		length: 1.65,
 		width: 0.74,
 		mass: 1.7,
@@ -59,6 +66,7 @@ export const MODELS = {
 		name: 'Lambo',
 		noun: 'Lambo',
 		pace: 1.4,
+		driver: { a: 1.3, b: 1.4, T: 0.8, s0: 0.5 },
 		length: 1.5,
 		width: 0.7,
 		mass: 0.9,
@@ -83,6 +91,7 @@ export const MODELS = {
 		name: 'Bus',
 		noun: 'Bus',
 		pace: 0.85,
+		driver: { a: 0.4, b: 0.8, T: 1.5, s0: 0.8 },
 		length: 4,
 		width: 0.85,
 		mass: 6,
