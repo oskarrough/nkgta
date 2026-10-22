@@ -1000,6 +1000,18 @@ const tarPaper = `
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
 
+// How much of a pixel `w` wide around `x` falls where fract(x) is in [a, b]:
+// a box filter of a repeating band, exact, so far windows settle into their
+// average instead of shimmering (after Slop New York's filteredPulse).
+const pulse = `
+float pulse(float x, float a, float b, float w) {
+	float hw = max(w, 0.0001) * 0.5;
+	float hi = floor(x + hw) * (b - a) + clamp(fract(x + hw), a, b) - a;
+	float lo = floor(x - hw) * (b - a) + clamp(fract(x - hw), a, b) - a;
+	return (hi - lo) / (2.0 * hw);
+}
+`
+
 // Walls draw their own windows: one per 3 m along the wall and per storey up
 // it, wider shop windows on the ground floor, a ledge between storeys and now
 // and then a lit window. Sheds and garages stay blank.
@@ -1019,6 +1031,7 @@ function wallMaterial(tileM, gradient) {
 			)
 		shader.fragmentShader =
 			decl +
+			pulse +
 			shader.fragmentShader.replace(
 				'#include <color_fragment>',
 				`#include <color_fragment>
@@ -1032,8 +1045,11 @@ function wallMaterial(tileM, gradient) {
 					float halfW = mix(0.22, 0.4, shop);
 					float lo = mix(0.35, 0.1, shop);
 					float hi = mix(0.8, 0.74, shop);
-					float wx = smoothstep(0.5 - halfW - aa.x, 0.5 - halfW + aa.x, u) * (1.0 - smoothstep(0.5 + halfW - aa.x, 0.5 + halfW + aa.x, u));
-					float wz = smoothstep(lo - aa.y, lo + aa.y, fz) * (1.0 - smoothstep(hi - aa.y, hi + aa.y, fz));
+					float wx = pulse(u, 0.5 - halfW, 0.5 + halfW, aa.x);
+					float wz = pulse(fz, lo, hi, aa.y);
+					// Below about a pixel a window, the details that pick one window
+					// out (lit, glint, sill, stripes) give way to their average.
+					float near = 1.0 - smoothstep(0.25, 0.6, max(aa.x, aa.y));
 					// Rounded, because interpolated varyings wobble in their last bits
 					// and the hash would blow that up into speckle.
 					float wallId = floor(vWall.y + 0.5) + floor(vWall.z * 8.0 + 0.5);
@@ -1043,16 +1059,17 @@ function wallMaterial(tileM, gradient) {
 					float wu = (u - 0.5 + halfW) / (2.0 * halfW);
 					float wv = (fz - lo) / (hi - lo);
 					float glint = step(abs(wu - wv - 0.15), 0.12) * (1.0 - shop);
-					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : mix(${glsl(WALL.glass)}, ${glsl(WALL.glint)}, glint);
+					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : mix(${glsl(WALL.glass)}, ${glsl(WALL.glint)}, glint * near);
+					glass = mix(mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, 0.06), glass, near);
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
 					// A pale sill under each upper window.
 					float sill = step(lo - ${WALL.sill.toFixed(3)}, fz) * step(fz, lo) * step(abs(u - 0.5), halfW + 0.04) * (1.0 - shop);
-					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8);
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8 * near);
 					// Shopfronts: an awning over some, plain or striped.
 					float awning = shop * step(bay, ${WALL.awnings.toFixed(2)}) * step(hi + 0.03, fz) * step(fz, 0.97) * step(abs(u - 0.5), halfW + 0.06);
 					float pick = fract(bay * 7.31);
 					vec3 cloth = pick < 0.25 ? ${glsl(AWNINGS[0])} : pick < 0.5 ? ${glsl(AWNINGS[1])} : pick < 0.75 ? ${glsl(AWNINGS[2])} : ${glsl(AWNINGS[3])};
-					if (fract(bay * 3.7) < 0.5 && fract(along * 5.0) < 0.5) cloth = ${glsl(WALL.stucco)};
+					if (fract(bay * 3.7) < 0.5) cloth = mix(cloth, ${glsl(WALL.stucco)}, mix(0.5, step(fract(along * 5.0), 0.5), near));
 					diffuseColor.rgb = mix(diffuseColor.rgb, cloth, awning);
 					float ledge = 1.0 - smoothstep(0.0, 0.05 + aa.y, fz);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
