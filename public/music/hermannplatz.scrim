@@ -1,0 +1,35 @@
+title    Hermannplatz
+about    Berlin trap out of a car window. A sliding 808, rolling hats and a cold bell.
+tempo    140
+beats    4
+steps    4
+reverb   0.25
+
+voice bell  bell     vol=0.6  pan=0.2
+voice pad   pad      vol=0.35 center=G4
+voice b808  synbass  vol=1.1  glide=0.09
+voice kick  kick     vol=0.9
+voice clap  clap     vol=0.55
+voice hat   hat      vol=0.45 pan=0.25
+voice ohat  ohat     vol=0.3  pan=-0.2
+
+pattern intro
+pad  | [Cm]--------------- | = |
+bell | G5-- Eb5-- C5-- G4-- Ab4--- | G5-- Eb5-- C5-- D5-- Eb5--- |
+hat  | _ | .... .... .... xxxx |
+
+pattern A
+bell | G5-- Eb5-- C5-- G4-- Ab4--- | G5-- Eb5-- C5-- D5-- Eb5--- | F5-- Eb5-- C5-- Ab4-- G4--- | D5-- B4-- G4-- D5-- B4--- |
+pad  | [Cm]--------------- | [Ab]--------------- | [Fm]--------------- | [G]--------------- |
+b808 | C2------ . ~C2- C2- ~Eb2--- | Ab1------ . Ab1- ~C2- ~Bb1--- | F1------ . F1- ~Ab1- ~C2--- | G1------ . G1- ~B1- ~D2--- |
+kick | x... .... ..x. .x.. | x..x .... ..x. .... | % | x... ..x. ..x. x... |
+clap | .... .... x... .... | % | % | .... .... x... ..x. |
+hat  | x.x. x.x. x.x. xxxx | x.x. xxx. x.x. x.x. | x.x. x.x. xxxx x.x. | x.xx x.x. x.x. XxXx |
+ohat | _ | _ | _ | .... .... .... ..x. |
+
+# the bell drops out and the 808 carries it
+pattern A2 from A
+mute bell pad
+
+play intro
+loop A A A2 A

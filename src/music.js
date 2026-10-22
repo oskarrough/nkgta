@@ -1,0 +1,214 @@
+// Music from places: a Späti radio, a bar door, an open window, a passing car.
+// Each plays one of the scores in public/music, plain text the Scrimshaw synth
+// plays live, quieter and duller the further away it is. Only the nearest few
+// play at all, and each one carries on where it had got to while you were away.
+import { compile } from './scrimshaw/score.js'
+import { createSynth } from './scrimshaw/synth.js'
+
+export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi']
+const HEAR = 18 // tiles, how far music carries
+const PLAYING = 2 // sources sounding at once
+const SHOP_EVERY = 3 // one Späti or bar in this many has music on
+const WINDOW_EVERY = 80 // one building in this many has a window open
+const RADIO_EVERY = 5 // one moving car in this many has the radio on
+const AHEAD = 0.3 // seconds of notes scheduled ahead
+// How each kind of source sounds: level, brightest cutoff in Hz, reverb send.
+const KINDS = {
+	radio: { level: 0.55, cutoff: 3200, wet: 0.25 },
+	bar: { level: 0.8, cutoff: 1400, wet: 0.5 },
+	window: { level: 0.7, cutoff: 2200, wet: 0.6 },
+	car: { level: 1, cutoff: 900, wet: 0.15 },
+}
+
+// A number in [0, 1) that is always the same for the same n.
+const hash = (n) => {
+	const s = Math.sin(n * 127.1 + 311.7) * 43758.5453
+	return s - Math.floor(s)
+}
+
+// Spätis, bars and the odd open window, each with its score and how long ago
+// its song started.
+export function placeSources(world, shops) {
+	const sources = []
+	for (const [i, shop] of shops.entries()) {
+		const kind = shop.kind === 'spaeti' ? 'radio' : shop.kind === 'bar' ? 'bar' : null
+		if (kind && hash(1000 + i) * SHOP_EVERY < 1) sources.push(source(kind, shop.x, shop.y, 1000 + i))
+	}
+	for (const [i, b] of world.buildings.entries()) {
+		if (hash(i) * WINDOW_EVERY >= 1) continue
+		const r = b.rings[0]
+		sources.push(source('window', r[0], r[1], i))
+	}
+	return sources
+}
+
+function source(kind, x, y, seed) {
+	return { kind, x, y, score: SCORES[Math.floor(hash(seed + 0.5) * SCORES.length)], since: hash(seed + 0.25) * 600 }
+}
+
+// The PLAYING sources nearest (x, y), within earshot.
+export function nearest(sources, x, y) {
+	return sources
+		.map((s) => ({ s, d: Math.hypot(s.x - x, s.y - y) }))
+		.filter((n) => n.d < HEAR)
+		.sort((a, b) => a.d - b.d)
+		.slice(0, PLAYING)
+		.map((n) => n.s)
+}
+
+// Where a song has got to after `elapsed` seconds: which timeline, the index of
+// the next note and that timeline's start, in seconds from the song's start.
+export function cueAt(song, elapsed) {
+	let list = 'intro'
+	let offset = 0
+	if (elapsed >= song.intro.dur && song.loop.dur > 0) {
+		list = 'loop'
+		offset = song.intro.dur + Math.floor((elapsed - song.intro.dur) / song.loop.dur) * song.loop.dur
+	}
+	const events = song[list].events
+	let i = events.findIndex((e) => offset + e.t >= elapsed)
+	if (i < 0) i = events.length
+	return { list, i, offset }
+}
+
+// Radios don't wait for you: a source's song started `since` seconds before the
+// audio clock did, so joining at `now` picks it up wherever it has got to.
+export function join(song, since, now) {
+	const start = -since
+	return { start, cue: cueAt(song, now - start) }
+}
+
+// Schedules a session's notes up to `horizon`, looping forever.
+function feed(p, horizon, now) {
+	const song = p.song
+	for (let guard = 0; guard < 5000; guard++) {
+		const events = song[p.cue.list].events
+		if (p.cue.i >= events.length) {
+			if (!song.loop.dur) return
+			const next = p.cue.list === 'intro' ? song.intro.dur : p.cue.offset + song.loop.dur
+			if (p.start + next > horizon) return
+			p.cue = { list: 'loop', i: 0, offset: next }
+			continue
+		}
+		const ev = events[p.cue.i]
+		const t = p.start + p.cue.offset + ev.t
+		if (t > horizon) return
+		if (t >= now - 0.03) p.session.play(ev, Math.max(t, now + 0.005))
+		p.cue.i++
+	}
+}
+
+export function createMusic(world, shops) {
+	const fixed = placeSources(world, shops)
+	const radios = new WeakMap()
+	let carSeed = 0
+	const texts = new Map()
+	const songs = new Map()
+	const playing = new Map()
+	let synth = null
+
+	function load(name) {
+		if (!texts.has(name)) {
+			texts.set(name, null)
+			fetch(`/music/${name}.scrim`)
+				.then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${name}: ${r.status}`))))
+				.then((text) => {
+					const song = compile(text)
+					if (song.errors.length) console.warn(`Score ${name}:`, song.errors)
+					songs.set(name, song)
+				})
+				.catch((error) => console.warn('Music unavailable:', error))
+		}
+		return songs.get(name)
+	}
+
+	function radioOf(car) {
+		if (!radios.has(car)) {
+			const seed = 5000 + carSeed++
+			radios.set(car, hash(seed) * RADIO_EVERY < 1 ? source('car', car.x, car.y, seed) : null)
+		}
+		const r = radios.get(car)
+		if (r) {
+			r.x = car.x
+			r.y = car.y
+		}
+		return r
+	}
+
+	function begin(src, song, audio) {
+		const { context } = audio
+		const kind = KINDS[src.kind]
+		const level = context.createGain()
+		level.gain.value = 0
+		const tone = context.createBiquadFilter()
+		tone.type = 'lowpass'
+		tone.frequency.value = kind.cutoff
+		const pan = context.createStereoPanner()
+		level.connect(tone).connect(pan).connect(synth.master)
+		const wet = context.createGain()
+		wet.gain.value = 0
+		wet.connect(synth.verbIn)
+		synth.warm(song)
+		const now = context.currentTime
+		const p = { src, song, level, tone, pan, wet, session: synth.session(song, level, wet), ...join(song, src.since, now + 0.05) }
+		playing.set(src, p)
+		return p
+	}
+
+	function end(p, context) {
+		p.level.gain.setTargetAtTime(0, context.currentTime, 0.3)
+		p.wet.gain.setTargetAtTime(0, context.currentTime, 0.3)
+		playing.delete(p.src)
+		setTimeout(() => {
+			p.session.stop(0.01)
+			for (const node of [p.level, p.tone, p.pan, p.wet]) node.disconnect()
+		}, 2000)
+	}
+
+	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
+	function update(audio, cars, listener, view, inCar) {
+		if (!audio || audio.muted) {
+			for (const p of playing.values()) if (audio) end(p, audio.context)
+			return
+		}
+		const { context, master } = audio
+		if (!synth) {
+			synth = createSynth(context, master)
+			synth.out.gain.value = 0.6
+		}
+		const sources = fixed.concat(
+			cars
+				.filter((c) => c.ai || c === listener.car)
+				.map(radioOf)
+				.filter(Boolean),
+		)
+		const want = nearest(sources, listener.x, listener.y)
+		for (const p of playing.values()) if (!want.includes(p.src)) end(p, context)
+		const now = context.currentTime
+		for (const src of want) {
+			const song = load(src.score)
+			if (!song) continue
+			const p = playing.get(src) ?? begin(src, song, audio)
+			const kind = KINDS[src.kind]
+			const near = 1 - Math.min(1, Math.hypot(src.x - listener.x, src.y - listener.y) / HEAR)
+			const own = src.kind === 'car' && listener.car && radios.get(listener.car) === src
+			const shut = inCar && !own ? 0.45 : 1
+			p.level.gain.setTargetAtTime(kind.level * near * near * shut, now, 0.15)
+			p.wet.gain.setTargetAtTime(kind.wet * near * shut, now, 0.15)
+			p.tone.frequency.setTargetAtTime(own ? 6000 : kind.cutoff * (0.35 + 0.65 * near) * shut, now, 0.15)
+			p.pan.pan.setTargetAtTime(own ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1)), now, 0.1)
+			feed(p, now + AHEAD, now)
+		}
+	}
+
+	return {
+		update,
+		inspect: () =>
+			[...playing.values()].map((p) => ({
+				kind: p.src.kind,
+				score: p.src.score,
+				gain: p.level.gain.value,
+				cutoff: p.tone.frequency.value,
+			})),
+	}
+}
