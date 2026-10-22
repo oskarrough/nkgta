@@ -13,6 +13,7 @@ const PER_CAR = 15 // tiles of lane per moving car
 const PER_PARKED = 12 // tiles of kerb per parked car
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
 const BIG_ROAD = 4 // tiles wide: buses keep to these
+const CONVOY = { cars: 5, gap: 2.4, every: [60, 150], colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', '#b8bcc2'] }
 
 export function createTraffic(world) {
 	const edges = roadGraph(world)
@@ -26,6 +27,7 @@ export function createTraffic(world) {
 	const runners = [] // drivers thrown out of their cars, running off
 	const peds = [] // everyone on foot, for drawing
 	let started = false
+	let convoyIn = 20 // seconds until the next wedding convoy comes round
 
 	function pick(list, weight) {
 		let r = Math.random() * list.reduce((s, e) => s + weight(e), 0)
@@ -67,13 +69,47 @@ export function createTraffic(world) {
 		}
 	}
 
+	// A wedding convoy: a string of cars nose to tail up one lane, out of sight,
+	// the bride's white car in front. They all take the turns the first one to
+	// get there takes, so they stay together.
+	function spawnConvoy(near, ring, view) {
+		const n = CONVOY.cars
+		const span = (n - 1) * CONVOY.gap + 1
+		for (let tries = 0; tries < 40; tries++) {
+			const edge = pick(near, (e) => (e.len > span ? e.len : 0))
+			if (edge.len <= span) return false
+			const s0 = span + Math.random() * (edge.len - span)
+			const spots = Array.from({ length: n }, (_, k) => pointAt(edge.lane, s0 - k * CONVOY.gap))
+			if (spots.some((p) => Math.hypot(p.x - ring.x, p.y - ring.y) > ring.max || (started && inView(view, p.x, p.y, 2)))) continue
+			const models = spots.map((_, k) => (k > 0 && Math.random() < 0.4 ? MODELS.suv : MODELS.car))
+			if (spots.some((p, k) => !fits(p.x, p.y, p.dir, models[k]))) continue
+			const group = { turns: new Map() }
+			for (const [k, p] of spots.entries()) {
+				const car = createCar({
+					x: p.x,
+					y: p.y,
+					angle: p.dir,
+					model: models[k],
+					color: CONVOY.colors[k % CONVOY.colors.length],
+					speed: edge.speed * 0.6,
+				})
+				car.convoy = group
+				car.ai = { edge, next: null, s: s0 - k * CONVOY.gap, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0 }
+				car.ai.next = nextEdge(edge, car.model, group)
+				cars.push(car)
+			}
+			return true
+		}
+		return false
+	}
+
 	function aiControls(c, player, dt) {
 		const ai = c.ai
 		ai.s = project(ai.edge.lane, c.x, c.y)
 		if (ai.s > ai.edge.len - 0.3) {
 			if (!ai.next) return null
 			ai.edge = ai.next
-			ai.next = nextEdge(ai.edge, c.model)
+			ai.next = nextEdge(ai.edge, c.model, c.convoy)
 			ai.s = project(ai.edge.lane, c.x, c.y)
 		}
 		const fwd = forwardSpeed(c)
@@ -190,8 +226,15 @@ export function createTraffic(world) {
 	}
 
 	// Lanes running into the edge of the map lead nowhere, and buses keep to
-	// the big roads where they can.
-	function nextEdge(edge, model) {
+	// the big roads where they can. A convoy goes where its first car went.
+	function nextEdge(edge, model, convoy) {
+		if (convoy?.turns.has(edge)) return convoy.turns.get(edge)
+		const next = chooseNext(edge, model)
+		convoy?.turns.set(edge, next)
+		return next
+	}
+
+	function chooseNext(edge, model) {
 		const out = edge.to.out.filter((e) => e !== edge.twin)
 		const onMap = out.filter((e) => !e.to.off)
 		let choices = onMap.length ? onMap : out
@@ -230,6 +273,11 @@ export function createTraffic(world) {
 			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(80, laneLength / PER_CAR); i++) spawn(near, ring, view, false)
 			for (let i = 0, n = started ? 2 : 999; i < n && parked + i < Math.min(60, laneLength / 2 / PER_PARKED); i++)
 				spawn(near, ring, view, true)
+		}
+		// Now and then a wedding convoy, one at a time.
+		if (near.length && !cars.some((c) => c.convoy) && (convoyIn -= dt) < 0) {
+			convoyIn = CONVOY.every[0] + Math.random() * (CONVOY.every[1] - CONVOY.every[0])
+			if (!spawnConvoy(near, ring, view)) convoyIn = 5
 		}
 		started = true
 		junctions.update(cars, dt)
@@ -282,11 +330,15 @@ export function createTraffic(world) {
 			runners.push({ x, y, dir: c.angle - Math.PI / 2 + (Math.random() - 0.5), t: 4 })
 			say(SHOUTS[Math.floor(Math.random() * SHOUTS.length)].replace('{}', c.model.noun))
 			c.ai = null
+			c.convoy = null
 		} else say(c.line ? `${c.model.name} ${c.line}` : c.model.name)
 		c.kept = true
 	}
 
-	return { cars, peds, update, enterable, steal, lights: junctions.lights }
+	// Sends the next wedding convoy round now, for trying it out.
+	const convoy = () => (convoyIn = 0)
+
+	return { cars, peds, update, enterable, steal, convoy, lights: junctions.lights }
 }
 
 // The Intelligent Driver Model (Treiber, 2000) decides how hard to press gas

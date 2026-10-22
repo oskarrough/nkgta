@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { compile } from '../src/scrimshaw/score.js'
-import { SCORES, cueAt, join, nearest, placeSources } from '../src/music.js'
+import { CONVOY, HEAR, SCORES, convoyCars, cueAt, join, nearest, placeSources, shape } from '../src/music.js'
 
 const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.scrim`, import.meta.url), 'utf8'))
 
@@ -30,6 +30,19 @@ describe('music in the street', () => {
 		expect(count('window')).toBeLessThan(15)
 		expect(placeSources(world, shops)).toEqual(sources)
 		for (const s of sources) expect(SCORES).toContain(s.score)
+		expect(sources.map((s) => s.score)).not.toContain(CONVOY)
+	})
+
+	test('you hear a wedding convoy coming from much further than a car radio, and louder', () => {
+		const convoy = { kind: 'convoy', x: HEAR * 2, y: 0 }
+		const car = { kind: 'car', x: HEAR * 2, y: 0 }
+		expect(nearest([car, convoy], 0, 0)).toEqual([convoy])
+		const far = shape('convoy', HEAR * 1.5)
+		const near = shape('convoy', 5)
+		expect(far.level).toBeGreaterThan(0)
+		expect(near.level).toBeGreaterThan(far.level)
+		expect(near.cutoff).toBeGreaterThan(far.cutoff)
+		expect(near.level).toBeGreaterThan(shape('car', 5).level)
 	})
 
 	test('only the nearest two in earshot play', () => {
@@ -42,6 +55,16 @@ describe('music in the street', () => {
 		expect(nearest(sources, 0, 0)).toEqual([sources[0], sources[2]])
 		expect(nearest(sources, 100, 0)).toEqual([sources[3]])
 		expect(nearest(sources, 60, 0)).toEqual([])
+	})
+
+	test('a passing convoy keeps playing until its last car has gone by', () => {
+		const group = {}
+		const convoy = [0, 1, 2, 3, 4].map((k) => ({ ai: {}, convoy: group, x: 40 - k * 2.4, y: 0 }))
+		const others = [{ ai: {}, x: 31, y: 0 }]
+		// Standing beside the tail, with the front car 9.6 tiles on.
+		const at = convoyCars([...convoy, ...others], 30.4, 1)
+		expect([...at]).toEqual([[group, convoy[4]]])
+		expect(Math.hypot(at.get(group).x - 30.4, at.get(group).y - 1)).toBe(1)
 	})
 
 	test('coming back, a source carries on where its song had got to', () => {
