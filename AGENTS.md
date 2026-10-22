@@ -10,7 +10,7 @@ See README.md for what the game is and where the code lives.
 ## Testing
 
 - `bun run check` lints and checks formatting; `bun run format` fixes formatting.
-- Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage). The dev server usually already runs on :5277; reuse it rather than starting another.
+- Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
 - After adding a dependency, restart the dev server, or Vite keeps serving stale optimized deps and the page hangs on "Lade Karte…".
 
 ## Map data
