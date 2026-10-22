@@ -283,6 +283,8 @@ let lastClink = -Infinity
 
 export const sound = {
 	start,
+	// The context and master for music from the street, once sound has started.
+	audio: () => context && { context, master, muted },
 	engine,
 	street,
 	async door() {

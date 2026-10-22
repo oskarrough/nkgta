@@ -32,6 +32,9 @@ Leaflet 1.9.4 by Volodymyr Agafonkin and contributors (BSD-2-Clause) - https://l
 polygon-clipping 0.15.7 by Mike Fogel (MIT) - https://github.com/mfogel/polygon-clipping
 TinyJoin 0.6.0 by James Pearce (MIT) - https://github.com/tinyplex/tinyjoin
 
+Scrimshaw score format and synth by Simon Willison (Apache-2.0) - https://tools.simonwillison.net/scrimshaw-jukebox
+  Vendored in src/scrimshaw/, with its licence. The scores in public/music/ are new, written for NK GTA.
+
 Build and development tools
 ---------------------------
 Vite 8.3.4 by Evan You and Vite contributors (MIT) - https://vite.dev

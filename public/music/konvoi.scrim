@@ -1,0 +1,36 @@
+title    Konvoi
+about    An Anatolian rock wedding on wheels, after Barış Manço. Clarinet in Hijaz, a saz on the off-beats, darbuka and claps.
+tempo    120
+beats    4
+steps    4
+reverb   0.25
+
+voice clar  clarinet vol=0.9  pan=-0.15
+voice saz   banjo    vol=0.6  pan=0.3
+voice organ organ    vol=0.45 pan=-0.3 gate=0.9 center=F#4
+voice bass  upright  vol=0.9
+voice dum   conga    vol=0.7
+voice tek   bongo    vol=0.5  pan=0.25
+voice tamb  tamb     vol=0.4  pan=0.4
+voice clap  clap     vol=0.4  pan=-0.2
+
+pattern intro
+saz | D4 D4 A4 D4 Eb4 D4 F#4 D4 D4 D4 A4 D4 G4 F#4 Eb4 D4 | % |
+dum | X... .... x... .... | X... .... x... x.x. |
+tek | .... x.x. .... x.xx | % |
+
+pattern A
+clar  | D5- Eb5- F#5- G5- A5--- G5- F#5- | G5- F#5- Eb5- F#5- D5------- | A5- Bb5- A5- G5- F#5- G5- A5--- | G5 F#5 Eb5 F#5 G5 F#5 Eb5 C5 D5------- |
+saz   | D4 D4 A4 D4 Eb4 D4 F#4 D4 D4 D4 A4 D4 G4 F#4 Eb4 D4 | % | C4 C4 G4 C4 Bb3 C4 Eb4 C4 D4 D4 A4 D4 G4 F#4 Eb4 D4 | D4 D4 A4 D4 Eb4 D4 F#4 D4 D4 D4 A4 D4 G4 F#4 Eb4 D4 |
+organ | [D]--------------- | = | [Cm]------- [D]------- | [D]--------------- |
+bass  | D2--- . D2 A1- D2--- A1--- | % | C2--- . C2 G1- D2--- A1--- | D2--- . D2 A1- D2--- A1--- |
+dum   | X... .... x... .... | % | % | X... .... x... x.x. |
+tek   | .... x.x. .... x.xx | % | % | % |
+tamb  | x.x. x.x. x.x. x.x. | % | % | % |
+clap  | .... x... .... x... | % | % | % |
+
+pattern A2 from A
+mute clar
+
+play intro
+loop A A2 A A+5

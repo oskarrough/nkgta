@@ -15,6 +15,7 @@ import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
 
 import { sound } from './sound.js'
+import { createMusic } from './music.js'
 
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
 
@@ -37,6 +38,7 @@ const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
+const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
@@ -144,6 +146,7 @@ function frame(now) {
 	if (!inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
+	music.update(sound.audio(), traffic.cars, street, streetView, !!player.car)
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt)
 	const help = camera.selected()
 		? cam.third
@@ -183,4 +186,4 @@ loading.remove()
 requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.
-if (import.meta.env.DEV) window.nkgta = window.__nkgta = { player, shops, visit, pfand, camera, traffic }
+if (import.meta.env.DEV) window.nkgta = window.__nkgta = { player, shops, visit, pfand, camera, traffic, music, sound }
