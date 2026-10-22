@@ -1,0 +1,42 @@
+title    Sonnenallee bei Nacht
+about    Deutschrap after midnight. An oud riff in maqam Saba over a sliding 808 and trap hats, a ney on top, darbuka in saidi when the kit drops out.
+street   Sonnenallee
+tempo    140
+beats    4
+steps    4
+reverb   0.3
+
+# Saba on D: D Eq F Gb A Bb C. The Gb against the half-flat E is what makes it ache.
+voice oud   oud      vol=0.85 pan=-0.15
+voice ney   ney      vol=0.7  pan=0.2
+voice b808  808      vol=0.8  glide=0.09
+voice kick  kick     vol=0.85
+voice clap  clap     vol=0.5
+voice hat   hat      vol=0.4  pan=0.25
+voice dum   dum      vol=0.85
+voice tek   tek      vol=0.5  pan=-0.25
+
+pattern intro
+oud | D4 . Eq4 F4 Gb4- F4 Eq4 D4-- . . A3- . | D4 . Eq4 F4 Gb4- A4 Gb4 F4-- Eq4 . D4-- |
+hat | _ | .... .... .... xxxx |
+
+pattern A
+oud  | D4 . Eq4 F4 Gb4- F4 Eq4 D4-- . . A3- . | D4 . Eq4 F4 Gb4- A4 Gb4 F4-- Eq4 . D4-- | D4 . Eq4 F4 Gb4- F4 Eq4 D4-- . . A3- . | Bb3 . C4 D4 Eq4- F4 Eq4 D4------- |
+b808 | D2------ . ~D2- D2- ~F2--- | Bb1------ . Bb1- ~C2- ~D2--- | D2------ . ~D2- D2- ~F2--- | C2------ . C2- ~D2- ~Eq2--- |
+kick | x... .... ..x. .x.. | x..x .... ..x. .... | % | x... ..x. ..x. x... |
+clap | .... .... x... .... | % | % | .... .... x... ..x. |
+hat  | x.x. x.x. x.x. xxxx | x.x. xxx. x.x. x.x. | x.x. x.x. xxxx x.x. | x.xx x.x. x.x. XxXx |
+tek  | _ | .... .... .... ..x. | _ | .... .... .... x.x. |
+
+# the ney comes in over the riff
+pattern A2 from A
+ney | F5------- Gb5--- F5- Eq5- | D5--------------- | A4--- Bb4--- A4- Gb4- F4- Gb4- | F4- Eq4- D4----------- |
+
+# the kit drops out; the darbuka keeps the street going in saidi
+pattern C from A2
+mute kick clap hat
+dum | X... ..x. x... .... | % | % | X... ..x. x... x.x. |
+tek | ..x. .... .... x.o. | % | % | ..x. .... ..x. x.xx |
+
+play intro
+loop A A2 C A2

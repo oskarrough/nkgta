@@ -37,6 +37,10 @@ const MELODIC = [
 	'synbass',
 	'timpani',
 	'chip',
+	'oud',
+	'qanun',
+	'ney',
+	'808',
 	'sine',
 	'square',
 	'saw',
@@ -67,14 +71,19 @@ const DRUMS = [
 	'timbale',
 	'tri',
 	'clap',
+	'dum',
+	'tek',
+	'riq',
 	'gong',
 	'thunder',
 	'surf',
 ]
 
 const PC = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
-const NOTE_RE = /^([A-Ga-g])(##|bb|#|b)?([0-8])$/
-const ACC = { '': 0, '#': 1, '##': 2, b: -1, bb: -2 }
+// q is a half-flat, a quarter tone down: Eq4 is the E half-flat of maqam Rast
+// and Bayati. Its midi number is fractional and the synth plays it as such.
+const NOTE_RE = /^([A-Ga-g])(##|bb|#|b|q)?([0-8])$/
+const ACC = { '': 0, '#': 1, '##': 2, b: -1, bb: -2, q: -0.5 }
 
 function noteToMidi(s) {
 	const m = NOTE_RE.exec(s)
@@ -131,7 +140,7 @@ function chordToMidis(sym, center) {
 
 const T_HOLD = /^-+$/
 const T_REST = /^(\.+)(-*)$/
-const NOTE_SRC = '[A-Ga-g](?:##|bb|#|b)?[0-8]'
+const NOTE_SRC = '[A-Ga-g](?:##|bb|#|b|q)?[0-8]'
 const T_NOTE = new RegExp('^(~?)(\\[[^\\]]+\\]|' + NOTE_SRC + '(?:\\+' + NOTE_SRC + ')*)([!?]*)(-*)([!?]*)$')
 
 function velFrom(marks) {
@@ -154,6 +163,7 @@ function parse(text) {
 		title: 'Untitled',
 		composer: '',
 		about: '',
+		street: '',
 		tempo: 120,
 		beats: 4,
 		steps: 4,
@@ -207,6 +217,9 @@ function parse(text) {
 				break
 			case 'about':
 				song.about = restStr
+				break
+			case 'street':
+				song.street = restStr
 				break
 			case 'tempo':
 				target.tempo = num(restStr, 20, 400, 120)
@@ -427,7 +440,7 @@ function parseMelodicBars(bars, barSteps, voice, ctx) {
 			} else if (tok === '%' || tok === '_' || tok === '=') {
 				ctx.err(`"${tok}" must be alone in its bar (${where}).`)
 			} else {
-				ctx.err(`Can't read "${tok}" in ${where}. Notes look like D5, F#4, Bb3, chords like [Dm] or C4+E4+G4.`)
+				ctx.err(`Can't read "${tok}" in ${where}. Notes look like D5, F#4, Bb3, Eq4 (half-flat), chords like [Dm] or C4+E4+G4.`)
 			}
 		}
 		const used = pos - start
@@ -583,6 +596,8 @@ function compile(text) {
 				for (const vName in p.perVoice) {
 					const voice = song.voiceMap[vName]
 					const vi = vIndex[vName]
+					// a glide slides from this voice's previous note
+					let prev = lastMidi[vi]
 					for (const e of p.perVoice[vName]) {
 						if (e.step >= total) continue
 						const t0 = timeOf(e.step)
@@ -591,7 +606,8 @@ function compile(text) {
 						if (!voice.drum) {
 							ev.m = e.notes.map((n) => n + voice.trans + ref.trans)
 							ev.d = Math.max(0.02, d * voice.gate)
-							if (e.glide && lastMidi[vi] != null) ev.g = lastMidi[vi] + 0
+							if (e.glide && prev != null) ev.g = prev
+							prev = ev.m[ev.m.length - 1]
 						}
 						evs.push(ev)
 					}
@@ -621,6 +637,7 @@ function compile(text) {
 		title: song.title,
 		composer: song.composer,
 		about: song.about,
+		street: song.street,
 		tempo: song.tempo,
 		beats: song.beats,
 		steps: song.steps,

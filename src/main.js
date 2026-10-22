@@ -185,4 +185,4 @@ loading.remove()
 requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.
-if (import.meta.env.DEV) window.nkgta = window.__nkgta = { player, shops, visit, pfand, camera, traffic, music, sound }
+if (import.meta.env.DEV) window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound }
