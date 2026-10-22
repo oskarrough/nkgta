@@ -189,6 +189,25 @@ function load(name) {
 	return buffers.get(name)
 }
 
+// Two cars' horns a third apart, always sounding, gated by their gain.
+function horns() {
+	const filter = context.createBiquadFilter()
+	filter.type = 'lowpass'
+	filter.frequency.value = 1800
+	const gain = context.createGain()
+	gain.gain.value = 0
+	const pan = context.createStereoPanner()
+	for (const hz of [370, 466]) {
+		const osc = context.createOscillator()
+		osc.type = 'square'
+		osc.frequency.value = hz
+		osc.connect(filter)
+		osc.start()
+	}
+	filter.connect(gain).connect(pan).connect(master)
+	return { gain, pan }
+}
+
 function play(buffer, name, amount, rate = 1, delay = 0) {
 	if (!buffer || muted || context.state !== 'running') return
 	const source = context.createBufferSource()
@@ -215,6 +234,11 @@ const neighbours = new Map()
 const spareTraffic = []
 const waiting = new WeakMap()
 let hornAfter = 0
+// A wedding convoy leans on its horns: dıt dıt dıııt, eight steps a second, in
+// bursts, heard about as far off as its song.
+const HONK = 'x.x.xxxxxx......'
+const HONK_HEAR = 40
+let honk
 let city
 let cityLoading = false
 function street(cars, player, view, dt) {
@@ -257,6 +281,17 @@ function street(cars, player, view, dt) {
 		smooth(v.filter.frequency, horn ? 950 : 170, 0.04)
 		smooth(v.gain.gain, horn ? 0.07 : 0.025 * (1 - distance(car) / 18) ** 2 * (player.car ? 0.55 : 1), 0.06)
 		smooth(v.pan.pan, Math.max(-1, Math.min(1, ((car.x - view.x0) / (view.x1 - view.x0)) * 2 - 1)))
+	}
+	let lead = null
+	for (const c of cars) if (c.convoy && c.ai && (!lead || distance(c) < distance(lead))) lead = c
+	if (lead && !honk) honk = horns()
+	if (honk) {
+		const step = Math.floor(now * 8)
+		if (step !== honk.step && step % HONK.length === 0) honk.on = Math.random() < 0.6
+		honk.step = step
+		const near = lead ? Math.max(0, 1 - distance(lead) / HONK_HEAR) : 0
+		smooth(honk.gain.gain, honk.on && HONK[step % HONK.length] === 'x' ? 0.05 * near * near : 0, 0.01)
+		if (lead) smooth(honk.pan.pan, Math.max(-1, Math.min(1, ((lead.x - view.x0) / (view.x1 - view.x0)) * 2 - 1)))
 	}
 	if (!cityLoading) {
 		cityLoading = true
