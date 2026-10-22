@@ -5,7 +5,7 @@
 import { compile } from './scrimshaw/score.js'
 import { createSynth } from './scrimshaw/synth.js'
 
-export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi']
+export const SCORES = ['hermannplatz', 'weserstrasse', 'sonnenallee', 'wriezener', 'hasenheide', 'konvoi', 'pannierstrasse']
 export const HEAR = 18 // tiles, how far music carries
 const PLAYING = 2 // sources sounding at once
 const SHOP_EVERY = 3 // one Späti or bar in this many has music on
