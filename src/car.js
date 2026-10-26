@@ -5,6 +5,7 @@
 // unit of mass.
 import { SOLID, T } from './tiles.js'
 import { MODELS } from './models.js'
+import { HILLS } from './terrain.js'
 
 export const { length: LENGTH, width: WIDTH } = MODELS.car // an ordinary car, for spacing traffic
 const REVERSE = 0.5
@@ -118,8 +119,8 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	// Gravity pulls down the slope, except on a parked car nobody's driving.
 	if (world.slopeAt && (throttle || speed > 0.2)) {
 		const [sx, sy] = world.slopeAt(c.x, c.y)
-		fx -= (GRAVITY / world.tileM) * sx
-		fy -= (GRAVITY / world.tileM) * sy
+		fx -= ((GRAVITY * HILLS.car) / world.tileM) * sx
+		fy -= ((GRAVITY * HILLS.car) / world.tileM) * sy
 	}
 
 	// Less lock the faster you go, or the front tyres scrub off all your speed.

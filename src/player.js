@@ -1,6 +1,7 @@
 // Walking, cycling, driving and bumping into things.
 import { T, SOLID } from './tiles.js'
 import { driveCar, speedOf, toWorld } from './car.js'
+import { HILLS } from './terrain.js'
 
 export const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
@@ -64,28 +65,34 @@ export function updatePlayer(p, input, world, dt) {
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
 	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
-	let max = (p.onBike ? 3.6 : 1.6) * push
-	if (p.onBike && (here === T.GRASS || here === T.GROUND)) max *= 0.55
-	if (p.onBike && here === T.CYCLEWAY) max *= 1.2
+	let cap = p.onBike ? 3.6 : 1.6
+	if (p.onBike && (here === T.GRASS || here === T.GROUND)) cap *= 0.55
+	if (p.onBike && here === T.CYCLEWAY) cap *= 1.2
 	// Uphill is slower going, on foot a little, on the bike a lot; downhill
-	// is quicker.
+	// is quicker, and a bike rolls on by itself. See HILLS.
 	const back = steering && steering.y > 0 ? -1 : 1
 	const [sx, sy] = world.slopeAt?.(p.x, p.y) ?? [0, 0]
 	const grade = (sx * Math.cos(p.dir) + sy * Math.sin(p.dir)) * back
-	max *= Math.max(0.45, Math.min(1.35, 1 - grade * (p.onBike ? 5 : 2.5)))
+	const feel = p.onBike ? (grade > 0 ? HILLS.bikeUp : HILLS.bikeDown) : HILLS.walk
+	cap *= Math.max(HILLS.slowest, Math.min(HILLS.fastest, 1 - grade * feel))
 	const boost = turbo ? 10 : 1
-	max *= boost
+	cap *= boost
+	const max = cap * push
 
 	if (steering) p.dir += steering.x * dt * (p.onBike ? 2.5 : 3.5)
+	const rolling = p.onBike && grade < 0
 	if (push) {
 		let diff = steering ? 0 : Math.atan2(axis.y, axis.x) - p.dir
 		diff = Math.atan2(Math.sin(diff), Math.cos(diff))
 		p.dir += diff * Math.min(1, dt * (p.onBike ? 6 : 14))
 		p.speed += dt * (p.onBike ? 4 : 12) * boost
+		p.speed = Math.min(p.speed, Math.max(max, rolling ? Math.min(p.speed, cap) : 0))
 	} else {
-		p.speed = Math.max(0, p.speed - dt * (p.onBike ? 3 : 14) * boost)
+		// Off the pedals: the bike slows, unless the hill's steep enough to keep it going.
+		const pull = rolling ? -grade * HILLS.coast : 0
+		p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14) * boost))
+		p.speed = Math.min(p.speed, rolling ? cap : max)
 	}
-	p.speed = Math.min(p.speed, max)
 
 	const step = p.speed * dt * (steering ? -steering.y : 1)
 	const fromX = p.x

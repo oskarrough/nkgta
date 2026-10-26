@@ -14,6 +14,7 @@ import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
+import { HILLS } from './terrain.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -524,7 +525,7 @@ function skidMarks(world) {
 // tiles, its normals from the slope so neighbouring chunks shade alike.
 const GROUND_STEP = 2
 const WALL_FOOT = 0.15 // tiles the walls reach below the ground they stand on
-const HILLSHADE = 1.5 // how much slopes lighten or darken; 1 is the sun's own
+const HILLSHADE = HILLS.shade
 function groundGeometry(chunk, world) {
 	const flat = world.flat
 	const cols = flat ? 1 : Math.ceil(chunk.w / GROUND_STEP)

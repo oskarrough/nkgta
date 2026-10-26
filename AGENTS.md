@@ -31,6 +31,7 @@ PLEASE, do not verify and visually screenshot everything single thing.
 - Anything standing in the city gets its z from `world.heightAt(x, y)` (tiles, 0 at the lowest point); slopes from `world.slopeAt`. Without terrain, e.g. picked areas, both return 0, so new code must work flat too.
 - Buildings stand on the lowest ground under their outline; walls reach a little below it. The overhead camera rises with the ground at the view's centre so the 2D overlay lines up there. Shop interiors stay flat (`cam.ground: 0`).
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
+- `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
 
 ## Version control
 

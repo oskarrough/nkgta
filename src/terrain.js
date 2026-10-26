@@ -6,6 +6,19 @@ import { fromBase64 } from './map-codec.js'
 export const CELL = 4 // tiles between heights
 const RELIEF = 1 // 1 is true to life; more steepens every slope
 
+// How much the hills are felt, without making them any higher. A grade is
+// metres up per metre along (0.043 is Werbellinstraße's steepest stretch).
+export const HILLS = {
+	walk: 3.5, // walking pace lost per unit of grade, uphill; gained downhill
+	bikeUp: 9, // the same on the bike, uphill: pedalling hurts
+	bikeDown: 6, // and downhill, freewheeling faster
+	slowest: 0.4, // never slower than this share of your pace, so you never get stuck
+	fastest: 1.5, // nor faster than this share of it, downhill
+	coast: 80, // tiles/s² a bike gains per unit of grade rolling downhill without pedalling
+	car: 1.6, // gravity along the slope on cars, against true to life (1)
+	shade: 2.6, // how much slopes lighten or darken from above; 1 is the sun's own
+}
+
 const FLAT = { heightAt: () => 0, slopeAt: () => [0, 0], flat: true }
 
 // `json` is public/terrain.json, or nothing. It only fits the map it was made for.
