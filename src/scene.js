@@ -366,6 +366,7 @@ export function createScene(canvas, world, shops = []) {
 		pixelGrid: () => LOOKS[look].grid,
 		// The plain look comes with the walk grid on.
 		showsWalls: () => LOOKS[look].plain,
+		look: () => look,
 		// P: the next look, by name.
 		cycleLook() {
 			setLook(nextLook(look))

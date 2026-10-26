@@ -64,6 +64,8 @@ export function createInput(actions) {
 	const keyDown = () => keyAxis().x !== 0 || keyAxis().y !== 0
 
 	return {
+		// Let go of every held key, e.g. when the menu opens.
+		release: () => keys.clear(),
 		// Direction the player is pushing, each axis -1…1. A key wins if one
 		// is held; otherwise the thumbstick's analogue deflection.
 		axis: () => actions.move(keyDown() ? keyAxis() : touch.axis()),

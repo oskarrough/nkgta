@@ -69,7 +69,9 @@ export function createHud(world) {
 			const privat = !p && world.tileAt(player.x, player.y) === T.PRIVATE
 			const here = p ? placeName(p) : privat ? 'Privatweg' : ''
 			const use = useHint(player, car)
-			const hint = door ?? (use ? `E: ${use}` : null)
+			// On touch the E button says it already; the line stays for the place.
+			const touch = document.body.classList.contains('touch')
+			const hint = touch ? (door?.startsWith('E: ') ? null : door) : (door ?? (use ? `E: ${use}` : null))
 			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
 			dot(toast || hint ? null : stop ? STOP_DOT[stop.kind] : p ? badgeColor(p.kind) : privat ? PRIVATE_DOT : null)
 		},

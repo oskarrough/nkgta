@@ -92,18 +92,14 @@ volumeSlider.addEventListener('change', () => volumeSlider.blur())
 addEventListener('pointerdown', (e) => {
 	if (!volumePanel.hidden && !e.target.closest('#sound')) showVolume(false)
 })
-addEventListener('keydown', (e) => {
-	if (e.key === 'Escape') showVolume(false)
-})
-const overheadHelp = document.getElementById('help').textContent
-const input = createInput({
+const actions = {
 	cameraActive: camera.active,
 	look: camera.look,
 	setLooking: camera.setLooking,
 	move: camera.move,
 	toggleCamera() {
 		const third = camera.toggle(player)
-		hud.say(third ? 'Verfolgerkamera · Rechte Maustaste halten und ziehen' : 'Vogelperspektive')
+		hud.say(third ? 'Verfolgerkamera' : 'Vogelperspektive')
 	},
 	use,
 	toggleMute,
@@ -116,6 +112,61 @@ const input = createInput({
 		showWalls = city3d.showsWalls()
 	},
 	pickArea: () => (location.href = `/pick.html${location.search}`),
+}
+const input = createInput(actions)
+
+// The menu: what the keys do, as buttons, with each toggle's state.
+const menu = document.getElementById('menu')
+const menuButton = document.getElementById('menu-button')
+const menuItems = {
+	streets: [actions.toggleStreetNames, () => (showStreetNames ? 'an' : 'aus')],
+	transit: [actions.toggleTransit, () => (showTransit ? 'an' : 'aus')],
+	walls: [actions.toggleWalls, () => (showWalls ? 'an' : 'aus')],
+	look: [actions.cycleLook, () => city3d.look()],
+	camera: [actions.toggleCamera, () => (camera.selected() ? 'Verfolger' : 'von oben')],
+	sound: [toggleMute, () => (sound.isMuted() ? 'aus' : 'an')],
+	area: [actions.pickArea, () => ''],
+}
+function showMenuState() {
+	for (const button of menu.querySelectorAll('button[data-action]')) {
+		button.querySelector('b').textContent = menuItems[button.dataset.action][1]()
+	}
+}
+function showMenu(open) {
+	menu.hidden = !open
+	menuButton.ariaExpanded = String(open)
+	input.release()
+	if (open) {
+		showVolume(false)
+		showMenuState()
+	} else document.activeElement?.blur()
+}
+menu.addEventListener('click', (e) => {
+	const button = e.target.closest('button[data-action]')
+	if (!button) return
+	menuItems[button.dataset.action][0]()
+	showMenuState()
+})
+menuButton.addEventListener('click', () => {
+	showMenu(menu.hidden)
+	menuButton.blur()
+})
+// Esc closes the volume pill first, otherwise opens or closes the menu. While
+// the menu is open the game doesn't hear walking, turbo or E.
+const GAME_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'e', 'Enter'])
+addEventListener(
+	'keydown',
+	(e) => {
+		if (e.key === 'Escape') {
+			if (!volumePanel.hidden) showVolume(false)
+			else showMenu(menu.hidden)
+		} else if (!menu.hidden && GAME_KEYS.has(e.key.length === 1 ? e.key.toLowerCase() : e.key)) e.stopPropagation()
+		else if (!menu.hidden) setTimeout(showMenuState)
+	},
+	{ capture: true },
+)
+addEventListener('pointerdown', (e) => {
+	if (!menu.hidden && !e.target.closest('#menu, #menu-button')) showMenu(false)
 })
 
 // E: in or out of a shop, out of the car, off the bike, or onto whichever is
@@ -191,12 +242,6 @@ function frame(now) {
 	sound.street(traffic.cars, street, streetView, dt)
 	music.update(sound.audio(), traffic.cars, street, streetView, !!player.car)
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
-	const help = camera.selected()
-		? cam.third
-			? 'V: Vogelperspektive · Rechte Maus ziehen: umsehen · Rad: Abstand · WASD: bewegen · E: benutzen · Leertaste: Turbo / Handbremse'
-			: 'Ladeneingang: Vogelperspektive · Danach wieder Verfolgerkamera · V: Kamera wechseln'
-		: overheadHelp
-	if (document.getElementById('help').textContent !== help) document.getElementById('help').textContent = help
 	visit.render(cam, traffic.cars, dt)
 	draw({
 		cam,

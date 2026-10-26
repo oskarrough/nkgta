@@ -76,7 +76,8 @@
 				gap: 0.4rem;
 				touch-action: none;
 			}
-			#sound button {
+			#sound button,
+			#menu-button {
 				width: 2.6rem;
 				height: 2.6rem;
 				padding: 0;
@@ -95,6 +96,93 @@
 				margin: auto;
 				image-rendering: pixelated;
 				pointer-events: none;
+			}
+			#menu-button {
+				display: none;
+				position: fixed;
+				top: calc(1rem + env(safe-area-inset-top));
+				left: calc(1rem + env(safe-area-inset-left));
+				z-index: 11;
+			}
+			body.touch #menu-button {
+				display: block;
+			}
+			/* Esc or the menu button: everything the keys do, as buttons. */
+			#menu {
+				position: fixed;
+				inset: 0;
+				z-index: 12;
+				width: min(20rem, calc(100vw - 2rem));
+				max-height: calc(100dvh - 2rem);
+				height: fit-content;
+				margin: auto;
+				padding: 0.75rem;
+				box-sizing: border-box;
+				overflow-y: auto;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+				list-style: none;
+				border: 2px solid rgba(255, 255, 255, 0.4);
+				border-radius: 1.3rem;
+				background: rgba(0, 0, 0, 0.6);
+				text-shadow: 0 2px 0 #000;
+				touch-action: pan-y;
+			}
+			#menu[hidden] {
+				display: none;
+			}
+			#menu button {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				width: 100%;
+				min-height: 3rem;
+				padding: 0 1rem;
+				border: 2px solid rgba(255, 255, 255, 0.4);
+				border-radius: 1.5rem;
+				background: rgba(0, 0, 0, 0.35);
+				color: #fff;
+				font:
+					800 1.05rem system-ui,
+					sans-serif;
+				text-align: left;
+				text-shadow: inherit;
+				cursor: pointer;
+			}
+			#menu button:focus-visible {
+				outline: 2px solid #e8c21a;
+			}
+			#menu b {
+				margin-left: auto;
+				color: #e8c21a;
+			}
+			#menu kbd {
+				min-width: 1.4em;
+				font: inherit;
+				font-size: 0.8rem;
+				opacity: 0.6;
+				text-align: center;
+			}
+			body.touch #menu kbd {
+				display: none;
+			}
+			#menu b + kbd {
+				margin-left: 0;
+			}
+			#menu details {
+				padding: 0.25rem 1rem;
+				font-size: 0.85rem;
+				font-weight: 400;
+			}
+			#menu summary {
+				font-weight: 800;
+				cursor: pointer;
+			}
+			#menu ul {
+				margin: 0.4rem 0 0;
+				padding-left: 1rem;
+				line-height: 1.5;
 			}
 			#mute.on {
 				background: rgba(232, 194, 26, 0.45);
@@ -194,13 +282,6 @@
 				text-align: center;
 				font-size: 1.5rem;
 			}
-			#help {
-				bottom: calc(1rem + env(safe-area-inset-bottom));
-				left: calc(1rem + env(safe-area-inset-left));
-				font-size: 0.8rem;
-				font-weight: 400;
-				opacity: 0.6;
-			}
 
 			/* Touch controls. Hidden until a coarse pointer or a real touch. */
 			#touch {
@@ -213,9 +294,6 @@
 			}
 			body.touch #touch {
 				display: block;
-			}
-			body.touch #help {
-				display: none;
 			}
 			body.touch #place {
 				bottom: calc(8.5rem + env(safe-area-inset-bottom));
@@ -335,10 +413,46 @@
 				<input id="volume-slider" type="range" min="0" max="100" step="1" aria-label="Lautstärke" />
 			</div>
 		</div>
-		<div class="hud" id="help">
-			V: Kamera · WASD: laufen, fahren · E: Rad, Auto klauen, aussteigen, Laden · Leertaste: Turbo, Handbremse · +/−: Zoom · N: Straßen · T:
-			Haltestellen · K: Wände · P: Look · L: Leise · M: Gegend · Pfand zum Späti
-		</div>
+		<button id="menu-button" type="button" aria-label="Menü" aria-expanded="false" aria-controls="menu" title="Menü (Esc)">
+			<img class="icon" src="/icons/menu.png" alt="" />
+		</button>
+		<menu id="menu" aria-label="Menü" hidden>
+			<li>
+				<button type="button" data-action="streets">Straßennamen <b></b><kbd>N</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="transit">Haltestellen <b></b><kbd>T</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="walls">Wände <b></b><kbd>K</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="look">Look <b></b><kbd>P</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="camera">Kamera <b></b><kbd>V</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="sound">Ton <b></b><kbd>L</kbd></button>
+			</li>
+			<li>
+				<button type="button" data-action="area">Gegend wählen <b></b><kbd>M</kbd></button>
+			</li>
+			<li>
+				<details>
+					<summary>Tasten</summary>
+					<ul>
+						<li>WASD / Pfeile: laufen, fahren, lenken</li>
+						<li>E: Rad, Auto klauen, aussteigen, Laden</li>
+						<li>Leertaste: Turbo, Handbremse</li>
+						<li>+/− oder Mausrad: Zoom</li>
+						<li>V: Kamera; rechte Maustaste ziehen: umsehen</li>
+						<li>N: Straßen · T: Haltestellen · K: Wände · P: Look</li>
+						<li>L: Ton aus · M: Gegend wählen · Esc: Menü</li>
+					</ul>
+				</details>
+			</li>
+		</menu>
 		<div id="touch" aria-hidden="true">
 			<div id="stick"><div id="stick-knob"></div></div>
 			<div id="touch-actions">
