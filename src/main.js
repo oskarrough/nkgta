@@ -59,8 +59,8 @@ const volumeMute = document.getElementById('volume-mute')
 const volumeSlider = document.getElementById('volume-slider')
 function showMute(muted) {
 	const volume = sound.volume()
-	muteButton.textContent = muted ? '🔇' : volume < 0.5 ? '🔉' : '🔊'
-	volumeMute.textContent = muted ? '🔊' : '🔇'
+	muteButton.querySelector('img').src = `/icons/${muted ? 'speaker-off' : volume < 0.5 ? 'speaker-low' : 'speaker'}.png`
+	volumeMute.querySelector('img').src = `/icons/${muted ? 'speaker' : 'speaker-off'}.png`
 	volumeMute.ariaLabel = volumeMute.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
 	const percent = muted ? 0 : Math.round(volume * 100)
 	volumeSlider.value = String(percent)

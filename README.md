@@ -41,4 +41,13 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/actors.js`: people and the bike, the same figures from above and in the chase camera. Everyone on foot is dressed from their own seed; the player wears yellow. From above they show over tree crowns and roofs, a bit bigger than life, inked round the outside (see `src/ink.js`).
 - `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names) and the text.
 
+## Icons
+
+Every icon is its own PNG in `public/icons/`, 32×32 with a transparent background, shown at 32 CSS pixels with `image-rendering: pixelated`. Paint over a file (same name, same size) and the game picks it up; no code to touch.
+
+- `speaker.png`: sound on (also the slider's "Ton an" button)
+- `speaker-low.png`: sound on, volume under half
+- `speaker-off.png`: muted (also the slider's "Ton aus" button)
+- `play.png`: the jukebox's Abspielen button
+
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.

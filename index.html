@@ -87,6 +87,15 @@
 				font-size: 1.2rem;
 				cursor: pointer;
 			}
+			/* Icons are 32x32 PNGs in public/icons, painted pixel by pixel. */
+			.icon {
+				display: block;
+				width: 32px;
+				height: 32px;
+				margin: auto;
+				image-rendering: pixelated;
+				pointer-events: none;
+			}
 			#mute.on {
 				background: rgba(232, 194, 26, 0.45);
 				border-color: rgba(232, 194, 26, 0.9);
@@ -106,8 +115,9 @@
 				display: none;
 			}
 			#volume button {
-				width: 2rem;
-				height: 2rem;
+				flex: none;
+				width: 2.2rem;
+				height: 2.2rem;
 				border: 0;
 				background: none;
 				font-size: 1rem;
@@ -316,10 +326,12 @@
 		<div class="hud" id="wasted"></div>
 		<div id="sound">
 			<button id="mute" type="button" aria-label="Lautstärke" aria-expanded="false" aria-controls="volume" title="Lautstärke (L: Ton aus)">
-				🔊
+				<img class="icon" src="/icons/speaker.png" alt="" />
 			</button>
 			<div id="volume" hidden>
-				<button id="volume-mute" type="button" aria-label="Ton aus" title="Ton aus (L)">🔇</button>
+				<button id="volume-mute" type="button" aria-label="Ton aus" title="Ton aus (L)">
+					<img class="icon" src="/icons/speaker-off.png" alt="" />
+				</button>
 				<input id="volume-slider" type="range" min="0" max="100" step="1" aria-label="Lautstärke" />
 			</div>
 		</div>

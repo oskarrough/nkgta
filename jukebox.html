@@ -101,6 +101,12 @@
 				background: #9be86a;
 				box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.6);
 			}
+			#unblock img {
+				width: 32px;
+				height: 32px;
+				vertical-align: middle;
+				image-rendering: pixelated;
+			}
 			#roll {
 				display: block;
 				width: 100%;
@@ -247,6 +253,6 @@
 		<div id="voices" aria-label="Stimmen: klicken schaltet sie aus und an"></div>
 		<textarea id="score" spellcheck="false"></textarea>
 		<pre id="errors" data-ok="Spielbar."></pre>
-		<button id="unblock" hidden>▶ Abspielen</button>
+		<button id="unblock" hidden><img src="/icons/play.png" alt="" /> Abspielen</button>
 	</body>
 </html>
