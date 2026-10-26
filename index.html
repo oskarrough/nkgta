@@ -107,54 +107,74 @@
 			body.touch #menu-button {
 				display: block;
 			}
-			/* Esc or the menu button: a grid of pictures, lit when on. */
-			#menu {
+			/* Esc or the menu button: a grid of pictures, lit when on. ` opens the
+			   debug menu, the same kind of panel. */
+			.panel {
 				position: fixed;
-				inset: 0;
 				z-index: 12;
 				width: fit-content;
 				height: fit-content;
-				margin: auto;
+				margin: 0;
 				padding: 0.75rem;
-				display: grid;
-				grid-template-columns: repeat(4, auto);
-				gap: 0.6rem;
-				list-style: none;
 				border: 2px solid rgba(255, 255, 255, 0.4);
 				border-radius: 1.3rem;
 				background: rgba(0, 0, 0, 0.6);
 			}
-			#menu[hidden] {
+			.panel[hidden] {
 				display: none;
 			}
-			#menu button {
+			.panel menu {
+				display: grid;
+				grid-template-columns: repeat(4, auto);
+				gap: 0.6rem;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			#menu {
+				inset: 0;
+				margin: auto;
+			}
+			#debug {
+				top: 1rem;
+				left: 1rem;
+			}
+			.panel button[data-action] {
 				position: relative;
 				width: 4.6rem;
-				height: 4.6rem;
-				padding: 0;
+				min-height: 4.6rem;
+				padding: 0.2rem 0.2rem 0.3rem;
 				border: 2px solid rgba(255, 255, 255, 0.4);
 				border-radius: 1.2rem;
 				background: rgba(0, 0, 0, 0.35);
 				cursor: pointer;
 			}
-			#menu button.on {
+			.panel button[data-action].on {
 				background: rgba(232, 194, 26, 0.45);
 				border-color: rgba(232, 194, 26, 0.9);
 			}
-			#menu button.off img {
+			.panel button.off img {
 				opacity: 0.4;
 			}
-			#menu button:focus-visible {
+			.panel button:focus-visible {
 				outline: 2px solid #e8c21a;
 			}
-			#menu .icon {
+			.panel .icon {
 				width: 64px;
 				height: 64px;
 			}
-			#menu kbd {
+			.panel button span {
+				display: block;
+				color: #fff;
+				font:
+					700 0.65rem / 1.2 system-ui,
+					sans-serif;
+				hyphens: manual;
+			}
+			.panel kbd {
 				position: absolute;
 				right: 0.2rem;
-				bottom: 0.2rem;
+				top: 0.2rem;
 				padding: 0 0.25em;
 				border-radius: 0.25em;
 				background: #e7e7e5;
@@ -164,7 +184,7 @@
 					800 0.6rem / 1.3 system-ui,
 					sans-serif;
 			}
-			body.touch #menu kbd {
+			body.touch .panel kbd {
 				display: none;
 			}
 			/* What E does here: the key and a picture of it. */
@@ -423,48 +443,55 @@
 		<button id="menu-button" type="button" aria-label="Menü" aria-expanded="false" aria-controls="menu" title="Menü (Esc)">
 			<img class="icon" src="/icons/menu.png" alt="" />
 		</button>
-		<menu id="menu" aria-label="Menü" hidden>
-			<li>
-				<button type="button" data-action="streets" aria-label="Straßennamen" title="Straßennamen (N)">
-					<img class="icon" src="/icons/menu-streets.png" alt="" /><kbd>N</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="transit" aria-label="Haltestellen" title="Haltestellen (T)">
-					<img class="icon" src="/icons/menu-stops.png" alt="" /><kbd>T</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="walls" aria-label="Wände" title="Wände (K)">
-					<img class="icon" src="/icons/menu-walls.png" alt="" /><kbd>K</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="look" aria-label="Look" title="Look (P)">
-					<img class="icon" src="/icons/menu-look.png" alt="" /><kbd>P</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="camera" aria-label="Kamera" title="Kamera (V)">
-					<img class="icon" src="/icons/menu-camera.png" alt="" /><kbd>V</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="music" aria-label="Musik-Debug" title="Musik-Debug (J)">
-					<img class="icon" src="/icons/menu-music.png" alt="" /><kbd>J</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="sound" aria-label="Ton" title="Ton (L)">
-					<img class="icon" src="/icons/speaker.png" alt="" /><kbd>L</kbd>
-				</button>
-			</li>
-			<li>
-				<button type="button" data-action="area" aria-label="Gegend wählen" title="Gegend wählen (M)">
-					<img class="icon" src="/icons/menu-area.png" alt="" /><kbd>M</kbd>
-				</button>
-			</li>
-		</menu>
+		<div id="menu" class="panel" hidden>
+			<menu aria-label="Menü">
+				<li>
+					<button type="button" data-action="streets" aria-label="Straßennamen" title="Straßennamen (N)">
+						<img class="icon" src="/icons/menu-streets.png" alt="" /><span>Straßen</span><kbd>N</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="transit" aria-label="Haltestellen" title="Haltestellen (T)">
+						<img class="icon" src="/icons/menu-stops.png" alt="" /><span>Halte&shy;stellen</span><kbd>T</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="walls" aria-label="Wände" title="Wände (K)">
+						<img class="icon" src="/icons/menu-walls.png" alt="" /><span>Wände</span><kbd>K</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="look" aria-label="Look" title="Look (P)">
+						<img class="icon" src="/icons/menu-look.png" alt="" /><span>Look</span><kbd>P</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="camera" aria-label="Kamera" title="Kamera (V)">
+						<img class="icon" src="/icons/menu-camera.png" alt="" /><span>Kamera</span><kbd>V</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="sound" aria-label="Ton" title="Ton (L)">
+						<img class="icon" src="/icons/speaker.png" alt="" /><span>Ton</span><kbd>L</kbd>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="area" aria-label="Gegend wählen" title="Gegend wählen (M)">
+						<img class="icon" src="/icons/menu-area.png" alt="" /><span>Gegend</span><kbd>M</kbd>
+					</button>
+				</li>
+			</menu>
+		</div>
+		<div id="debug" class="panel" hidden>
+			<menu aria-label="Debug">
+				<li>
+					<button type="button" data-action="music" aria-label="Musik-Debug" title="Musik-Debug (J)">
+						<img class="icon" src="/icons/menu-music.png" alt="" /><span>Musik</span><kbd>J</kbd>
+					</button>
+				</li>
+			</menu>
+			<form id="tune"></form>
+		</div>
 		<div id="touch" aria-hidden="true">
 			<div id="stick"><div id="stick-knob"></div></div>
 			<div id="touch-actions">

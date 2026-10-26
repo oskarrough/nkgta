@@ -6,6 +6,7 @@ import { createTraffic } from './traffic.js'
 import { createWasted } from './wasted.js'
 import { createPfand } from './pfand.js'
 import { createCamera, ZOOM } from './camera.js'
+import { tuneZoom } from './tune.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useAction, useHint } from './hud.js'
@@ -48,13 +49,6 @@ const wasted = createWasted({
 	respawn: () => Object.assign(player, createPlayer(world.startPoint(START))),
 })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
-// The camera's zoom knobs, toggled with ` or open from the start with ?tune.
-let tuning
-async function toggleTune() {
-	tuning ??= import('./tune.js').then((m) => m.tunePanel(ZOOM, camera, player))
-	;(await tuning).toggle()
-}
-if (new URLSearchParams(location.search).has('tune')) toggleTune()
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
@@ -130,7 +124,7 @@ const actions = {
 		city3d.cycleLook()
 		showWalls = city3d.showsWalls()
 	},
-	toggleTune,
+	toggleDebug: () => showDebug(debug.hidden),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 }
 const input = createInput(actions)
@@ -138,6 +132,9 @@ const input = createInput(actions)
 // The menu: what the keys do, as buttons, with each toggle's state.
 const menu = document.getElementById('menu')
 const menuButton = document.getElementById('menu-button')
+// `: the debug menu, the same kind of panel, open from the start with ?tune.
+const debug = document.getElementById('debug')
+tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 // Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
 	streets: [actions.toggleStreetNames, () => showStreetNames],
@@ -150,7 +147,7 @@ const menuItems = {
 	area: [actions.pickArea, () => null],
 }
 function showMenuState() {
-	for (const button of menu.querySelectorAll('button[data-action]')) {
+	for (const button of document.querySelectorAll('.panel button[data-action]')) {
 		const on = menuItems[button.dataset.action][1]()
 		button.classList.toggle('on', on === true)
 		button.classList.toggle('off', on === false)
@@ -168,12 +165,20 @@ function showMenu(open) {
 		showMenuState()
 	} else document.activeElement?.blur()
 }
-menu.addEventListener('click', (e) => {
-	const button = e.target.closest('button[data-action]')
-	if (!button) return
-	menuItems[button.dataset.action][0]()
-	showMenuState()
-})
+function showDebug(open) {
+	debug.hidden = !open
+	if (open) showMenuState()
+}
+if (new URLSearchParams(location.search).has('tune')) showDebug(true)
+for (const panel of [menu, debug]) {
+	panel.addEventListener('click', (e) => {
+		const button = e.target.closest('button[data-action]')
+		if (!button) return
+		menuItems[button.dataset.action][0]()
+		showMenuState()
+		button.blur()
+	})
+}
 menuButton.addEventListener('click', () => {
 	showMenu(menu.hidden)
 	menuButton.blur()
@@ -188,7 +193,7 @@ addEventListener(
 			if (!volumePanel.hidden) showVolume(false)
 			else showMenu(menu.hidden)
 		} else if (!menu.hidden && GAME_KEYS.has(e.key.length === 1 ? e.key.toLowerCase() : e.key)) e.stopPropagation()
-		else if (!menu.hidden) setTimeout(showMenuState)
+		else if (!menu.hidden || !debug.hidden) setTimeout(showMenuState)
 	},
 	{ capture: true },
 )
