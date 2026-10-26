@@ -10,7 +10,8 @@ import { drawMusicDebug } from './music-debug.js'
 // Tiles round a person, from above, that the ground layer leaves clear.
 const PERSON = 0.32
 // The chevron on the ground ahead of you, so you can tell which way you face.
-const AHEAD = { gap: 0.75, size: 0.32, min: 5 }
+// Only standing still: it fades in after `wait` seconds, out at once on the move.
+const AHEAD = { gap: 0.6, size: 0.2, min: 3.5, alpha: 0.75, wait: 0.4, fadeIn: 0.25, fadeOut: 0.08 }
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
@@ -53,6 +54,9 @@ export function createRenderer(canvas, world, shops = []) {
 
 	// `inside` a shop, only the player: the map's places, stops, names, walls
 	// and the parked bike are all out on the street.
+	let facing = 0 // how much the chevron shows, 0 to 1
+	let still = 0 // seconds the player has stood still
+	let last = performance.now()
 	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music, people = [], cars = [] }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
@@ -181,12 +185,21 @@ export function createRenderer(canvas, world, shops = []) {
 		}
 
 		// Which way you face: a small chevron on the ground just ahead of you,
-		// on foot and on the bike. A car's shape already says it.
-		if (!player.car && !player.down) {
+		// on foot and on the bike, while you stand still. Moving says it anyway,
+		// and a car's shape already does.
+		const now = performance.now()
+		const dt = Math.min(0.1, (now - last) / 1000)
+		last = now
+		const resting = !player.car && !player.down && Math.abs(player.speed) < 0.05
+		still = resting ? still + dt : 0
+		const show = still > AHEAD.wait ? 1 : 0
+		facing += (show - facing) * (1 - Math.exp(-dt / (show > facing ? AHEAD.fadeIn : AHEAD.fadeOut)))
+		if (facing > 0.02) {
 			const size = Math.max(AHEAD.min * devicePixelRatio, AHEAD.size * scale)
 			const gap = AHEAD.gap * (player.onBike ? 1.6 : 1) * scale + size
 			const [px, py] = toScreen(player.x, player.y)
 			ctx.save()
+			ctx.globalAlpha = facing * AHEAD.alpha
 			ctx.translate(px + Math.cos(player.dir) * gap, py + Math.sin(player.dir) * gap)
 			ctx.rotate(player.dir)
 			ctx.beginPath()
@@ -196,7 +209,7 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.lineTo(-size * 0.6, size)
 			ctx.closePath()
 			ctx.lineJoin = 'round'
-			ctx.lineWidth = Math.max(2, size * 0.35)
+			ctx.lineWidth = Math.max(1.5, size * 0.3)
 			ctx.strokeStyle = '#1a1e1b'
 			ctx.stroke()
 			ctx.fillStyle = '#e8c21a'
