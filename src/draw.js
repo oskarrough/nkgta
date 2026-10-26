@@ -7,6 +7,11 @@ import { DEPTH as AWNING_DEPTH } from './signs.js'
 import { RADIUS } from './player.js'
 import { drawMusicDebug } from './music-debug.js'
 
+// Tiles round a person, from above, that the ground layer leaves clear.
+const PERSON = 0.32
+// The chevron on the ground ahead of you, so you can tell which way you face.
+const AHEAD = { gap: 0.75, size: 0.32, min: 5 }
+
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
 // Badges, the classic map way: names when near, icons when far. A shop's
@@ -48,13 +53,69 @@ export function createRenderer(canvas, world, shops = []) {
 
 	// `inside` a shop, only the player: the map's places, stops, names, walls
 	// and the parked bike are all out on the street.
-	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music }) {
+	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music, people = [], cars = [] }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
 		if (cam.third) return
+
+		// On the ground, under people and cars: place badges and stops. They're
+		// drawn first and then cut away wherever someone stands or drives, since
+		// the people and cars themselves are in the 3D layer underneath.
+		const perTile = scale / devicePixelRatio
+		const size = Math.max(BADGE.size[0], Math.min(BADGE.size[1], perTile * BADGE.perTile)) * devicePixelRatio
+		const t = Math.max(0, Math.min(1, (BADGE.fadeIn - perTile) / (BADGE.fadeIn - BADGE.full)))
+		const fade = t * t * (3 - 2 * t)
+		const placed = []
+		// Zoomed far out, a badge on every shop would carpet the map.
+		const thin = Math.max(0, Math.min(1, (BADGE.sparse[0] - perTile) / (BADGE.sparse[0] - BADGE.sparse[1])))
+		const apart = BADGE.apart + (BADGE.sparseApart - BADGE.apart) * thin
+		for (const b of inside ? [] : badges) {
+			const alpha = b.awning ? fade : 1
+			if (alpha <= 0) continue
+			const [sx, sy] = toScreen(b.x, b.y)
+			const s = b.awning ? size * (BADGE.shrink + (1 - BADGE.shrink) * fade) : size
+			if (!onScreen(sx, sy, s)) continue
+			// First come, first drawn: a badge on top of another is left out.
+			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * apart)) continue
+			placed.push([sx, sy])
+			ctx.globalAlpha = alpha
+			ctx.drawImage(icons[b.kind], sx - s / 2, sy - s / 2, s, s)
+		}
+		ctx.globalAlpha = 1
+
+		if (showTransit && !inside) {
+			const sign = Math.max(14 * devicePixelRatio, scale * 1.6)
+			for (const t of world.transit ?? []) {
+				const [sx, sy] = toScreen(t.x, t.y)
+				if (onScreen(sx, sy, sign)) ctx.drawImage(signs[t.kind], sx - sign / 2, sy - sign / 2, sign, sign)
+			}
+		}
+
+		if (!inside) {
+			ctx.globalCompositeOperation = 'destination-out'
+			const person = PERSON * scale
+			for (const p of [player, ...people]) {
+				ctx.beginPath()
+				ctx.arc(...toScreen(p.x, p.y), person, 0, Math.PI * 2)
+				ctx.fill()
+			}
+			if (!player.onBike && !player.car && player.bike) {
+				ctx.beginPath()
+				ctx.arc(...toScreen(player.bike.x, player.bike.y), person * 1.4, 0, Math.PI * 2)
+				ctx.fill()
+			}
+			for (const c of cars) {
+				ctx.save()
+				ctx.translate(...toScreen(c.x, c.y))
+				ctx.rotate(c.angle)
+				ctx.fillRect((-c.model.length / 2) * scale, (-c.model.width / 2) * scale, c.model.length * scale, c.model.width * scale)
+				ctx.restore()
+			}
+			ctx.globalCompositeOperation = 'source-over'
+		}
 
 		// K: the walk grid as the game sees it, every solid tile in red, and
 		// (on top of everything, at the end) what the player hits walls with.
@@ -89,36 +150,6 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.fill()
 		}
 
-		const perTile = scale / devicePixelRatio
-		const size = Math.max(BADGE.size[0], Math.min(BADGE.size[1], perTile * BADGE.perTile)) * devicePixelRatio
-		const t = Math.max(0, Math.min(1, (BADGE.fadeIn - perTile) / (BADGE.fadeIn - BADGE.full)))
-		const fade = t * t * (3 - 2 * t)
-		const placed = []
-		// Zoomed far out, a badge on every shop would carpet the map.
-		const thin = Math.max(0, Math.min(1, (BADGE.sparse[0] - perTile) / (BADGE.sparse[0] - BADGE.sparse[1])))
-		const apart = BADGE.apart + (BADGE.sparseApart - BADGE.apart) * thin
-		for (const b of inside ? [] : badges) {
-			const alpha = b.awning ? fade : 1
-			if (alpha <= 0) continue
-			const [sx, sy] = toScreen(b.x, b.y)
-			const s = b.awning ? size * (BADGE.shrink + (1 - BADGE.shrink) * fade) : size
-			if (!onScreen(sx, sy, s)) continue
-			// First come, first drawn: a badge on top of another is left out.
-			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * apart)) continue
-			placed.push([sx, sy])
-			ctx.globalAlpha = alpha
-			ctx.drawImage(icons[b.kind], sx - s / 2, sy - s / 2, s, s)
-		}
-		ctx.globalAlpha = 1
-
-		if (showTransit && !inside) {
-			const sign = Math.max(14 * devicePixelRatio, scale * 1.6)
-			for (const t of world.transit ?? []) {
-				const [sx, sy] = toScreen(t.x, t.y)
-				if (onScreen(sx, sy, sign)) ctx.drawImage(signs[t.kind], sx - sign / 2, sy - sign / 2, sign, sign)
-			}
-		}
-
 		if (showStreetNames && !inside) {
 			const k = (13 / LABEL_PX) * devicePixelRatio
 			for (const l of world.labels) {
@@ -146,6 +177,30 @@ export function createRenderer(canvas, world, shops = []) {
 				ctx.rect((-c.model.length / 2) * scale, (-c.model.width / 2) * scale, c.model.length * scale, c.model.width * scale)
 			} else ctx.arc(0, 0, RADIUS * scale, 0, Math.PI * 2)
 			ctx.stroke()
+			ctx.restore()
+		}
+
+		// Which way you face: a small chevron on the ground just ahead of you,
+		// on foot and on the bike. A car's shape already says it.
+		if (!player.car && !player.down) {
+			const size = Math.max(AHEAD.min * devicePixelRatio, AHEAD.size * scale)
+			const gap = AHEAD.gap * (player.onBike ? 1.6 : 1) * scale + size
+			const [px, py] = toScreen(player.x, player.y)
+			ctx.save()
+			ctx.translate(px + Math.cos(player.dir) * gap, py + Math.sin(player.dir) * gap)
+			ctx.rotate(player.dir)
+			ctx.beginPath()
+			ctx.moveTo(size, 0)
+			ctx.lineTo(-size * 0.6, -size)
+			ctx.lineTo(-size * 0.15, 0)
+			ctx.lineTo(-size * 0.6, size)
+			ctx.closePath()
+			ctx.lineJoin = 'round'
+			ctx.lineWidth = Math.max(2, size * 0.35)
+			ctx.strokeStyle = '#1a1e1b'
+			ctx.stroke()
+			ctx.fillStyle = '#e8c21a'
+			ctx.fill()
 			ctx.restore()
 		}
 

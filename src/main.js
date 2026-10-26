@@ -280,6 +280,8 @@ function frame(now) {
 		showWalls: showWalls && !indoors,
 		inside: indoors,
 		music: showMusic ? music.debug : null,
+		people: indoors ? [] : traffic.peds,
+		cars: indoors ? [] : traffic.cars,
 	})
 	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
 	const door = visit.hint()
