@@ -16,6 +16,9 @@ const TREE_TONE_MIN = 0.85 // per-tree brightness variation
 const TREE_TONE_MAX = 1.1
 const BLOB_TONE = [0.94, 1.06] // a little variation between a tree's own blobs
 const SIMPLE_RADIUS = 0.95 // a simple tree's one blob, as a share of the crown radius
+const TRUNK = '#5e4a38'
+const TRUNK_RADIUS = [0.15, 0.3] // metres, from small crowns to big ones
+const TRUNK_SIDES = 5
 
 const hash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 const blobCount = (i) => BLOBS_MIN + Math.floor(hash(i * 7 + 2) * (BLOBS_MAX - BLOBS_MIN + 1))
@@ -49,10 +52,7 @@ export function createTrees(world, gradient, pick = (world.trees ?? []).keys(), 
 	for (const i of list) {
 		const t = trees[i]
 		const r = t.crown / 2 / tileM
-		const bottom = BOTTOM / tileM
-		const top = Math.max(bottom + 1.5, t.top / tileM)
-		const half = ((top - bottom) / 2) * SQUASH
-		const cz = (top + bottom) / 2 + world.heightAt(t.x, t.y)
+		const { half, cz } = crownOf(t, tileM, world)
 		const base = Math.floor(hash(i * 5 + 1) * CROWNS.length)
 		const tone = TREE_TONE_MIN + hash(i * 3 + 7) * (TREE_TONE_MAX - TREE_TONE_MIN)
 		if (simple) {
@@ -82,5 +82,41 @@ export function createTrees(world, gradient, pick = (world.trees ?? []).keys(), 
 	}
 	mesh.instanceMatrix.needsUpdate = true
 	if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+	return mesh
+}
+
+function crownOf(t, tileM, world) {
+	const bottom = BOTTOM / tileM
+	const top = Math.max(bottom + 1.5, t.top / tileM)
+	const half = ((top - bottom) / 2) * SQUASH
+	return { half, cz: (top + bottom) / 2 + world.heightAt(t.x, t.y) }
+}
+
+// One tapered stem per tree, from a little below the ground up to the middle
+// of its crown, thicker under bigger crowns.
+export function createTrunks(world, gradient, pick = (world.trees ?? []).keys()) {
+	const trees = world.trees ?? []
+	const list = [...pick]
+	const geometry = new THREE.CylinderGeometry(0.7, 1, 1, TRUNK_SIDES).rotateX(Math.PI / 2).translate(0, 0, 0.5)
+	const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshToonMaterial({ color: TRUNK, gradientMap: gradient }), list.length)
+	mesh.castShadow = true
+	mesh.receiveShadow = true
+	mesh.frustumCulled = false
+
+	const tileM = world.tileM
+	const m = new THREE.Matrix4()
+	const pos = new THREE.Vector3()
+	const scale = new THREE.Vector3()
+	const q = new THREE.Quaternion()
+	list.forEach((i, n) => {
+		const t = trees[i]
+		const { cz } = crownOf(t, tileM, world)
+		const ground = world.heightAt(t.x, t.y) - 0.3 / tileM
+		const r = mix(TRUNK_RADIUS, Math.min(1, Math.max(0, (t.crown - 4) / 10))) / tileM
+		pos.set(t.x, -t.y, ground)
+		scale.set(r, r, cz - ground)
+		mesh.setMatrixAt(n, m.compose(pos, q, scale))
+	})
+	mesh.instanceMatrix.needsUpdate = true
 	return mesh
 }

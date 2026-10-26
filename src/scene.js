@@ -8,7 +8,7 @@ import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { createInk } from './ink.js'
 import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import { createBridges } from './bridges.js'
-import { createTrees } from './trees.js'
+import { createTrees, createTrunks } from './trees.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
@@ -181,7 +181,7 @@ export function createScene(canvas, world, shops = []) {
 			const key = Math.floor(t.x / TREE_CELL) * 4096 + Math.floor(t.y / TREE_CELL)
 			cells.set(key, [...(cells.get(key) ?? []), i])
 		}
-		const near = [...cells.values()].map((pick) => createTrees(world, gradient, pick))
+		const near = [...cells.values()].flatMap((pick) => [createTrees(world, gradient, pick), createTrunks(world, gradient, pick)])
 		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
 		for (const mesh of [stacks, hatchMesh, ...near, ...far]) {
 			if (!mesh) continue
