@@ -4,8 +4,11 @@ let master
 let noise
 let playerVoice
 let muted = false
+// 0–1, scales everything that reaches master; squared so the slider feels even.
+let volume = 1
 try {
 	muted = localStorage.getItem('nk-leise') === 'true'
+	volume = Math.min(1, Math.max(0, Number(localStorage.getItem('nk-lautstaerke') ?? 1) || 0))
 } catch {
 	// Sound still works when browser storage is unavailable.
 }
@@ -14,13 +17,26 @@ const note = (kind, gain) => {
 	events.push({ kind, gain: +gain.toFixed(4) })
 	if (events.length > 24) events.shift()
 }
+const level = () => (muted ? 0 : 0.22 * volume * volume)
+const store = (key, value) => {
+	try {
+		localStorage.setItem(key, String(value))
+	} catch {
+		// A blocked storage write must not interrupt driving.
+	}
+}
+function applyLevel() {
+	if (!master) return
+	master.gain.cancelAndHoldAtTime(context.currentTime)
+	master.gain.linearRampToValueAtTime(level(), context.currentTime + 0.04)
+}
 const smooth = (param, value, time = 0.1) => param.setTargetAtTime(value, context.currentTime, time)
 
 function start() {
 	if (!context) {
 		context = new AudioContext()
 		master = context.createGain()
-		master.gain.value = muted ? 0 : 0.22
+		master.gain.value = level()
 		master.connect(context.destination)
 		noise = context.createBuffer(1, context.sampleRate * 2, context.sampleRate)
 		const data = noise.getChannelData(0)
@@ -343,15 +359,21 @@ export const sound = {
 	isMuted: () => muted,
 	toggleMute() {
 		muted = !muted
-		if (master) {
-			master.gain.cancelAndHoldAtTime(context.currentTime)
-			master.gain.linearRampToValueAtTime(muted ? 0 : 0.22, context.currentTime + 0.04)
-		}
-		try {
-			localStorage.setItem('nk-leise', String(muted))
-		} catch {
-			// A blocked storage write must not interrupt driving.
-		}
+		// Unmuting at zero volume would stay silent, so come back at half.
+		if (!muted && volume === 0) volume = 0.5
+		applyLevel()
+		store('nk-leise', muted)
+		store('nk-lautstaerke', volume)
+		return muted
+	},
+	volume: () => volume,
+	// Dragging to zero mutes; dragging up again unmutes.
+	setVolume(value) {
+		volume = Math.min(1, Math.max(0, value))
+		muted = volume === 0
+		applyLevel()
+		store('nk-leise', muted)
+		store('nk-lautstaerke', volume)
 		return muted
 	},
 	// Read actual AudioParams for browser verification without an audio device.
@@ -359,6 +381,7 @@ export const sound = {
 		return {
 			state: context?.state ?? 'unstarted',
 			muted,
+			volume,
 			master: master?.gain.value ?? 0,
 			engine: playerVoice && {
 				hz: playerVoice.motor.frequency.value,

@@ -65,11 +65,18 @@
 				background: var(--bottle) center / contain no-repeat;
 				vertical-align: -0.15em;
 			}
-			#mute {
+			#sound {
 				position: fixed;
 				top: calc(6rem + env(safe-area-inset-top));
 				right: calc(1.25rem + env(safe-area-inset-right));
 				z-index: 11;
+				display: flex;
+				flex-direction: row-reverse;
+				align-items: center;
+				gap: 0.4rem;
+				touch-action: none;
+			}
+			#sound button {
 				width: 2.6rem;
 				height: 2.6rem;
 				padding: 0;
@@ -79,6 +86,69 @@
 				color: #fff;
 				font-size: 1.2rem;
 				cursor: pointer;
+			}
+			#mute.on {
+				background: rgba(232, 194, 26, 0.45);
+				border-color: rgba(232, 194, 26, 0.9);
+			}
+			#volume {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0 0.9rem 0 0.2rem;
+				height: 2.6rem;
+				border: 2px solid rgba(255, 255, 255, 0.4);
+				border-radius: 1.3rem;
+				background: rgba(0, 0, 0, 0.35);
+				box-sizing: border-box;
+			}
+			#volume[hidden] {
+				display: none;
+			}
+			#volume button {
+				width: 2rem;
+				height: 2rem;
+				border: 0;
+				background: none;
+				font-size: 1rem;
+			}
+			#volume input {
+				appearance: none;
+				-webkit-appearance: none;
+				width: 8.5rem;
+				height: 2.2rem;
+				margin: 0;
+				background: none;
+				cursor: pointer;
+				touch-action: none;
+			}
+			#volume input::-webkit-slider-runnable-track {
+				height: 0.45rem;
+				border-radius: 0.25rem;
+				background: linear-gradient(to right, #e8c21a var(--level, 100%), rgba(255, 255, 255, 0.35) var(--level, 100%));
+			}
+			#volume input::-moz-range-track {
+				height: 0.45rem;
+				border-radius: 0.25rem;
+				background: linear-gradient(to right, #e8c21a var(--level, 100%), rgba(255, 255, 255, 0.35) var(--level, 100%));
+			}
+			#volume input::-webkit-slider-thumb {
+				-webkit-appearance: none;
+				width: 1.4rem;
+				height: 1.4rem;
+				margin-top: -0.48rem;
+				border: 2px solid #fff;
+				border-radius: 50%;
+				background: #e8c21a;
+				box-shadow: 0 2px 0 #000;
+			}
+			#volume input::-moz-range-thumb {
+				width: 1.2rem;
+				height: 1.2rem;
+				border: 2px solid #fff;
+				border-radius: 50%;
+				background: #e8c21a;
+				box-shadow: 0 2px 0 #000;
 			}
 			#place {
 				bottom: calc(2.5rem + env(safe-area-inset-bottom));
@@ -244,7 +314,15 @@
 		<div class="hud" id="bag"></div>
 		<div class="hud" id="place"></div>
 		<div class="hud" id="wasted"></div>
-		<button id="mute" type="button" aria-label="Ton aus" title="Ton aus (L)">🔊</button>
+		<div id="sound">
+			<button id="mute" type="button" aria-label="Lautstärke" aria-expanded="false" aria-controls="volume" title="Lautstärke (L: Ton aus)">
+				🔊
+			</button>
+			<div id="volume" hidden>
+				<button id="volume-mute" type="button" aria-label="Ton aus" title="Ton aus (L)">🔇</button>
+				<input id="volume-slider" type="range" min="0" max="100" step="1" aria-label="Lautstärke" />
+			</div>
+		</div>
 		<div class="hud" id="help">
 			V: Kamera · WASD: laufen, fahren · E: Rad, Auto klauen, aussteigen, Laden · Leertaste: Turbo, Handbremse · +/−: Zoom · N: Straßen · T:
 			Haltestellen · K: Wände · P: Look · L: Leise · M: Gegend · Pfand zum Späti

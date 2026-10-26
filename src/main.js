@@ -52,20 +52,48 @@ let showStreetNames = true
 let showTransit = true
 let showWalls = false
 
+// Tap the speaker for a volume slider; L still mutes.
 const muteButton = document.getElementById('mute')
+const volumePanel = document.getElementById('volume')
+const volumeMute = document.getElementById('volume-mute')
+const volumeSlider = document.getElementById('volume-slider')
 function showMute(muted) {
-	muteButton.textContent = muted ? '🔇' : '🔊'
-	muteButton.ariaLabel = muteButton.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
+	const volume = sound.volume()
+	muteButton.textContent = muted ? '🔇' : volume < 0.5 ? '🔉' : '🔊'
+	volumeMute.textContent = muted ? '🔊' : '🔇'
+	volumeMute.ariaLabel = volumeMute.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
+	const percent = muted ? 0 : Math.round(volume * 100)
+	volumeSlider.value = String(percent)
+	volumeSlider.style.setProperty('--level', `${percent}%`)
 }
 function toggleMute() {
 	const muted = sound.toggleMute()
 	showMute(muted)
 	hud.say(muted ? 'Leise: Ton aus' : 'Ton an')
 }
+function showVolume(open) {
+	volumePanel.hidden = !open
+	muteButton.classList.toggle('on', open)
+	muteButton.ariaExpanded = String(open)
+}
 showMute(sound.isMuted())
 muteButton.addEventListener('click', () => {
-	toggleMute()
+	sound.start()
+	showVolume(volumePanel.hidden)
 	muteButton.blur()
+})
+volumeMute.addEventListener('click', () => {
+	toggleMute()
+	volumeMute.blur()
+})
+volumeSlider.addEventListener('input', () => showMute(sound.setVolume(volumeSlider.valueAsNumber / 100)))
+// Hand the keys straight back to the game once the slider lets go.
+volumeSlider.addEventListener('change', () => volumeSlider.blur())
+addEventListener('pointerdown', (e) => {
+	if (!volumePanel.hidden && !e.target.closest('#sound')) showVolume(false)
+})
+addEventListener('keydown', (e) => {
+	if (e.key === 'Escape') showVolume(false)
 })
 const overheadHelp = document.getElementById('help').textContent
 const input = createInput({
