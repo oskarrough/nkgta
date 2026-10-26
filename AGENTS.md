@@ -37,3 +37,7 @@ PLEASE, do not verify and visually screenshot everything single thing.
 This repo uses jj (colocated with git). Commit messages say what changed for the player, not how.
 
 Pushing `main` deploys to nkgta.0sk.ar automatically via Cloudflare Workers CI.
+
+## Pull requests
+
+If the change shows on screen, attach a before/after: `gh pr edit <n> --attach './before.png#Alt text'`. Otherwise skip screenshots.
