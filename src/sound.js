@@ -17,6 +17,16 @@ const note = (kind, gain) => {
 	events.push({ kind, gain: +gain.toFixed(4) })
 	if (events.length > 24) events.shift()
 }
+// Loud sounds push the music down for a moment, so a crash cuts through a song.
+let duckLevel = 0
+let duckAt = 0
+const DUCK_FADE = 1.2 // seconds back to full
+function duck(amount) {
+	if (!context) return
+	duckLevel = Math.min(1, Math.max(ducking(), amount))
+	duckAt = context.currentTime
+}
+const ducking = () => (context ? duckLevel * Math.max(0, 1 - (context.currentTime - duckAt) / DUCK_FADE) : 0)
 const level = () => (muted ? 0 : 0.22 * volume * volume)
 const store = (key, value) => {
 	try {
@@ -115,6 +125,7 @@ function burst(frequency, amount, duration) {
 		filter.disconnect()
 		gain.disconnect()
 	}
+	duck(amount * 3)
 	note('impact', amount)
 }
 
@@ -286,6 +297,7 @@ function street(cars, player, view, dt) {
 			v.hornUntil = now + 0.16
 			hornAfter = now + 18 + Math.random() * 15
 			waiting.set(car, 0)
+			duck(0.3)
 			note('horn', 0.07)
 		}
 		// A horn borrows its engine oscillator: still only two traffic voices.
@@ -335,12 +347,13 @@ let lastClink = -Infinity
 export const sound = {
 	start,
 	// The context and master for music from the street, once sound has started.
-	audio: () => context && { context, master, muted },
+	audio: () => context && { context, master, muted, duck: ducking },
 	engine,
 	street,
 	async door() {
 		if (!context || muted) return
 		const [open, close] = await Promise.all([load('door-open'), load('door-close')])
+		duck(0.35)
 		play(open, 'door-open', 0.18)
 		play(close, 'door-close', 0.15, 1, 0.3)
 	},
@@ -355,7 +368,10 @@ export const sound = {
 		lastClink = context.currentTime
 		cue('glass', 0.09, 1.1 + Math.random() * 0.15)
 	},
-	till: () => cue('till', 0.13),
+	till() {
+		duck(0.4)
+		cue('till', 0.13)
+	},
 	isMuted: () => muted,
 	toggleMute() {
 		muted = !muted

@@ -180,6 +180,12 @@ export function stationPool(homes) {
 	const own = SCORES.filter((n) => homes[n]?.at?.includes('autoradio'))
 	return own.length ? own : PLACE_SCORES
 }
+// R turns the dial: the rock station, everything the Kiez plays, then off.
+export const STATIONS = [
+	{ name: 'Radio A100', pool: stationPool },
+	{ name: 'Kiezfunk', pool: (homes) => PLACE_SCORES.filter((n) => !stationPool(homes).includes(n)) },
+	{ name: null }, // off
+]
 export const nextOnAir = (pool, score) => pool[(pool.indexOf(score) + 1) % pool.length]
 
 // A convoy plays from whichever of its cars is nearest (x, y), so the song
@@ -192,6 +198,31 @@ export function convoyCar(cars, x, y) {
 		if (d < bestD) [best, bestD] = [c, d]
 	}
 	return best
+}
+
+// However many play, one leads: a source steps back behind a louder one as
+// that one gets near, so you hear a song and some street, not two songs at
+// once. Two about as loud share the space; your own radio leaves the street a
+// murmur.
+export function lead(shapes, kinds) {
+	return shapes.map((s, i) => {
+		let back = 0
+		for (const [j, o] of shapes.entries()) {
+			if (j === i || !s.level) continue
+			const louder = Math.min(1, Math.max(0, (o.level / s.level - 1) * 2))
+			back = Math.max(back, BACK * louder * Math.min(1, o.level / KINDS[kinds[j]].level))
+		}
+		return { ...s, level: s.level * (1 - back), wet: s.wet * (1 - back) }
+	})
+}
+const BACK = 0.85 // how far the others step back behind a louder one right beside you
+
+// The music bus, as loud as the moment wants: low on foot so the street and
+// the doors come through, up when your own radio is on, ducked under a loud
+// noise, muffled in a shop, sunk under water when you're wasted.
+export function mix({ radio, duck = 0, inside = false, down = false }) {
+	const level = (radio ? 0.6 : 0.3) * (1 - 0.65 * duck) * (down ? 0.45 : 1)
+	return { level, cutoff: down ? 320 : inside ? 900 : 18000 }
 }
 
 // The PLAYING sources nearest (x, y), within earshot, nearness measured
@@ -300,7 +331,7 @@ export function end(p, context) {
 	}, 2000)
 }
 
-export function createMusic(world, shops) {
+export function createMusic(world, shops, say = () => {}) {
 	const songs = new Map()
 	// Sources are placed once every song is in, since a song says where it belongs.
 	let fixed = null
@@ -311,8 +342,16 @@ export function createMusic(world, shops) {
 	let fieldSeed = 9000
 	const radios = new WeakMap()
 	let convoy = null // the convoy's song, while it lasts
-	// Your car radio, on whenever you sit in a car and still on air while you don't.
-	const station = { kind: 'car', x: 0, y: 0, score: null, since: 0 }
+	// Your car radio, on whenever you sit in a car and still on air while you
+	// don't. Every station keeps going while you listen to another.
+	const stations = STATIONS.map(
+		(s, i) => s.name && { kind: 'car', x: 0, y: 0, score: null, since: 0, name: s.name, pool: s.pool, seed: 7000 + i },
+	)
+	let dial = 0
+	let tunedIn = null // the station and song last announced
+	let announceAt = Infinity
+	let wasInCar = false
+	let bus = null
 	let carSeed = 0
 	const playing = new Map()
 	let synth = null
@@ -372,22 +411,32 @@ export function createMusic(world, shops) {
 	}
 
 	// The station follows you from car to car. Getting in, you join whatever's
-	// on; a song that has played through gives way to the next from the top.
+	// on; when a song ends the next starts, on air whether you listen or not.
 	function stationIn(car, now) {
-		if (!car) return []
-		const pool = stationPool(homes)
+		const station = stations[dial]
+		if (!car || !station) return []
+		const pool = station.pool(homes)
 		const length = (n) => (songs.has(n) ? songs.get(n).intro.dur + songs.get(n).loop.dur : Infinity)
 		if (!station.score) {
-			station.score = pool[Math.floor(hash(7000.5) * pool.length)]
-			station.since = hash(7000.25) * length(station.score)
+			station.score = pool[Math.floor(hash(station.seed + 0.5) * pool.length)]
+			station.since = hash(station.seed + 0.25) * length(station.score)
 		}
-		if (now + station.since >= length(station.score)) {
+		for (let guard = 0; guard < 100 && now + station.since >= length(station.score); guard++) {
+			station.since -= length(station.score)
 			station.score = nextOnAir(pool, station.score)
-			station.since = -now
 		}
 		station.x = car.x
 		station.y = car.y
 		return [station]
+	}
+
+	// What's on, in the place line: the station and the song, once each.
+	function announce(now) {
+		const station = stations[dial]
+		const key = station ? `${station.name}:${station.score}` : 'off'
+		if (key === tunedIn || now < announceAt) return
+		tunedIn = key
+		say(station ? `${station.name} · ${songs.get(station.score)?.title ?? station.score}` : 'Radio aus')
 	}
 
 	function convoyOf(cars, listener) {
@@ -401,42 +450,70 @@ export function createMusic(world, shops) {
 	}
 
 	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
-	function update(audio, cars, listener, view, inCar) {
+	function update(audio, cars, listener, view, { inCar = false, inside = false, down = false } = {}) {
 		if (!fixed || !audio || audio.muted) {
 			heard = fixed
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
 		const { context, master } = audio
-		synth ??= synthFor(context, master)
+		if (!bus) {
+			bus = { gain: context.createGain(), tone: context.createBiquadFilter() }
+			bus.gain.gain.value = 0
+			bus.tone.type = 'lowpass'
+			bus.tone.frequency.value = 18000
+			bus.gain.connect(bus.tone).connect(master)
+		}
+		synth ??= synthFor(context, bus.gain)
 		const now = context.currentTime
+		if (inCar && !wasInCar) {
+			// Let the car's name show first.
+			announceAt = now + 1.8
+			tunedIn = null
+		}
+		wasInCar = inCar
+		const own = stationIn(listener.car, now)
+		if (inCar && (!own.length || songs.has(own[0].score))) announce(now)
 		const sources = fixed.concat(
 			cars
 				.filter((c) => c.ai && !c.convoy && c !== listener.car)
 				.map(radioOf)
 				.filter(Boolean),
-			stationIn(listener.car, now),
+			own,
 			convoyOf(cars, listener),
 			[fieldAt(listener.x, listener.y)].filter(Boolean),
 		)
 		heard = sources
-		const want = nearest(sources, listener.x, listener.y)
+		const want = nearest(sources, listener.x, listener.y).filter((src) => songs.has(src.score))
 		for (const p of playing.values()) if (!want.includes(p.src) || p.song !== songs.get(p.src.score)) stop(p, context)
-		for (const src of want) {
-			const song = songs.get(src.score)
-			if (!song) continue
+		const shapes = lead(
+			want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar)),
+			want.map((src) => src.kind),
+		)
+		for (const [i, src] of want.entries()) {
 			let p = playing.get(src)
-			if (!p) playing.set(src, (p = begin(synth, context, src, song)))
-			const own = src === station
-			const d = Math.hypot(src.x - listener.x, src.y - listener.y)
-			const pan = own || src.kind === 'field' ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
-			tune(p, shape(src.kind, d, own, inCar), pan, now)
+			if (!p) playing.set(src, (p = begin(synth, context, src, songs.get(src.score))))
+			const pan =
+				own.includes(src) || src.kind === 'field' ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
+			tune(p, shapes[i], pan, now)
 			feed(p, now + AHEAD, now)
 		}
+		const m = mix({ radio: own.length > 0, duck: audio.duck?.() ?? 0, inside, down })
+		bus.gain.gain.setTargetAtTime(m.level, now, 0.12)
+		bus.tone.frequency.setTargetAtTime(m.cutoff, now, down ? 0.25 : 0.15)
+	}
+
+	// R: the next station, or off. Only in a car; nothing on the dial on foot.
+	function nextStation(inCar) {
+		if (!inCar || !fixed) return false
+		dial = (dial + 1) % stations.length
+		announceAt = 0
+		return true
 	}
 
 	return {
 		update,
+		nextStation,
 		// Musik-Debug: every source, and the gain of the ones playing.
 		debug: () => ({ sources: heard ?? [], gains: new Map([...playing].map(([src, p]) => [src, p.level.gain.value])) }),
 		inspect: () =>

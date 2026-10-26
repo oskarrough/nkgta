@@ -27,6 +27,7 @@ export function createInput(actions) {
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
 		if (key === 'j') actions.toggleMusicDebug()
+		if (key === 'r') actions.nextStation()
 		if (e.code === 'Backquote' || key === '`') actions.toggleDebug()
 	})
 	addEventListener('blur', () => keys.clear())

@@ -9,6 +9,8 @@ import {
 	convoyCar,
 	cueAt,
 	join,
+	lead,
+	mix,
 	nearest,
 	nextOnAir,
 	stationPool,
@@ -253,5 +255,21 @@ describe('the open field', () => {
 		expect(at(52.4745, 13.4)).toBe(0) // the middle of the Feld
 		expect(at(52.4845, 13.4165)).toBe(18) // Hasenheide
 		expect(at(52.4812, 13.4352)).toBe(18) // Rathaus Neukölln
+	})
+})
+
+describe('the mix', () => {
+	test('one song leads: a quieter one steps back behind it, two alike share', () => {
+		const [near, far] = lead([shape('radio', 1), shape('window', 12)], ['radio', 'window'])
+		expect(near.level).toBeCloseTo(shape('radio', 1).level)
+		expect(far.level).toBeLessThan(shape('window', 12).level * 0.3)
+		const pair = lead([shape('radio', 5), shape('radio', 5)], ['radio', 'radio'])
+		expect(pair[0].level).toBeCloseTo(shape('radio', 5).level)
+	})
+
+	test('music sits back on foot, comes up with your radio, dips under a crash', () => {
+		expect(mix({ radio: false }).level).toBeLessThan(mix({ radio: true }).level)
+		expect(mix({ radio: true, duck: 1 }).level).toBeLessThan(mix({ radio: true }).level * 0.5)
+		expect(mix({ inside: true }).cutoff).toBeLessThan(2000)
 	})
 })

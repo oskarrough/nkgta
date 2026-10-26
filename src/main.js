@@ -39,7 +39,7 @@ const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world)
-const music = createMusic(world, shops)
+const music = createMusic(world, shops, (text) => hud.say(text))
 phase('overlay, hud, traffic')
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
@@ -124,6 +124,7 @@ const actions = {
 		city3d.cycleLook()
 		showWalls = city3d.showsWalls()
 	},
+	nextStation: () => music.nextStation(!!player.car),
 	toggleDebug: () => showDebug(debug.hidden),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 }
@@ -272,7 +273,7 @@ function frame(now) {
 	if (!inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
-	music.update(sound.audio(), traffic.cars, street, streetView, !!player.car)
+	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	visit.render(cam, traffic.cars, dt)
 	draw({
