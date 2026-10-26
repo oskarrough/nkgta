@@ -5,10 +5,10 @@ let noise
 let playerVoice
 let muted = false
 // 0–1, scales everything that reaches master; squared so the slider feels even.
-let volume = 1
+let volume = 0.5
 try {
 	muted = localStorage.getItem('nk-leise') === 'true'
-	volume = Math.min(1, Math.max(0, Number(localStorage.getItem('nk-lautstaerke') ?? 1) || 0))
+	volume = Math.min(1, Math.max(0, Number(localStorage.getItem('nk-lautstaerke') ?? 0.5) || 0))
 } catch {
 	// Sound still works when browser storage is unavailable.
 }
