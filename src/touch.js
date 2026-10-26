@@ -170,12 +170,12 @@ export function createTouch(actions) {
 			const turn = clamp(diff / 0.9, -1, 1) * (backwards ? -1 : 1)
 			return { throttle, turn, handbrake: boostHeld }
 		},
-		// Wording on the E button, from the same hint the HUD shows.
-		setUse(hint) {
-			if (use.dataset.hint === (hint ?? '')) return
-			use.dataset.hint = hint ?? ''
-			use.textContent = hint ? hint.toUpperCase() : 'E'
-			use.classList.toggle('dim', !hint)
+		// The E button shows a picture of what it does, the same as the HUD's.
+		setUse(action) {
+			if (use.dataset.action === (action ?? '')) return
+			use.dataset.action = action ?? ''
+			use.innerHTML = action ? `<img class="icon" src="/icons/act-${action}.png" alt="">` : ''
+			use.classList.toggle('dim', !action)
 		},
 		setDriving(driving) {
 			if (boost.dataset.driving === String(driving)) return

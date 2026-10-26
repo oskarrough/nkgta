@@ -107,82 +107,88 @@
 			body.touch #menu-button {
 				display: block;
 			}
-			/* Esc or the menu button: everything the keys do, as buttons. */
+			/* Esc or the menu button: a grid of pictures, lit when on. */
 			#menu {
 				position: fixed;
 				inset: 0;
 				z-index: 12;
-				width: min(20rem, calc(100vw - 2rem));
-				max-height: calc(100dvh - 2rem);
+				width: fit-content;
 				height: fit-content;
 				margin: auto;
 				padding: 0.75rem;
-				box-sizing: border-box;
-				overflow-y: auto;
-				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
+				display: grid;
+				grid-template-columns: repeat(4, auto);
+				gap: 0.6rem;
 				list-style: none;
 				border: 2px solid rgba(255, 255, 255, 0.4);
 				border-radius: 1.3rem;
 				background: rgba(0, 0, 0, 0.6);
-				text-shadow: 0 2px 0 #000;
-				touch-action: pan-y;
 			}
 			#menu[hidden] {
 				display: none;
 			}
 			#menu button {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-				width: 100%;
-				min-height: 3rem;
-				padding: 0 1rem;
+				position: relative;
+				width: 4.6rem;
+				height: 4.6rem;
+				padding: 0;
 				border: 2px solid rgba(255, 255, 255, 0.4);
-				border-radius: 1.5rem;
+				border-radius: 1.2rem;
 				background: rgba(0, 0, 0, 0.35);
-				color: #fff;
-				font:
-					800 1.05rem system-ui,
-					sans-serif;
-				text-align: left;
-				text-shadow: inherit;
 				cursor: pointer;
+			}
+			#menu button.on {
+				background: rgba(232, 194, 26, 0.45);
+				border-color: rgba(232, 194, 26, 0.9);
+			}
+			#menu button.off img {
+				opacity: 0.4;
 			}
 			#menu button:focus-visible {
 				outline: 2px solid #e8c21a;
 			}
-			#menu b {
-				margin-left: auto;
-				color: #e8c21a;
+			#menu .icon {
+				width: 64px;
+				height: 64px;
 			}
 			#menu kbd {
-				min-width: 1.4em;
-				font: inherit;
-				font-size: 0.8rem;
-				opacity: 0.6;
-				text-align: center;
+				position: absolute;
+				right: 0.2rem;
+				bottom: 0.2rem;
+				padding: 0 0.25em;
+				border-radius: 0.25em;
+				background: #e7e7e5;
+				box-shadow: 0 2px 0 #9a9a98;
+				color: #1a1e1b;
+				font:
+					800 0.6rem / 1.3 system-ui,
+					sans-serif;
 			}
 			body.touch #menu kbd {
 				display: none;
 			}
-			#menu b + kbd {
-				margin-left: 0;
+			/* What E does here: the key and a picture of it. */
+			#use {
+				bottom: calc(5rem + env(safe-area-inset-bottom));
+				left: 0;
+				right: 0;
+				display: flex;
+				justify-content: center;
+				gap: 0.4rem;
 			}
-			#menu details {
-				padding: 0.25rem 1rem;
-				font-size: 0.85rem;
-				font-weight: 400;
+			#use[hidden],
+			body.touch #use {
+				display: none;
 			}
-			#menu summary {
-				font-weight: 800;
-				cursor: pointer;
+			#use .icon {
+				margin: 0;
+				width: 64px;
+				height: 64px;
+				filter: drop-shadow(0 2px 0 #000);
 			}
-			#menu ul {
-				margin: 0.4rem 0 0;
-				padding-left: 1rem;
-				line-height: 1.5;
+			#touch-use .icon {
+				width: 64px;
+				height: 64px;
 			}
 			#mute.on {
 				background: rgba(232, 194, 26, 0.45);
@@ -401,6 +407,7 @@
 		<div class="hud" id="money"></div>
 		<div class="hud" id="bag"></div>
 		<div class="hud" id="place"></div>
+		<div class="hud" id="use" hidden><img class="icon" src="/icons/key-e.png" alt="E" /><img class="icon" id="use-act" alt="" /></div>
 		<div class="hud" id="wasted"></div>
 		<div id="sound">
 			<button id="mute" type="button" aria-label="Lautstärke" aria-expanded="false" aria-controls="volume" title="Lautstärke (L: Ton aus)">
@@ -418,49 +425,51 @@
 		</button>
 		<menu id="menu" aria-label="Menü" hidden>
 			<li>
-				<button type="button" data-action="streets">Straßennamen <b></b><kbd>N</kbd></button>
+				<button type="button" data-action="streets" aria-label="Straßennamen" title="Straßennamen (N)">
+					<img class="icon" src="/icons/menu-streets.png" alt="" /><kbd>N</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="transit">Haltestellen <b></b><kbd>T</kbd></button>
+				<button type="button" data-action="transit" aria-label="Haltestellen" title="Haltestellen (T)">
+					<img class="icon" src="/icons/menu-stops.png" alt="" /><kbd>T</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="walls">Wände <b></b><kbd>K</kbd></button>
+				<button type="button" data-action="walls" aria-label="Wände" title="Wände (K)">
+					<img class="icon" src="/icons/menu-walls.png" alt="" /><kbd>K</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="look">Look <b></b><kbd>P</kbd></button>
+				<button type="button" data-action="look" aria-label="Look" title="Look (P)">
+					<img class="icon" src="/icons/menu-look.png" alt="" /><kbd>P</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="camera">Kamera <b></b><kbd>V</kbd></button>
+				<button type="button" data-action="camera" aria-label="Kamera" title="Kamera (V)">
+					<img class="icon" src="/icons/menu-camera.png" alt="" /><kbd>V</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="music">Musik-Debug <b></b><kbd>J</kbd></button>
+				<button type="button" data-action="music" aria-label="Musik-Debug" title="Musik-Debug (J)">
+					<img class="icon" src="/icons/menu-music.png" alt="" /><kbd>J</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="sound">Ton <b></b><kbd>L</kbd></button>
+				<button type="button" data-action="sound" aria-label="Ton" title="Ton (L)">
+					<img class="icon" src="/icons/speaker.png" alt="" /><kbd>L</kbd>
+				</button>
 			</li>
 			<li>
-				<button type="button" data-action="area">Gegend wählen <b></b><kbd>M</kbd></button>
-			</li>
-			<li>
-				<details>
-					<summary>Tasten</summary>
-					<ul>
-						<li>WASD / Pfeile: laufen, fahren, lenken</li>
-						<li>E: Rad, Auto klauen, aussteigen, Laden</li>
-						<li>Leertaste: Turbo, Handbremse</li>
-						<li>+/− oder Mausrad: Zoom</li>
-						<li>V: Kamera; rechte Maustaste ziehen: umsehen</li>
-						<li>N: Straßen · T: Haltestellen · K: Wände · P: Look</li>
-						<li>J: Musik-Debug · L: Ton aus · M: Gegend wählen · Esc: Menü</li>
-					</ul>
-				</details>
+				<button type="button" data-action="area" aria-label="Gegend wählen" title="Gegend wählen (M)">
+					<img class="icon" src="/icons/menu-area.png" alt="" /><kbd>M</kbd>
+				</button>
 			</li>
 		</menu>
 		<div id="touch" aria-hidden="true">
 			<div id="stick"><div id="stick-knob"></div></div>
 			<div id="touch-actions">
 				<button class="touch-button" id="touch-boost" type="button" aria-label="Turbo oder Handbremse">Turbo</button>
-				<button class="touch-button dim" id="touch-use" type="button" aria-label="Benutzen">E</button>
+				<button class="touch-button dim" id="touch-use" type="button" aria-label="Benutzen"></button>
 			</div>
 		</div>
 		<script type="module" src="/src/main.js"></script>

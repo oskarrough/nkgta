@@ -14,6 +14,13 @@ export function useHint(player, car) {
 	return null
 }
 
+// The picture for what E does: from a shop door's hint or from useHint.
+const ACTIONS = { aussteigen: 'exit', absteigen: 'exit', 'aufs Fahrrad': 'bike', 'Auto klauen': 'car', einsteigen: 'car' }
+export function useAction(door, hint) {
+	if (door) return door.startsWith('E: raus') ? 'exit' : door.startsWith('E: ') ? 'shop' : null
+	return ACTIONS[hint] ?? null
+}
+
 const stopName = (s) => {
 	const name = s.kind === 'ubahn' ? `U ${s.name || 'Bahnhof'}` : s.name || 'Haltestelle'
 	return s.lines.length ? `${name} · ${s.lines.join(', ')}` : name
@@ -41,6 +48,16 @@ export function createHud(world) {
 		if (color) el.style.setProperty('--dot', color)
 	}
 
+	// E plus a picture of what it does, instead of words.
+	const useEl = document.getElementById('use')
+	const useAct = document.getElementById('use-act')
+	function showUse(action) {
+		if (shown.use === action) return
+		shown.use = action
+		useEl.hidden = !action
+		if (action) useAct.src = `/icons/act-${action}.png`
+	}
+
 	document.getElementById('bag').style.setProperty('--bottle', `url(${bottleIcon()})`)
 
 	let street = ''
@@ -50,14 +67,17 @@ export function createHud(world) {
 		say: (text) => (toast = { text, t: 3 }),
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door.
-		update({ player, car, bag, showTransit, wasted, inside, door }, dt) {
+		update({ player, bag, showTransit, wasted, inside, door, action }, dt) {
 			if (toast && (toast.t -= dt) < 0) toast = null
+			showUse(wasted ? null : action)
+			// A door that's open already just names the shop.
+			const shopName = door && !door.startsWith('E: ') ? door.split(' · ').pop() : null
 			set('money', euro(bag.cents))
 			set('bag', bag.bottles ? String(bag.bottles) : '')
 			if (inside) {
 				set('street', '')
 				set('wasted', '')
-				set('place', toast?.text ?? door ?? '')
+				set('place', toast?.text ?? shopName ?? '')
 				dot(null)
 				return
 			}
@@ -68,12 +88,8 @@ export function createHud(world) {
 			set('wasted', wasted ? 'WASTED' : '')
 			const privat = !p && world.tileAt(player.x, player.y) === T.PRIVATE
 			const here = p ? placeName(p) : privat ? 'Privatweg' : ''
-			const use = useHint(player, car)
-			// On touch the E button says it already; the line stays for the place.
-			const touch = document.body.classList.contains('touch')
-			const hint = touch ? (door?.startsWith('E: ') ? null : door) : (door ?? (use ? `E: ${use}` : null))
-			set('place', toast?.text ?? hint ?? (stop ? stopName(stop) : here))
-			dot(toast || hint ? null : stop ? STOP_DOT[stop.kind] : p ? badgeColor(p.kind) : privat ? PRIVATE_DOT : null)
+			set('place', toast?.text ?? shopName ?? (stop ? stopName(stop) : here))
+			dot(toast || shopName ? null : stop ? STOP_DOT[stop.kind] : p ? badgeColor(p.kind) : privat ? PRIVATE_DOT : null)
 		},
 	}
 }

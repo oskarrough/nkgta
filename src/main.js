@@ -8,7 +8,7 @@ import { createPfand } from './pfand.js'
 import { createCamera } from './camera.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
-import { createHud, useHint } from './hud.js'
+import { createHud, useAction, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
@@ -75,7 +75,6 @@ function showMute(muted) {
 function toggleMute() {
 	const muted = sound.toggleMute()
 	showMute(muted)
-	hud.say(muted ? 'Leise: Ton aus' : 'Ton an')
 }
 function showVolume(open) {
 	volumePanel.hidden = !open
@@ -104,8 +103,7 @@ const actions = {
 	setLooking: camera.setLooking,
 	move: camera.move,
 	toggleCamera() {
-		const third = camera.toggle(player)
-		hud.say(third ? 'Verfolgerkamera' : 'Vogelperspektive')
+		camera.toggle(player)
 	},
 	use,
 	toggleMute,
@@ -122,7 +120,7 @@ const actions = {
 		}
 	},
 	cycleLook() {
-		hud.say(`Look: ${city3d.cycleLook()}`)
+		city3d.cycleLook()
 		showWalls = city3d.showsWalls()
 	},
 	pickArea: () => (location.href = `/pick.html${location.search}`),
@@ -132,20 +130,26 @@ const input = createInput(actions)
 // The menu: what the keys do, as buttons, with each toggle's state.
 const menu = document.getElementById('menu')
 const menuButton = document.getElementById('menu-button')
+// Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
-	streets: [actions.toggleStreetNames, () => (showStreetNames ? 'an' : 'aus')],
-	transit: [actions.toggleTransit, () => (showTransit ? 'an' : 'aus')],
-	walls: [actions.toggleWalls, () => (showWalls ? 'an' : 'aus')],
-	look: [actions.cycleLook, () => city3d.look()],
-	camera: [actions.toggleCamera, () => (camera.selected() ? 'Verfolger' : 'von oben')],
-	music: [actions.toggleMusicDebug, () => (showMusic ? 'an' : 'aus')],
-	sound: [toggleMute, () => (sound.isMuted() ? 'aus' : 'an')],
-	area: [actions.pickArea, () => ''],
+	streets: [actions.toggleStreetNames, () => showStreetNames],
+	transit: [actions.toggleTransit, () => showTransit],
+	walls: [actions.toggleWalls, () => showWalls],
+	look: [actions.cycleLook, () => null],
+	camera: [actions.toggleCamera, () => camera.selected()],
+	music: [actions.toggleMusicDebug, () => showMusic],
+	sound: [toggleMute, () => !sound.isMuted()],
+	area: [actions.pickArea, () => null],
 }
 function showMenuState() {
 	for (const button of menu.querySelectorAll('button[data-action]')) {
-		button.querySelector('b').textContent = menuItems[button.dataset.action][1]()
+		const on = menuItems[button.dataset.action][1]()
+		button.classList.toggle('on', on === true)
+		button.classList.toggle('off', on === false)
+		button.ariaPressed = on === null ? null : String(on)
 	}
+	menu.querySelector('[data-action=sound] img').src = `/icons/${sound.isMuted() ? 'speaker-off' : 'speaker'}.png`
+	menu.querySelector('[data-action=look]').title = `Look: ${city3d.look()} (P)`
 }
 function showMenu(open) {
 	menu.hidden = !open
@@ -271,9 +275,10 @@ function frame(now) {
 	})
 	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
 	const door = visit.hint()
-	input.setUse(door?.startsWith('E: ') ? door.slice(3) : door ? null : useHint(player, car))
+	const action = useAction(door, useHint(player, car))
+	input.setUse(action)
 	input.setDriving(!!player.car)
-	hud.update({ player, car, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door }, dt)
+	hud.update({ player, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door, action }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
 	if (FPS) fpsMeter(now)
 	last = now

@@ -18,7 +18,7 @@ bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
 ```
 
-The screen stays clean while you play: the only prompt is what E does right here (on a phone, the E button says it). Esc, or the menu button on a phone, opens the menu: street names, stops, walls, look, camera, sound and area as buttons showing whether they're on, and the full key list under Tasten. The keys below still work.
+The screen stays clean while you play, in pictures rather than words: the only prompt is an E key with a picture of what it does here (bike, car, out, shop); on a phone the E button shows that picture. Esc, or the menu button on a phone, opens the menu: a grid of pictures for street names, stops, walls, look, camera, music debug, sound and area, lit yellow when on, each with its key in the corner. The keys below still work.
 
 In overhead view, W/S (or up/down) move forward/backward along your facing and A/D (or left/right) turn, on foot and on the bike. E gets on and off the bike and in and out of cars, space is turbo (for testing), +/− or the mouse wheel zooms, N toggles street names, T toggles U-Bahn and bus stops, P switches the look between default, pixel art and raw: the shapes and walls the game built from the map in plain grey, with the walk grid on (K toggles that grid in any look), M picks another area. Footpaths and Tordurchfahrten through buildings (`tunnel=building_passage`) cut through the block, so you can walk the Kino-Passage from Karl-Marx-Straße into the Hof and out onto Richardstraße. Private paths and passages are walkable too, hatched on the map. Every shop wears an awning with its name painted on it. Stand at its door and E tears the air open on the facade, showing the shop inside, live; walk into the tear and you're in. Collect Pfand bottles and cash them in at the counter inside a Späti.
 
@@ -47,11 +47,11 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 
 Every icon is its own PNG in `public/icons/`, 32×32 with a transparent background, shown at 32 CSS pixels with `image-rendering: pixelated`. Paint over a file (same name, same size) and the game picks it up; no code to touch.
 
-- `speaker.png`: sound on (also the slider's "Ton an" button)
-- `speaker-low.png`: sound on, volume under half
-- `speaker-off.png`: muted (also the slider's "Ton aus" button)
-- `play.png`: the jukebox's Abspielen button
+- `speaker.png`, `speaker-low.png`, `speaker-off.png`: sound on, quiet, muted (speaker button, volume pill, menu)
 - `menu.png`: the menu button on touch screens
-- `speaker-source.png`: a music source in Musik-Debug (J, or in the menu): rings show how far each source carries
+- `menu-streets.png`, `menu-stops.png`, `menu-walls.png`, `menu-look.png`, `menu-camera.png`, `menu-music.png`, `menu-area.png`: the menu's buttons (N, T, K, P, V, J, M), shown at 64 px
+- `key-e.png` and `act-bike.png`, `act-car.png`, `act-exit.png`, `act-shop.png`: the E prompt, E plus what it does, shown at 64 px; the touch E button shows the same `act-*` picture
+- `speaker-source.png`: a music source in Musik-Debug (J): rings show how far each carries
+- `play.png`: the jukebox's Abspielen button
 
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.
