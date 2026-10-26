@@ -7,15 +7,41 @@ import { forwardSpeed } from './car.js'
 const PROBE = 0.1 // tiles either side of the boom that must be clear of buildings
 const HOLD = 0.6 // seconds
 
+// The knobs for how close the camera sits, tuned live with ?tune. Zoom is
+// screen pixels per tile over PX; boom lengths are tiles. Speed is tiles per
+// second: walking 1.6, the bike 3.6, a car flat out 14, a sports car 24,
+// turbo on the bike 36. Above `calm`, the view pulls back towards its
+// furthest, `out` (top-down, a fraction of the zoom) or `boomOut` (chase,
+// tiles), getting most of the way there by `fast`. It eases out over
+// `easeOut` seconds and back in over the slower `easeIn`.
+export const ZOOM = {
+	foot: 15,
+	bike: 14,
+	car: 12.5,
+	out: 0.5,
+	calm: 2,
+	fast: 14,
+	easeOut: 0.6,
+	easeIn: 1.8,
+	boom: 2.2,
+	boomOut: 2.5,
+	boomPerLength: 0.3,
+}
+
+// How far out speed takes the view, 0 to 1.
+const pull = (speed) => 1 - Math.exp(-Math.max(0, speed - ZOOM.calm) / (ZOOM.fast / 2))
+// Eases `from` towards `to`, quicker on the way out than back in.
+const glide = (from, to, dt) => from + (to - from) * (1 - Math.exp(-dt / Math.max(0.01, to > from ? ZOOM.easeOut : ZOOM.easeIn)))
+
 export function createCamera(world) {
-	let zoom = 11
-	let userZoom = 11
-	let cruise = 0
+	let zoom = ZOOM.foot
+	let userZoom = 1 // the player's +/- on top of the zoom for the mode they're in
+	let away = 0 // how far speed has pulled the view out, 0 to 1
 	let thirdPerson = false
 	let suspended = false
 	let yaw = 0
 	let pitch = 0.35
-	let distance = 3
+	let distance = 1 // the player's +/- on the chase camera's boom
 	let looking = false
 	let returnDelay = 0
 	let speedDistance = 0
@@ -36,7 +62,7 @@ export function createCamera(world) {
 			thirdPerson = !thirdPerson
 			if (thirdPerson) yaw = target.dir
 			boom = null
-			speedDistance = aheadX = aheadY = 0
+			speedDistance = aheadX = aheadY = away = 0
 			return thirdPerson
 		},
 		setLooking(value) {
@@ -56,12 +82,15 @@ export function createCamera(world) {
 			}
 		},
 		zoomBy(f) {
-			if (active()) distance = Math.max(0.8, Math.min(8, distance / f))
-			else userZoom = Math.max(0.5, Math.min(24, userZoom * f))
+			if (active()) distance = Math.max(0.35, Math.min(3.5, distance / f))
+			else userZoom = Math.max(0.05, Math.min(2, userZoom * f))
 		},
 
 		// Screen pixels per tile, and the top-left corner, centred on `target`.
 		// `closer` zooms in on top of the player's zoom, as inside a shop.
+		// For ?tune: what speed is doing to the view right now.
+		state: () => ({ away, boom: speedDistance }),
+
 		update(target, canvas, dt, pixelGrid, closer = 1) {
 			if (active()) {
 				const vehicle = target.car || target.onBike
@@ -74,15 +103,15 @@ export function createCamera(world) {
 					const turn = Math.atan2(Math.sin(target.dir - yaw), Math.cos(target.dir - yaw))
 					yaw += turn * (1 - Math.exp(-1.8 * dt))
 				}
+				const extra = pull(Math.abs(target.speed)) * ZOOM.boomOut + (target.car?.model.length ?? 0) * ZOOM.boomPerLength
+				speedDistance = glide(speedDistance, extra, dt)
 				const ease = 1 - Math.exp(-2.5 * dt)
-				const extra = vehicle ? Math.min(2, Math.abs(target.speed) * 0.14) + (target.car?.model.length ?? 0) * 0.35 : 0
-				speedDistance += (extra - speedDistance) * ease
 				const pace = target.car ? forwardSpeed(target.car) : target.speed
 				const lead = following ? Math.max(-1, Math.min(1.5, pace * 0.16)) : 0
 				aheadX += (Math.cos(target.dir) * lead - aheadX) * ease
 				aheadY += (Math.sin(target.dir) * lead - aheadY) * ease
 				const height = 0.55 + Math.max(0, (target.car?.model.length ?? 0) - 1.5) * 0.15
-				const reach = distance + speedDistance
+				const reach = ZOOM.boom * distance + speedDistance
 				const horizontal = Math.cos(pitch) * reach
 				const dx = -Math.cos(yaw) * horizontal
 				const dy = -Math.sin(yaw) * horizontal
@@ -128,16 +157,17 @@ export function createCamera(world) {
 			}
 			boom = null
 			ground = null
-			// Follow a slow average of speed, so bumping into walls doesn't pump the zoom.
-			cruise += (Math.abs(target.speed) - cruise) * Math.min(1, dt * 1.5)
-			// Only a touch: flat out you see about a fifth further than on foot.
-			const out = Math.min(1, Math.max(0.8, 1 - cruise * 0.02)) * closer
+			// Eased, and slower coming back in, so bumping into a wall doesn't
+			// pump the zoom.
+			away = glide(away, pull(Math.abs(target.speed)), dt)
+			const base = target.car ? ZOOM.car : target.onBike ? ZOOM.bike : ZOOM.foot
+			const out = (1 - away * ZOOM.out) * closer
 			if (pixelGrid) {
 				// On the pixel grid every in-between zoom redraws every pixel, so
-				// zoom jumps straight there, and speed zooms out in two steps.
-				zoom = (userZoom * Math.round(out * 10)) / 10
+				// zoom jumps straight there, and speed zooms out in steps.
+				zoom = base * userZoom * Math.max(0.1, Math.round(out * 10) / 10)
 			} else {
-				const want = userZoom * out
+				const want = base * userZoom * out
 				zoom += (want - zoom) * Math.min(1, dt * 3)
 				// Settle for good, or the zoom creeps on for seconds.
 				if (Math.abs(want - zoom) < 0.002) zoom = want

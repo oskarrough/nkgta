@@ -27,6 +27,7 @@ export function createInput(actions) {
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
 		if (key === 'j') actions.toggleMusicDebug()
+		if (e.code === 'Backquote' || key === '`') actions.toggleTune()
 	})
 	addEventListener('blur', () => keys.clear())
 	// Dragging keeps the cursor available for the rest of the game UI.
