@@ -51,6 +51,12 @@ if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
+let showMusic = false
+try {
+	showMusic = localStorage.getItem('nk-musik-debug') === 'true'
+} catch {
+	// Debug views just start off when storage is blocked.
+}
 
 // Tap the speaker for a volume slider; L still mutes.
 const muteButton = document.getElementById('mute')
@@ -107,6 +113,14 @@ const actions = {
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),
 	toggleTransit: () => (showTransit = !showTransit),
 	toggleWalls: () => (showWalls = !showWalls),
+	toggleMusicDebug() {
+		showMusic = !showMusic
+		try {
+			localStorage.setItem('nk-musik-debug', String(showMusic))
+		} catch {
+			// Fine, it just won't be remembered.
+		}
+	},
 	cycleLook() {
 		hud.say(`Look: ${city3d.cycleLook()}`)
 		showWalls = city3d.showsWalls()
@@ -124,6 +138,7 @@ const menuItems = {
 	walls: [actions.toggleWalls, () => (showWalls ? 'an' : 'aus')],
 	look: [actions.cycleLook, () => city3d.look()],
 	camera: [actions.toggleCamera, () => (camera.selected() ? 'Verfolger' : 'von oben')],
+	music: [actions.toggleMusicDebug, () => (showMusic ? 'an' : 'aus')],
 	sound: [toggleMute, () => (sound.isMuted() ? 'aus' : 'an')],
 	area: [actions.pickArea, () => ''],
 }
@@ -252,6 +267,7 @@ function frame(now) {
 		showTransit,
 		showWalls: showWalls && !indoors,
 		inside: indoors,
+		music: showMusic ? music.debug : null,
 	})
 	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
 	const door = visit.hint()

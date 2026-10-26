@@ -26,6 +26,7 @@ export function createInput(actions) {
 		if (key === 'k') actions.toggleWalls()
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
+		if (key === 'j') actions.toggleMusicDebug()
 	})
 	addEventListener('blur', () => keys.clear())
 	// Dragging keeps the cursor available for the rest of the game UI.

@@ -55,7 +55,7 @@ export const KINDS = {
 	field: { level: 0.4, cutoff: 5000, wet: 0.8 },
 	convoy: { level: 1.2, cutoff: 4200, wet: 0.2, hear: 45 }, // windows down, all of it
 }
-const reach = (kind) => KINDS[kind].hear ?? HEAR
+export const reach = (kind) => KINDS[kind].hear ?? HEAR
 const CELL = 8 // tiles, how coarsely the field is mapped
 const FIELD = 150 // hectares of open grass before it counts as a field
 
@@ -316,6 +316,7 @@ export function createMusic(world, shops) {
 	let carSeed = 0
 	const playing = new Map()
 	let synth = null
+	let heard = null // every source in the last frame, for the music debug view
 	Promise.all(
 		SCORES.map((name) =>
 			fetch(`/music/${name}.song`)
@@ -402,6 +403,7 @@ export function createMusic(world, shops) {
 	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
 	function update(audio, cars, listener, view, inCar) {
 		if (!fixed || !audio || audio.muted) {
+			heard = fixed
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
@@ -417,6 +419,7 @@ export function createMusic(world, shops) {
 			convoyOf(cars, listener),
 			[fieldAt(listener.x, listener.y)].filter(Boolean),
 		)
+		heard = sources
 		const want = nearest(sources, listener.x, listener.y)
 		for (const p of playing.values()) if (!want.includes(p.src) || p.song !== songs.get(p.src.score)) stop(p, context)
 		for (const src of want) {
@@ -434,6 +437,8 @@ export function createMusic(world, shops) {
 
 	return {
 		update,
+		// Musik-Debug: every source, and the gain of the ones playing.
+		debug: () => ({ sources: heard ?? [], gains: new Map([...playing].map(([src, p]) => [src, p.level.gain.value])) }),
 		inspect: () =>
 			[...playing.values()].map((p) => ({
 				kind: p.src.kind,

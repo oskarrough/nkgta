@@ -5,6 +5,7 @@ import { SOLID } from './tiles.js'
 import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 import { DEPTH as AWNING_DEPTH } from './signs.js'
 import { RADIUS } from './player.js'
+import { drawMusicDebug } from './music-debug.js'
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
@@ -47,7 +48,7 @@ export function createRenderer(canvas, world, shops = []) {
 
 	// `inside` a shop, only the player: the map's places, stops, names, walls
 	// and the parked bike are all out on the street.
-	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside }) {
+	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
@@ -147,5 +148,7 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.stroke()
 			ctx.restore()
 		}
+
+		if (music && !inside) drawMusicDebug(ctx, music(), toScreen, scale)
 	}
 }

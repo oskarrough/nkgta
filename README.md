@@ -52,5 +52,6 @@ Every icon is its own PNG in `public/icons/`, 32×32 with a transparent backgrou
 - `speaker-off.png`: muted (also the slider's "Ton aus" button)
 - `play.png`: the jukebox's Abspielen button
 - `menu.png`: the menu button on touch screens
+- `speaker-source.png`: a music source in Musik-Debug (J, or in the menu): rings show how far each source carries
 
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.
