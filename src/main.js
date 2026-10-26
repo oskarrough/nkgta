@@ -252,6 +252,14 @@ function fpsMeter(now) {
 	meterFrames = [now]
 }
 
+// Which way you're trying to walk, on the map: with the keys from above,
+// up is forward and down is back, whichever way you face.
+function heading() {
+	const steering = input.steer()
+	if (!steering) return input.axis()
+	return { x: Math.cos(player.dir) * -steering.y, y: Math.sin(player.dir) * -steering.y }
+}
+
 let last = performance.now()
 let first = true
 function frame(now) {
@@ -259,7 +267,7 @@ function frame(now) {
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	camera.suspend(visit.busy())
 	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
-	visit.update(dt, input.axis())
+	visit.update(dt, heading())
 	wasted.update(dt)
 	const inside = visit.inside()
 	const indoors = visit.indoors()

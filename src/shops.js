@@ -167,7 +167,8 @@ export function shopAt(shops, x, y) {
 		const dy = y - s.stand.y
 		const out = dx * s.nx + dy * s.ny
 		const along = Math.abs(dx * s.ex + dy * s.ey)
-		if (out < -0.4 || out > AT_DOOR.out || along > AT_DOOR.along) continue
+		// All the way back to the wall: pressed against the door still counts.
+		if (out < -s.out - 0.1 || out > AT_DOOR.out || along > AT_DOOR.along) continue
 		if (Math.abs(out) + along < bestD) [best, bestD] = [s, Math.abs(out) + along]
 	}
 	return best

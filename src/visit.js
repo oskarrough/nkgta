@@ -1,8 +1,8 @@
-// Going into a shop. E at the door tears the air open on the facade, showing
-// the room inside, live and in parallax. Walk into the tear and it swells
-// until it fills the view while the room swings upright, and you're inside.
-// The tear stays open behind you at the shop door; walk back through it, or
-// press E, and you're on the street where you left it.
+// Going into a shop. Walk into the door, or press E at it, and the air tears
+// open on the facade, showing the room inside, live and in parallax. Once it's
+// open enough it swells until it fills the view while the room swings upright,
+// and you're inside. The tear stays open behind you at the shop door; walk
+// back into it, or press E, and you're on the street where you left it.
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
@@ -39,7 +39,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 	let shop = null // the shop the tear opens onto
 	let inside = false
 	let warp = null // { t, from: { x, y } } while stepping through
-	let armed = false // inside, the way out waits until you've let go of the keys
+	let going = false // E was pressed: step through as soon as the tear lets you
+	let armed = true // just through a door, it waits until you've stopped pushing towards it
 	let settle = 0 // how far the camera has drifted to the room's middle
 	const focus = { x: 0, y: 0, speed: 0 }
 	// Traffic keeps running round the shop door while you're in, for the
@@ -77,13 +78,16 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 	}
 
 	function open(s) {
-		shop = s
-		interior.setShop(s)
-		aim(0)
+		if (s !== shop || portal.phase === 'closed') {
+			shop = s
+			interior.setShop(s)
+			aim(0)
+		}
 		portal.open()
 	}
 
 	function startWarp() {
+		going = false
 		warp = { t: 0, from: { x: player.x, y: player.y } }
 		player.speed = 0
 	}
@@ -101,7 +105,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		} else {
 			inside = false
 			Object.assign(player, { x: shop.stand.x, y: shop.stand.y, speed: 0, dir: angleOf({ x: shop.nx, y: shop.ny }) })
-			// It seals behind you.
+			// It seals behind you, and won't reopen until you stop walking at it.
+			armed = false
 			aim(0)
 			portal.collapse()
 		}
@@ -135,7 +140,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			return focus
 		},
 
-		// E: in or out, open or close. True if it was for us.
+		// E: in or out. True if it was for us.
 		use() {
 			if (warp) return true
 			if (inside) {
@@ -145,9 +150,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			if (player.car || player.onBike) return false
 			const s = shopAt(shops, player.x, player.y)
 			if (!s) return false
-			if (portal.phase === 'closed') open(s)
-			else if (s === shop) portal.isOpen ? portal.collapse() : portal.open()
-			else portal.collapse()
+			open(s)
+			going = true
 			return true
 		},
 
@@ -170,19 +174,27 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			}
 			const pushing = (n) => -(axis.x * n.x + axis.y * n.y) > 0.3
 			if (inside) {
-				if (!axis.x && !axis.y) armed = true
+				const out = pushing({ x: DOOR.nx, y: DOOR.ny })
+				if (!out) armed = true
+				// Anywhere from just in front of the door to flat against it.
 				const dx = player.x - DOOR.x
 				const dy = player.y - DOOR.y
-				if (armed && Math.abs(dx) < 0.75 && Math.abs(dy) < 0.5 && pushing({ x: DOOR.nx, y: DOOR.ny })) startWarp()
+				if (armed && out && Math.abs(dx) < 0.9 && dy > -0.6) startWarp()
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) pfand.cashIn(shop.name, say)
 				return
 			}
+			// Walking into a door opens it.
+			const at = !player.car && !player.onBike && shopAt(shops, player.x, player.y)
+			const walking = at && pushing({ x: at.nx, y: at.ny }) && armed
+			if (!at || !pushing({ x: at.nx, y: at.ny })) armed = true
+			if (walking && (at !== shop || !portal.isOpen)) open(at)
 			if (!shop || portal.phase === 'closed') return
 			if (player.car || player.onBike || Math.hypot(player.x - shop.stand.x, player.y - shop.stand.y) > WANDER) {
+				going = false
 				portal.collapse()
 				return
 			}
-			if (portal.openness > 0.4 && shopAt(shops, player.x, player.y) === shop && pushing({ x: shop.nx, y: shop.ny })) startWarp()
+			if (portal.openness > 0.4 && (going || (walking && at === shop))) startWarp()
 		},
 
 		// Draw the frame: the street or the room, and the tear over it.
@@ -212,7 +224,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			if (player.car || player.onBike) return null
 			const s = shopAt(shops, player.x, player.y)
 			if (!s) return null
-			return s === shop && portal.isOpen ? `Rein da · ${s.name}` : `E: ${s.name} betreten`
+			return `E: ${s.name} betreten`
 		},
 	}
 
