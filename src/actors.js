@@ -34,7 +34,8 @@ const HATS = ['#24272b', '#d23c3c', '#2d3a5c', '#e8e6df', '#3e7a4a']
 const PACKS = ['#24272b', '#2d3a5c', '#7d2a35', '#3e7a4a', '#55585c', '#d23c3c']
 const SPAETI_BAG = '#eeeeea'
 
-// Fair hair, so from above the player is yellow from head to shoulders.
+// Fair hair, so from above the player is yellow from head to shoulders, and
+// a dark backpack, so from above you can tell their back from their front.
 export const PLAYER_LOOK = {
 	skin: '#d5a17b',
 	hair: '#e3bd5c',
@@ -44,7 +45,7 @@ export const PLAYER_LOOK = {
 	trousers: '#3d5a80',
 	shoes: '#1d1d1d',
 	hat: null,
-	pack: null,
+	pack: '#24272b',
 	bag: false,
 	build: 1.1,
 	height: 1,
@@ -86,30 +87,30 @@ const LEG = { l: 0.1, w: 0.09, h: 0.24 }
 const ARM = { l: 0.08, w: 0.07, h: 0.24 }
 const HIP = 0.065
 const SHOULDER = 0.165
-// From above the head covers the middle of the shoulders, so the torso is
-// deeper than the head: the top shows in front of it and behind it.
+// From above the head sits a little forward on the shoulders and the hair
+// covers only its back, so the face shows which way someone faces.
 const PARTS = [
 	{ name: 'torso', geo: block(0.17, 0.26, 0.25), at: [0, 0, 0.35], color: (k) => k.top },
 	// The nose makes the direction readable while orbiting.
 	{
 		name: 'head',
 		geo: mergeGeometries([block(0.12, 0.125, 0.14), block(0.035, 0.045, 0.035, 0.075)]),
-		at: [0, 0, 0.55],
+		at: [0.02, 0, 0.55],
 		color: (k) => k.skin,
 	},
 	// Over the top and down the back of the head; from above the face shows as
 	// a strip of skin at the front.
 	{
 		name: 'short',
-		geo: mergeGeometries([block(0.1, 0.135, 0.035, -0.015, 0, 0.075), block(0.035, 0.135, 0.1, -0.055, 0, 0.025)]),
-		at: [0, 0, 0.55],
+		geo: mergeGeometries([block(0.08, 0.135, 0.035, -0.025, 0, 0.075), block(0.035, 0.135, 0.1, -0.055, 0, 0.025)]),
+		at: [0.02, 0, 0.55],
 		color: (k) => k.hair,
 		has: (k) => k.hairStyle === 'short' && !k.hat,
 	},
 	{
 		name: 'long',
-		geo: mergeGeometries([block(0.1, 0.14, 0.04, -0.015, 0, 0.075), block(0.045, 0.15, 0.24, -0.06, 0, -0.03)]),
-		at: [0, 0, 0.55],
+		geo: mergeGeometries([block(0.08, 0.14, 0.04, -0.025, 0, 0.075), block(0.045, 0.15, 0.24, -0.06, 0, -0.03)]),
+		at: [0.02, 0, 0.55],
 		color: (k) => k.hair,
 		has: (k) => k.hairStyle === 'long',
 	},
@@ -117,7 +118,7 @@ const PARTS = [
 	{
 		name: 'hat',
 		geo: mergeGeometries([block(0.135, 0.14, 0.05, -0.005, 0, 0.085), block(0.06, 0.11, 0.015, 0.085, 0, 0.065)]),
-		at: [0, 0, 0.55],
+		at: [0.02, 0, 0.55],
 		color: (k) => k.hat,
 		has: (k) => !!k.hat,
 	},

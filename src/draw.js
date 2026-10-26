@@ -9,8 +9,6 @@ import { drawMusicDebug } from './music-debug.js'
 
 // Tiles round a person, from above, that the ground layer leaves clear.
 const PERSON = 0.32
-// The chevron on the ground ahead of you, so you can tell which way you face.
-const AHEAD = { gap: 0.75, size: 0.32, min: 5 }
 
 const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
 
@@ -177,30 +175,6 @@ export function createRenderer(canvas, world, shops = []) {
 				ctx.rect((-c.model.length / 2) * scale, (-c.model.width / 2) * scale, c.model.length * scale, c.model.width * scale)
 			} else ctx.arc(0, 0, RADIUS * scale, 0, Math.PI * 2)
 			ctx.stroke()
-			ctx.restore()
-		}
-
-		// Which way you face: a small chevron on the ground just ahead of you,
-		// on foot and on the bike. A car's shape already says it.
-		if (!player.car && !player.down) {
-			const size = Math.max(AHEAD.min * devicePixelRatio, AHEAD.size * scale)
-			const gap = AHEAD.gap * (player.onBike ? 1.6 : 1) * scale + size
-			const [px, py] = toScreen(player.x, player.y)
-			ctx.save()
-			ctx.translate(px + Math.cos(player.dir) * gap, py + Math.sin(player.dir) * gap)
-			ctx.rotate(player.dir)
-			ctx.beginPath()
-			ctx.moveTo(size, 0)
-			ctx.lineTo(-size * 0.6, -size)
-			ctx.lineTo(-size * 0.15, 0)
-			ctx.lineTo(-size * 0.6, size)
-			ctx.closePath()
-			ctx.lineJoin = 'round'
-			ctx.lineWidth = Math.max(2, size * 0.35)
-			ctx.strokeStyle = '#1a1e1b'
-			ctx.stroke()
-			ctx.fillStyle = '#e8c21a'
-			ctx.fill()
 			ctx.restore()
 		}
 

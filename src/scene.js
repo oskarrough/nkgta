@@ -409,10 +409,12 @@ function carMeshes(gradient, world) {
 		const add = (kind, geo) => boxes.set(kind, [...(boxes.get(kind) ?? []), geo])
 		for (const [kind, l, w, h, x, z, y = 0] of m.look) add(kind, box(l * m.length, w * m.width, h, x * m.length, z, y * m.width))
 		const [, , , h, , z] = m.look[0]
-		const lamp = (x, s) => box(0.04, 0.12, 0.06, x, z + h * 0.55).translate(0, (s * m.width) / 3, 0)
+		// They come up through the top of the body, so from above pale lamps
+		// at the front and red at the back say which way it points.
+		const lamp = (x, s) => box(0.08, 0.15, 0.05, x, z + h - 0.04).translate(0, (s * m.width) / 3, 0)
 		for (const s of [-1, 1]) {
-			add('lights', lamp(-m.length / 2, s))
-			add('heads', lamp(m.length / 2, s))
+			add('lights', lamp(-m.length / 2 + 0.03, s))
+			add('heads', lamp(m.length / 2 - 0.03, s))
 		}
 		const [, bl, bw] = m.look[0]
 		add('rim', box(bl * m.length + CAR_RIM.width * 2, bw * m.width + CAR_RIM.width * 2, 0.01, 0, 0.005))
