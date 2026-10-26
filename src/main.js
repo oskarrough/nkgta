@@ -5,7 +5,7 @@ import { createPlayer, leaveCar, nearBike, toggleBike, updatePlayer } from './pl
 import { createTraffic } from './traffic.js'
 import { createWasted } from './wasted.js'
 import { createPfand } from './pfand.js'
-import { createCamera } from './camera.js'
+import { createCamera, ZOOM } from './camera.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useAction, useHint } from './hud.js'
@@ -48,6 +48,13 @@ const wasted = createWasted({
 	respawn: () => Object.assign(player, createPlayer(world.startPoint(START))),
 })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
+// The camera's zoom knobs, toggled with ` or open from the start with ?tune.
+let tuning
+async function toggleTune() {
+	tuning ??= import('./tune.js').then((m) => m.tunePanel(ZOOM, camera, player))
+	;(await tuning).toggle()
+}
+if (new URLSearchParams(location.search).has('tune')) toggleTune()
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
@@ -123,6 +130,7 @@ const actions = {
 		city3d.cycleLook()
 		showWalls = city3d.showsWalls()
 	},
+	toggleTune,
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 }
 const input = createInput(actions)
