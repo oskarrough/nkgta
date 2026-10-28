@@ -159,7 +159,7 @@ export function createTraffic(world) {
 			for (const o of others) {
 				const [ox, oy] = local(o.x, o.y)
 				// The other one's size seen along our heading and across it.
-				const turned = (o.angle ?? o.dir) - c.angle
+				const turned = (o.angle ?? o.dir ?? 0) - c.angle
 				const ol = (o.model?.length ?? 0.6) / 2
 				const ow = (o.model?.width ?? 0.6) / 2
 				const deep = Math.abs(Math.cos(turned)) * ol + Math.abs(Math.sin(turned)) * ow

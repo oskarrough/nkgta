@@ -45,7 +45,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 	const focus = { x: 0, y: 0, speed: 0 }
 	// Traffic keeps running round the shop door while you're in, for the
 	// street seen through the tear; this stands in for you there.
-	const standIn = { x: 0, y: 0, speed: 0, car: null }
+	const standIn = { x: 0, y: 0, dir: 0, speed: 0, car: null }
 
 	// The tear for a door at `anchor`, where you stand, `out` tiles off its
 	// wall, with `n` pointing from the wall to you: centred on the wall and
@@ -99,7 +99,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			inside = true
 			Object.assign(player, { x: ENTRY.x, y: ENTRY.y, speed: 0, dir: -Math.PI / 2 })
 			armed = false
-			Object.assign(standIn, shop.stand)
+			Object.assign(standIn, shop.stand, { dir: angleOf({ x: shop.nx, y: shop.ny }), speed: 0 })
 			aim(0)
 			portal.flash()
 		} else {

@@ -40,7 +40,8 @@ function applyLevel() {
 	master.gain.cancelAndHoldAtTime(context.currentTime)
 	master.gain.linearRampToValueAtTime(level(), context.currentTime + 0.04)
 }
-const smooth = (param, value, time = 0.1) => param.setTargetAtTime(value, context.currentTime, time)
+// A bad number from the game mustn't take the game down with it.
+const smooth = (param, value, time = 0.1) => Number.isFinite(value) && param.setTargetAtTime(value, context.currentTime, time)
 
 function start() {
 	if (!context) {
