@@ -207,13 +207,13 @@ const size = new THREE.Vector3()
 const paint = new THREE.Color()
 
 // Person `i` of crowd `c` standing at (x, y, z) facing `dir`, mid-stride at
-// `phase`, `grow` times life size. Lying down, they're face down with their
-// head the way they faced.
-function pose(c, i, look, x, y, z, dir, phase, grow, down = false) {
-	euler.set(0, down ? Math.PI / 2 : 0, -dir)
+// `phase`, `grow` times life size. Lying down (`down`, 0 to 1 of the way), they're
+// face down with their head the way they faced.
+function pose(c, i, look, x, y, z, dir, phase, grow, down = 0) {
+	euler.set(0, (down * Math.PI) / 2, -dir)
 	turn.setFromEuler(euler)
-	const back = down ? 0.3 * grow : 0
-	at.set(x - Math.cos(dir) * back, -(y - Math.sin(dir) * back), z + (down ? 0.07 * grow : 0))
+	const back = 0.3 * grow * down
+	at.set(x - Math.cos(dir) * back, -(y - Math.sin(dir) * back), z + 0.07 * grow * down)
 	body.compose(at, turn, size.set(grow, grow * look.build, grow * look.height))
 	const stride = Math.sin(phase) * STRIDE
 	PARTS.forEach((part, k) => {
@@ -318,7 +318,18 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			if (you.group.parent !== parent) parent.add(you.group)
 			const z = ground + (player.onBike && !player.down ? 0.15 : 0)
 			const grow = cam.third ? 1 : OVERHEAD
-			pose(you, 0, PLAYER_LOOK, player.x, player.y, z, player.dir, player.speed > 0.01 && !player.down ? stride : 0, grow, !!player.down)
+			pose(
+				you,
+				0,
+				PLAYER_LOOK,
+				player.x,
+				player.y,
+				z,
+				player.dir,
+				player.speed > 0.01 && !player.down ? stride : 0,
+				grow,
+				player.down ? 1 : 0,
+			)
 			done(you, shown ? 1 : 0)
 			puddle.visible = !!player.down && !room
 			puddle.position.set(player.x, -player.y, ground + 0.004)
@@ -336,7 +347,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 				crowds = crowd(people, peds.length * 2)
 				root.add(crowds.group)
 			}
-			peds.forEach((p, i) => pose(crowds, i, lookFor(p), p.x, p.y, heightAt(p.x, p.y), p.dir, p.stride ?? p.t * 12, grow))
+			peds.forEach((p, i) => pose(crowds, i, lookFor(p), p.x, p.y, heightAt(p.x, p.y), p.dir, p.stride ?? p.t * 12, grow, p.lie ?? 0))
 			done(crowds, peds.length)
 
 			street.visible = !!cam.third

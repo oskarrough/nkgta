@@ -2,8 +2,8 @@
 // beside a road or a crossing over one arm of a junction, queues behind
 // whoever's ahead on it, waits at the kerb to cross, and at the end of one
 // track takes another that starts there, or turns round. After the people of
-// Slop New York.
-import { T } from './tiles.js'
+// Slop New York, who also get out of the way: see `dodge`.
+import { T, SOLID } from './tiles.js'
 import { offsetLine, pointAt } from './roads.js'
 import { LENGTH } from './car.js'
 
@@ -15,6 +15,22 @@ const MAX = 90
 const GAP = 7 // tiles: no car this close before people cross where there are no lights
 const PATIENCE = 6 // seconds before they go anyway
 const REACH = 1.5 // tiles: how close another track must start to walk on along it
+
+// Getting out of the way of cars and bikes, after Slop New York: every ~120 ms
+// each person checks when their path and a vehicle's would meet, tries to stop,
+// sprint on, turn back, step aside or dive, and keeps whichever leaves the most
+// room. If nothing is clean they leap anyway, far and fast enough to clear it.
+const GLANCE = 0.12 // seconds between looks at what's coming
+const HORIZON = 2 // seconds ahead they work out
+const ALARM = 1.5 // seconds to contact when they move
+const MARGIN = 0.35 // tiles added round a vehicle for a person's width
+const RUSH = 3 // tiles per second, sprinting
+const STEP = { dist: 1, speed: 2.2 }
+const DIVE = { dist: 1.8, speed: 7 }
+const LEAP_MAX = 14 // tiles per second, fastest a person can throw themselves
+const LUNGE = 0.26 // seconds in the air for an ordinary dive
+const RISE = 0.6 // seconds to get up off the ground
+const VEHICLE = 1.5 // tiles per second: slower than this nobody needs to jump
 
 const walkable = (t) => t === T.SIDEWALK || t === T.GROUND
 
@@ -80,7 +96,7 @@ export function createPedestrians(world, junctions) {
 		return !cars.some((c) => c.ai && Math.abs(c.x - mid.x) < GAP && Math.abs(c.y - mid.y) < GAP)
 	}
 
-	function update(dt, near, cars, hidden, ring, budget) {
+	function update(dt, near, cars, hidden, ring, budget, scare = null) {
 		// Off out of sight and far away.
 		for (let i = people.length - 1; i >= 0; i--) {
 			const p = people[i]
@@ -107,7 +123,8 @@ export function createPedestrians(world, junctions) {
 			return options[Math.floor(Math.random() * options.length)]
 		}
 		for (const c of crosswalks) c.busy = 0
-		walk(people, dt, (t, waited) => mayCross(t, waited, cars), next)
+		walk(people, dt, (t, waited) => mayCross(t, waited, cars), next, scare)
+		if (scare) for (const p of people) keepClear(p, scare.threats, scare.ok)
 		crosswalks = people.filter((p) => p.track.edge && !p.kerb).map((p) => p.track)
 		for (const c of crosswalks) c.busy++
 	}
@@ -145,10 +162,21 @@ export function createPedestrians(world, junctions) {
 
 // One step for everyone: walk on, queue, wait at the kerb, cross. `mayCross`
 // says whether a crossing's open, `next` finds a track to go on along.
-export function walk(people, dt, mayCross, next = () => null) {
+export function walk(people, dt, mayCross, next = () => null, scare = null) {
 	for (let i = 0; i < people.length; i++) {
 		const p = people[i]
 		const t = p.track
+		if (p.dodge) {
+			dodgeStep(p, dt, scare)
+			place(p)
+			continue
+		}
+		if (p.off) relax(p, dt)
+		if (scare) {
+			const left = p.way > 0 ? t.b - p.s : p.s - t.a
+			const room = p.kerb ? { ahead: 0, back: 0 } : { ahead: left, back: t.b - t.a - left }
+			glance(p, dt, scare, room)
+		}
 		p.waited = p.kerb ? (p.waited ?? 0) + dt : 0
 		if (p.kerb && p.pause <= 0 && mayCross(t, p.waited)) p.kerb = false
 		// Stop for a bit now and then, stepped aside: on the phone, at a window.
@@ -158,14 +186,22 @@ export function walk(people, dt, mayCross, next = () => null) {
 		let ahead = Infinity
 		for (let k = 0; k < people.length; k++) {
 			const o = people[k]
-			if (k === i || o.track !== t || o.way !== p.way || o.pause > 0) continue
+			if (k === i || o.track !== t || o.way !== p.way || o.pause > 0 || o.dodge) continue
 			const d = (o.s - p.s) * p.way
 			if (d > 0 || (d === 0 && k < i)) ahead = Math.min(ahead, d) // side by side: the first goes first
 		}
 		const end = p.way > 0 ? t.b : t.a
 		const left = (end - p.s) * p.way
-		const want = p.kerb || p.pause > 0 ? 0 : Math.min(p.pref, Math.max(0, (ahead - SPACING) * 1.5), left < 0.01 ? 0 : p.pref)
-		p.v += Math.max(-3 * dt, Math.min(1.5 * dt, want - p.v))
+		const want = p.flee
+			? p.flee.stop
+				? 0
+				: RUSH
+			: p.kerb || p.pause > 0
+				? 0
+				: Math.min(p.pref, Math.max(0, (ahead - SPACING) * 1.5), left < 0.01 ? 0 : p.pref)
+		const snap = p.flee ? 8 : 0
+		p.v += Math.max(-(3 + snap) * dt, Math.min((1.5 + snap) * dt, want - p.v))
+		if (p.flee && (p.flee.t -= dt) < 0) p.flee = null
 		p.s = Math.max(t.a, Math.min(t.b, p.s + p.v * p.way * dt))
 
 		if (left < 0.01) {
@@ -183,8 +219,195 @@ export function walk(people, dt, mayCross, next = () => null) {
 function place(p) {
 	const at = pointAt(p.track.line, p.s)
 	const side = p.track.edge ? p.spot : p.way * (p.pause > 0 ? 0.35 : KEEP_RIGHT)
-	p.x = at.x - Math.sin(at.dir) * side
-	p.y = at.y + Math.cos(at.dir) * side
-	p.dir = p.way > 0 ? at.dir : at.dir + Math.PI
+	p.x = at.x - Math.sin(at.dir) * side + (p.off?.x ?? 0)
+	p.y = at.y + Math.cos(at.dir) * side + (p.off?.y ?? 0)
+	p.dir = p.dodge ? p.dodge.dir : p.way > 0 ? at.dir : at.dir + Math.PI
 	return p
+}
+
+// When the vehicle `c`, driving straight on, would first touch someone who
+// does `legs`: [vx, vy, seconds] each, standing still after. Infinity if
+// never, within the horizon. Both move in straight lines, so this is a swept
+// box test in the vehicle's frame, not a guess at samples.
+export function contact(from, legs, c) {
+	const cos = Math.cos(c.angle)
+	const sin = Math.sin(c.angle)
+	let u = (from.x - c.x) * cos + (from.y - c.y) * sin
+	let v = (from.y - c.y) * cos - (from.x - c.x) * sin
+	const hu = c.model.length / 2 + MARGIN
+	const hv = c.model.width / 2 + MARGIN
+	const total = legs.reduce((s, l) => s + l[2], 0)
+	let t = 0
+	for (const [wx, wy, d] of total < HORIZON ? [...legs, [0, 0, HORIZON - total]] : legs) {
+		const ru = (wx - c.vx) * cos + (wy - c.vy) * sin
+		const rv = (wy - c.vy) * cos - (wx - c.vx) * sin
+		let enter = 0
+		let exit = d
+		for (const [pos, rate, h] of [
+			[u, ru, hu],
+			[v, rv, hv],
+		]) {
+			if (Math.abs(rate) < 1e-6) {
+				if (Math.abs(pos) > h) exit = -1
+				continue
+			}
+			const a = (-h - pos) / rate
+			const b = (h - pos) / rate
+			enter = Math.max(enter, Math.min(a, b))
+			exit = Math.min(exit, Math.max(a, b))
+		}
+		if (enter <= exit) return t + enter
+		u += ru * d
+		v += rv * d
+		t += d
+	}
+	return Infinity
+}
+
+// What `from`, facing `heading` at `speed` with `room` tiles of way on ahead
+// and back, should do about `threats` (anything with x, y, vx, vy, angle and
+// model.length/width). Nothing (null) if they'd be missed anyway. Otherwise
+// the choice: { kind: 'stop' | 'ahead' | 'back' | 'step' | 'dive', vx, vy,
+// seconds }. `ok(x, y)` says where they may land.
+export function dodge(from, heading, speed, room, threats, ok = () => true) {
+	const [hx, hy] = heading
+	const near = threats.filter((c) => Math.hypot(c.x - from.x, c.y - from.y) < 4 + Math.hypot(c.vx, c.vy) * HORIZON)
+	const worst = (legs) => near.reduce((m, c) => Math.min(m, contact(from, legs, c)), Infinity)
+	const going = speed > 0.05 ? [[hx * speed, hy * speed, Math.max(0.01, room.ahead / speed)]] : []
+	const risk = worst(going)
+	if (risk > ALARM) return null
+
+	// The vehicle that matters, for which way is out of its path.
+	const c = near.reduce((a, b) => (contact(from, going, b) < contact(from, going, a) ? b : a))
+	const lateral = [-Math.sin(c.angle), Math.cos(c.angle)]
+	const side = (n, dist, v) => {
+		const legs = [[n[0] * v, n[1] * v, dist / v]]
+		return ok(from.x + n[0] * dist * 0.5, from.y + n[1] * dist * 0.5) && ok(from.x + n[0] * dist, from.y + n[1] * dist) ? legs : null
+	}
+	const options = [{ kind: 'stop', legs: [] }]
+	if (room.ahead > 0.5) options.push({ kind: 'ahead', legs: [[hx * RUSH, hy * RUSH, room.ahead / RUSH]] })
+	if (room.back > 0.5) options.push({ kind: 'back', legs: [[-hx * RUSH, -hy * RUSH, room.back / RUSH]] })
+	for (const [kind, spec, axis] of [
+		['step', STEP, [-hy, hx]],
+		['dive', DIVE, lateral],
+	])
+		for (const k of [1, -1]) {
+			const n = [axis[0] * k, axis[1] * k]
+			const legs = side(n, spec.dist, spec.speed)
+			if (legs) options.push({ kind, legs, vx: n[0] * spec.speed, vy: n[1] * spec.speed, seconds: spec.dist / spec.speed })
+		}
+	let best = options[0]
+	best.score = worst(best.legs)
+	for (const o of options.slice(1)) {
+		o.score = worst(o.legs)
+		if (o.score > best.score + (o.kind === 'dive' ? 0.1 : 0.03)) best = o
+	}
+	if (best.score < Infinity) {
+		// Nothing's clean: throw themselves clear of the vehicle's line, as
+		// fast as it takes. The nearer to it, the harder the throw.
+		const v = (from.y - c.y) * Math.cos(c.angle) - (from.x - c.x) * Math.sin(c.angle)
+		for (const k of [1, -1]) {
+			const n = [lateral[0] * k, lateral[1] * k]
+			const dist = Math.max(DIVE.dist, c.model.width / 2 + MARGIN + 0.15 + v * -k)
+			const seconds = Math.max(dist / LEAP_MAX, Math.min(LUNGE, risk * 0.7))
+			const leap = {
+				kind: 'dive',
+				legs: [[n[0] * (dist / seconds), n[1] * (dist / seconds), seconds]],
+				vx: n[0] * (dist / seconds),
+				vy: n[1] * (dist / seconds),
+				seconds,
+			}
+			if (!ok(from.x + n[0] * dist, from.y + n[1] * dist)) continue
+			leap.score = worst(leap.legs)
+			if (leap.score > best.score) best = leap
+		}
+	}
+	return best
+}
+
+// Look up now and then, and if something's coming, do something about it.
+// For anyone with a heading `p.dir`, a `p.v` and `p.x/y`; `room` is how far
+// they could go either way. `scare` is { threats, ok, shout }.
+export function glance(p, dt, scare, room) {
+	p.look = (p.look ?? Math.random() * GLANCE) - dt
+	if (p.look > 0 || !scare.threats.length) return
+	p.look = GLANCE
+	const heading = [Math.cos(p.dir), Math.sin(p.dir)]
+	const choice = dodge(p, heading, p.flee?.stop ? 0 : (p.v ?? RUSH), room, scare.threats, scare.ok)
+	if (!choice) return
+	if (choice.kind === 'step' || choice.kind === 'dive') {
+		const lie = choice.kind === 'dive' ? 0.45 + Math.random() * 0.4 : 0
+		p.dodge = {
+			age: 0,
+			vx: choice.vx,
+			vy: choice.vy,
+			dir: Math.atan2(choice.vy, choice.vx),
+			keep: p.dir,
+			lunge: choice.seconds,
+			lie,
+			total: choice.seconds + lie + (lie ? RISE : 0.15),
+			shout: lie > 0 && Math.random() < 0.6,
+		}
+		p.flee = null
+		p.v = 0
+		return
+	}
+	if (choice.kind === 'back') {
+		if (p.track) p.way = -p.way
+		else p.dir += Math.PI
+	}
+	p.flee = { stop: choice.kind === 'stop', t: 0.8 }
+}
+
+// Moves someone aside by (dx, dy), if there's room: on the pavement it's an
+// offset from their track, which they walk back off afterwards.
+function shift(p, dx, dy, ok) {
+	if (!ok(p.x + dx, p.y + dy)) return
+	if (p.track) p.off = { x: (p.off?.x ?? 0) + dx, y: (p.off?.y ?? 0) + dy }
+	p.x += dx
+	p.y += dy
+}
+
+// A step or dive under way: the lunge, lying there a beat, getting up, and a
+// shout on the way.
+export function dodgeStep(p, dt, scare) {
+	const d = p.dodge
+	const before = d.age
+	d.age += dt
+	const flying = Math.max(0, Math.min(d.age, d.lunge) - before)
+	if (flying > 0) shift(p, d.vx * flying, d.vy * flying, scare?.ok ?? (() => true))
+	const up = d.lunge + d.lie
+	p.lie = d.lie ? (d.age < up ? Math.min(1, d.age / (d.lunge + 0.1)) : Math.max(0, 1 - (d.age - up) / RISE)) : 0
+	if (!p.track) p.dir = d.dir
+	if (d.shout && before < up && d.age >= up) scare?.shout?.(p)
+	if (d.age >= d.total) {
+		if (!p.track) p.dir = d.keep
+		p.dodge = null
+		p.lie = 0
+	}
+}
+
+// Back to the track, slowly, after being thrown off it.
+function relax(p, dt) {
+	const d = Math.hypot(p.off.x, p.off.y)
+	if (d < 0.02) p.off = null
+	else {
+		const k = Math.max(0, d - 1.2 * dt) / d
+		p.off.x *= k
+		p.off.y *= k
+	}
+}
+
+// Whatever happens, nobody stays under a wheel: someone inside a vehicle's
+// outline pops out of its side.
+export function keepClear(p, threats, ok = () => true) {
+	for (const c of threats) {
+		const cos = Math.cos(c.angle)
+		const sin = Math.sin(c.angle)
+		const u = (p.x - c.x) * cos + (p.y - c.y) * sin
+		const v = (p.y - c.y) * cos - (p.x - c.x) * sin
+		if (Math.abs(u) > c.model.length / 2 + 0.1 || Math.abs(v) > c.model.width / 2 + 0.1) continue
+		const out = (c.model.width / 2 + 0.25) * (v < 0 ? -1 : 1) - v
+		shift(p, -sin * out, cos * out, ok)
+	}
 }

@@ -2,16 +2,18 @@
 // kerbs, both popping in out of sight around the player, GTA 1 style.
 import { createCar, driveCar, collideCars, shoveOut, forwardSpeed, speedOf, toWorld, distanceTo, LENGTH } from './car.js'
 import { MODELS, pickModel } from './models.js'
-import { SOLID } from './tiles.js'
+import { SOLID, T } from './tiles.js'
 import { roadGraph, pointAt, project } from './roads.js'
 import { createJunctions } from './junctions.js'
-import { createPedestrians } from './pedestrians.js'
+import { createPedestrians, glance, dodgeStep, keepClear } from './pedestrians.js'
 
 const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
 const SIGHT = 25 // tiles up the lane a driver watches the car ahead
 const PER_CAR = 15 // tiles of lane per moving car
 const PER_PARKED = 12 // tiles of kerb per parked car
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
+const DIVE_SHOUTS = ['Ey!', 'Alter!', 'Spinnst du?']
+const SHOUT_RANGE = 12 // tiles: further than this you wouldn't hear it
 const BIG_ROAD = 4 // tiles wide: buses keep to these
 const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', '#b8bcc2'] }
 // Dodging the player: seconds ahead a driver sees it coming, seconds it keeps
@@ -20,7 +22,7 @@ const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', 
 const DODGE = { notice: 1.8, hold: 1.2, fast: 2.2 }
 const CALM = { alarm: 0, reaction: 0, panic: 0, panicAcc: 0, evade: 0, honk: false }
 
-export function createTraffic(world) {
+export function createTraffic(world, say = () => {}) {
 	const edges = roadGraph(world)
 	const signals = []
 	for (let i = 0; i < (world.signals?.length ?? 0); i += 2) signals.push({ x: world.signals[i], y: world.signals[i + 1] })
@@ -32,6 +34,7 @@ export function createTraffic(world) {
 	const runners = [] // drivers thrown out of their cars, running off
 	const peds = [] // everyone on foot, for drawing
 	let started = false
+	let shouted = 0 // seconds since someone last yelled at you
 	let convoyIn = 20 // seconds until the next wedding convoy comes round
 	let mover = null // the player as something that could hit a car, this frame
 
@@ -333,15 +336,50 @@ export function createTraffic(world) {
 		let hit = 0
 		if (!player.car) for (const c of cars) hit = Math.max(hit, shoveOut(c, player, 0.3))
 
+		// Anything that could run people over: vehicles at speed, yours or a
+		// car off the road (the rest keep to their lanes, and people to theirs).
+		shouted += dt
+		const threats = cars.filter(
+			(c) =>
+				speedOf(c) >= 1.5 && (!c.ai || world.tileAt(c.x, c.y) !== T.ROAD || world.tileAt(c.x + c.vx * 0.5, c.y + c.vy * 0.5) !== T.ROAD),
+		)
+		if (player.onBike && !player.down && player.speed >= 1.5)
+			threats.push({
+				x: player.x,
+				y: player.y,
+				vx: Math.cos(player.dir) * player.speed,
+				vy: Math.sin(player.dir) * player.speed,
+				angle: player.dir,
+				model: { length: 0.5, width: 0.25 },
+			})
+		const scare = {
+			threats,
+			ok: (x, y) => !SOLID.has(world.tileAt(x, y)),
+			shout: (p) => {
+				if (shouted < 3 || Math.hypot(p.x - player.x, p.y - player.y) > SHOUT_RANGE) return
+				shouted = 0
+				say(DIVE_SHOUTS[Math.floor(Math.random() * DIVE_SHOUTS.length)])
+			},
+		}
+
 		for (let i = runners.length - 1; i >= 0; i--) {
 			const p = runners[i]
 			if ((p.t -= dt) < 0) runners.splice(i, 1)
-			const nx = p.x + Math.cos(p.dir) * 2.2 * dt
-			const ny = p.y + Math.sin(p.dir) * 2.2 * dt
+			if (p.dodge) {
+				dodgeStep(p, dt, scare)
+				keepClear(p, threats, scare.ok)
+				continue
+			}
+			glance(p, dt, scare, { ahead: 6, back: 6 })
+			if (p.flee && (p.flee.t -= dt) < 0) p.flee = null
+			const pace = p.flee ? (p.flee.stop ? 0 : 3.4) : 2.2
+			const nx = p.x + Math.cos(p.dir) * pace * dt
+			const ny = p.y + Math.sin(p.dir) * pace * dt
 			if (SOLID.has(world.tileAt(nx, ny))) p.dir += 1.5
 			else Object.assign(p, { x: nx, y: ny })
+			keepClear(p, threats, scare.ok)
 		}
-		walkers.update(dt, near, cars, (x, y) => first || !inView(view, x, y, 2), ring, first ? 999 : 6)
+		walkers.update(dt, near, cars, (x, y) => first || !inView(view, x, y, 2), ring, first ? 999 : 6, scare)
 		peds.length = 0
 		peds.push(...runners, ...walkers.people)
 		return hit
