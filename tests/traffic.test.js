@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { freeRoad, follow, stopAt, pedal } from '../src/traffic.js'
+import { freeRoad, follow, stopAt, pedal, moverOf, threatTime, dodge } from '../src/traffic.js'
 import { signalPhase, waveOffset } from '../src/junctions.js'
 import { createCar, driveCar, forwardSpeed } from '../src/car.js'
 import { MODELS } from '../src/models.js'
-import { T } from '../src/tiles.js'
+import { T, SOLID } from '../src/tiles.js'
 
 const d = MODELS.car.driver
 const L = MODELS.car.length
@@ -102,5 +102,42 @@ describe('traffic lights', () => {
 		const start = -waveOffset(a, heading) + 32 * 10
 		expect(signalPhase(start + waveOffset(a, heading))).toBe('green')
 		expect(signalPhase(start + 80 / 4.6 + 0.5 + waveOffset(b, heading))).toBe('green')
+	})
+})
+
+describe('drivers dodge you', () => {
+	// A car going +x at 4 tiles/s down a road with houses beyond `y0` and `y1`.
+	const street = (y0 = -9, y1 = 9) => {
+		const world = { tileAt: (x, y) => (y < y0 || y > y1 ? T.BUILDING : T.ROAD) }
+		return { car: createCar({ x: 0, y: 0, speed: 4 }), free: (x, y) => !SOLID.has(world.tileAt(x, y)) }
+	}
+	const you = (x, y, dir, speed, car) => moverOf({ x, y, dir, speed, car })
+
+	test('stepping in front of a car is no threat; the car just stops for you', () => {
+		expect(you(3, 0, Math.PI, 1.6)).toBeNull()
+	})
+
+	test('your car head on: it brakes and swerves where there is room', () => {
+		const { car, free } = street()
+		const yours = createCar({ x: 6, y: 0, angle: Math.PI, speed: 4 })
+		const p = you(6, 0, Math.PI, 4, yours)
+		expect(threatTime(car, p)).toBeLessThan(1.8)
+		const open = dodge(car, p, free)
+		expect(open.acc).toBe(-1)
+		expect(open.evade).toBe(1)
+		expect(dodge(car, p, street(-9, 0.6).free).evade).toBe(-1) // houses on that side: the other way
+		expect(dodge(car, p, street(-0.6, 0.6).free).evade).toBe(0) // houses both sides: brake and hope
+	})
+
+	test('a bike about to hit its back half: it floors it', () => {
+		const { car, free } = street()
+		const p = you(1.5, -3, Math.PI / 2, 3.6)
+		expect(threatTime(car, p)).toBeLessThan(1.8)
+		expect(dodge(car, p, free).acc).toBe(1)
+	})
+
+	test('a bike going the same way alongside is no threat', () => {
+		const { car } = street()
+		expect(threatTime(car, you(0, 1.5, 0, 3.6))).toBe(Infinity)
 	})
 })

@@ -350,6 +350,12 @@ function street(cars, player, view, dt) {
 			duck(0.3)
 			note('horn', 0.07)
 		}
+		// Swerving or stamping on the brake for you: a long, angry one.
+		if (!muted && car.ai.honk) {
+			v.hornUntil = now + 0.5
+			duck(0.3)
+			note('horn', 0.07)
+		}
 		// A horn borrows its engine oscillator: still only two traffic voices.
 		const horn = now < (v.hornUntil ?? 0)
 		const hz = horn ? 330 : 29 + Math.min(50, Math.hypot(car.vx, car.vy) * 7)

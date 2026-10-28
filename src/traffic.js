@@ -14,6 +14,11 @@ const PER_PARKED = 12 // tiles of kerb per parked car
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
 const BIG_ROAD = 4 // tiles wide: buses keep to these
 const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', '#b8bcc2'] }
+// Dodging the player: seconds ahead a driver sees it coming, seconds it keeps
+// up what it decided, and tiles/s the player must be doing to count as a
+// threat at all. A walk doesn't: stepping in front of a car still stops it.
+const DODGE = { notice: 1.8, hold: 1.2, fast: 2.2 }
+const CALM = { alarm: 0, reaction: 0, panic: 0, panicAcc: 0, evade: 0, honk: false }
 
 export function createTraffic(world) {
 	const edges = roadGraph(world)
@@ -28,6 +33,7 @@ export function createTraffic(world) {
 	const peds = [] // everyone on foot, for drawing
 	let started = false
 	let convoyIn = 20 // seconds until the next wedding convoy comes round
+	let mover = null // the player as something that could hit a car, this frame
 
 	function pick(list, weight) {
 		let r = Math.random() * list.reduce((s, e) => s + weight(e), 0)
@@ -63,7 +69,7 @@ export function createTraffic(world) {
 			if (!fits(p.x, p.y, p.dir, model)) continue
 			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: parked ? 0 : edge.speed * 0.8 })
 			if (model === MODELS.bus && busLines.length) car.line = busLines[Math.floor(Math.random() * busLines.length)]
-			if (!parked) car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0 }
+			if (!parked) car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
 			cars.push(car)
 			return
 		}
@@ -89,7 +95,7 @@ export function createTraffic(world) {
 			for (const { s, color, p, model } of string) {
 				const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, color, speed: edge.speed * 0.6 })
 				car.convoy = turns
-				car.ai = { edge, next: nextEdge(edge, model, turns), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0 }
+				car.ai = { edge, next: nextEdge(edge, model, turns), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
 				cars.push(car)
 			}
 			return true
@@ -189,6 +195,16 @@ export function createTraffic(world) {
 			return { throttle: -1, turn: -Math.sign(aim) }
 		}
 
+		// About to be hit: stamp on the brake or floor it, and swerve.
+		react(c, dt)
+		if (ai.panic > 0) {
+			const swerve = Math.atan2(ty + ai.evade, tx)
+			const turn = Math.max(-1, Math.min(1, swerve * 2.5))
+			if (ai.panicAcc < 0) return fwd > 0.3 ? { throttle: -1, turn } : { throttle: 0, hold: true, turn }
+			if (acc > -d.b) return { throttle: 1, turn }
+			return { throttle: pedal(m, acc, fwd), turn }
+		}
+
 		// Standing and meaning to stay: foot on the brake.
 		const hold = fwd < 0.3 && acc < d.a * 0.1
 		return {
@@ -196,6 +212,35 @@ export function createTraffic(world) {
 			hold,
 			turn: Math.max(-1, Math.min(1, aim * 2.5)),
 		}
+	}
+
+	// Dodging the player, as people do: late, and without second thoughts. A
+	// driver who sees the player about to hit it reacts only once that has
+	// lasted its reaction time, then commits to what `dodge` says for a while,
+	// and for as long as the player still comes at it.
+	function react(c, dt) {
+		const ai = c.ai
+		ai.honk = false
+		const t = mover ? threatTime(c, mover) : Infinity
+		if (ai.panic > 0) {
+			ai.panic -= dt
+			if (t < DODGE.notice) ai.panic = Math.max(ai.panic, 0.4)
+			return
+		}
+		if (t >= DODGE.notice) {
+			ai.alarm = 0
+			return
+		}
+		if (!ai.alarm) ai.reaction = 0.25 + Math.random() * 0.4
+		ai.alarm += dt
+		if (ai.alarm < ai.reaction) return
+		const free = (x, y) => !SOLID.has(world.tileAt(x, y)) && !cars.some((o) => o !== c && o !== mover.car && distanceTo(o, x, y) === 0)
+		const { acc, evade } = dodge(c, mover, free)
+		ai.alarm = 0
+		ai.panic = DODGE.hold
+		ai.panicAcc = acc
+		ai.evade = evade
+		ai.honk = forwardSpeed(c) > 1 && (acc < 0 || evade !== 0)
 	}
 
 	// Buses pull in at each stop on their side of the road, open up for a
@@ -270,6 +315,7 @@ export function createTraffic(world) {
 			convoyIn = spawnConvoy(near, ring, view) ? 60 + Math.random() * 90 : 5
 		started = true
 		junctions.update(cars, dt)
+		mover = moverOf(player)
 
 		for (let i = cars.length - 1; i >= 0; i--) {
 			const c = cars[i]
@@ -350,6 +396,87 @@ export const stopAt = (d, v, gap) => follow(d, v, gap, 0, 0.1, 0)
 export function pedal(m, acc, v) {
 	const need = acc + m.drag * v * Math.abs(v) + 4 * m.rolling * v
 	return Math.max(-1, Math.min(1, need / (need > 0 ? m.engine : m.brake)))
+}
+
+// The player as something coming at a car: where, how fast, which way and
+// how big. Only quick enough counts.
+export function moverOf(p) {
+	const c = p.car
+	const vx = c ? c.vx : Math.cos(p.dir) * p.speed
+	const vy = c ? c.vy : Math.sin(p.dir) * p.speed
+	if (Math.hypot(vx, vy) < DODGE.fast) return null
+	return { x: p.x, y: p.y, vx, vy, angle: c ? c.angle : p.dir, length: c?.model.length ?? 0.6, width: c?.model.width ?? 0.6, car: c }
+}
+
+// Seconds until `p` would hit car c (with a little margin), both keeping on
+// straight as they go; Infinity if not within DODGE.notice. Where it hits
+// goes in `threat`: p ahead of c's centre and to its side then, and p's
+// speed across c's heading.
+const threat = { ahead: 0, aside: 0, across: 0 }
+export function threatTime(c, p) {
+	const dx = p.x - c.x
+	const dy = p.y - c.y
+	if (Math.abs(dx) > 40 || Math.abs(dy) > 40) return Infinity
+	const cos = Math.cos(c.angle)
+	const sin = Math.sin(c.angle)
+	const ahead = dx * cos + dy * sin
+	const aside = -dx * sin + dy * cos
+	const along = (p.vx - c.vx) * cos + (p.vy - c.vy) * sin
+	const across = (p.vx - c.vx) * -sin + (p.vy - c.vy) * cos
+	// p's half size along and across c's heading, as it is turned
+	const turned = p.angle - c.angle
+	const reach = [
+		c.model.length / 2 + (Math.abs(Math.cos(turned)) * p.length + Math.abs(Math.sin(turned)) * p.width) / 2 + 0.2,
+		c.model.width / 2 + (Math.abs(Math.sin(turned)) * p.length + Math.abs(Math.cos(turned)) * p.width) / 2 + 0.2,
+	]
+	let enter = 0
+	let exit = DODGE.notice
+	for (const [at, rate, r] of [
+		[ahead, along, reach[0]],
+		[aside, across, reach[1]],
+	]) {
+		if (Math.abs(rate) < 1e-6) {
+			if (Math.abs(at) >= r) return Infinity
+			continue
+		}
+		const t0 = (-r - at) / rate
+		const t1 = (r - at) / rate
+		enter = Math.max(enter, Math.min(t0, t1))
+		exit = Math.min(exit, Math.max(t0, t1))
+	}
+	if (enter >= exit) return Infinity
+	threat.ahead = ahead + along * enter
+	threat.aside = aside + across * enter
+	threat.across = across
+	return enter
+}
+
+// What a driver does about `p` coming at it: brake (acc -1) if p would hit
+// its front half, floor it (1) if its rear half, where braking only makes
+// it worse. Moving, it also swerves, tiles to the side (+ is local +y):
+// away from where p will be a moment after, or the other way if there's
+// more room there. `free(x, y)` says if the car fits at a point.
+export function dodge(c, p, free) {
+	threatTime(c, p)
+	const acc = threat.ahead < 0 ? 1 : -1
+	if (forwardSpeed(c) < 1) return { acc, evade: 0 }
+	const later = threat.aside + threat.across * 0.5
+	const side = Math.abs(later) < 0.3 ? 1 : -Math.sign(later)
+	const room = swerveRoom(c, side, free)
+	const other = swerveRoom(c, -side, free)
+	return { acc, evade: other > room ? -side * other : side * room }
+}
+
+// How far to one side of where it is c can swerve: well over, a little, or
+// not at all, as far as its corners fit there and a little way ahead.
+function swerveRoom(c, side, free) {
+	const m = c.model
+	const ahead = m.length / 2 + Math.max(0, forwardSpeed(c)) * 0.6
+	for (const r of [1, 0.5]) {
+		const off = side * (r + m.width / 2)
+		if ([-m.length / 2, 0, ahead].every((a) => free(...toWorld(c, a, off)))) return r
+	}
+	return 0
 }
 
 const inView = (v, x, y, pad) => x > v.x0 - pad && x < v.x1 + pad && y > v.y0 - pad && y < v.y1 + pad
