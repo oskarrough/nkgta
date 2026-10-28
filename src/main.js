@@ -281,6 +281,7 @@ function frame(now) {
 	if (!inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
+	sound.listen(world, street.x, street.y, inside)
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	visit.render(cam, traffic.cars, dt)
@@ -293,7 +294,7 @@ function frame(now) {
 		showTransit,
 		showWalls: showWalls && !indoors,
 		inside: indoors,
-		music: showMusic ? music.debug : null,
+		music: showMusic ? () => ({ ...music.debug(), enclosure: sound.enclosure() }) : null,
 		people: indoors ? [] : traffic.peds,
 		cars: indoors ? [] : traffic.cars,
 	})

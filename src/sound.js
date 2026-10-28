@@ -1,6 +1,11 @@
-// Quiet street audio. Every source reaches the same master, including delayed cues.
+// Quiet street audio. Every source reaches the same master, including delayed cues,
+// and the same small room: the more walls around you, the more of it each source
+// sends there.
+import { enclosure } from './space.js'
+
 let context
 let master
+let room // where every source sends, by how enclosed you are
 let noise
 let playerVoice
 let muted = false
@@ -27,6 +32,13 @@ function duck(amount) {
 	duckAt = context.currentTime
 }
 const ducking = () => (context ? duckLevel * Math.max(0, 1 - (context.currentTime - duckAt) / DUCK_FADE) : 0)
+// How much of each source goes to the room when you're shut in. Subtle: the
+// dry mix stays as tuned and the room only adds colour.
+const SEND = 0.3
+const LOOK_EVERY = 0.25 // seconds between looks at the walls
+const ROOM = 0.5 // inside a shop, the room is small whatever the street does
+let shut = 0 // 0 open to 1 shut in, as heard
+let lookAt = -Infinity
 const level = () => (muted ? 0 : 0.22 * volume * volume)
 const store = (key, value) => {
 	try {
@@ -49,6 +61,14 @@ function start() {
 		master = context.createGain()
 		master.gain.value = level()
 		master.connect(context.destination)
+		room = context.createGain()
+		room.gain.value = 0
+		const body = context.createBiquadFilter()
+		body.type = 'highpass'
+		body.frequency.value = 250
+		const verb = context.createConvolver()
+		verb.buffer = impulse(context, 1.3)
+		room.connect(body).connect(verb).connect(master)
 		noise = context.createBuffer(1, context.sampleRate * 2, context.sampleRate)
 		const data = noise.getChannelData(0)
 		for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
@@ -56,6 +76,30 @@ function start() {
 		for (const name of ['door-open', 'door-close', 'glass', 'till']) load(name)
 	}
 	if (context.state === 'suspended') context.resume().catch(() => {})
+}
+
+// A made-up room: noise that thins out and darkens, after a few early echoes.
+function impulse(ctx, seconds) {
+	const rate = ctx.sampleRate
+	const buffer = ctx.createBuffer(2, Math.floor(rate * seconds), rate)
+	for (let c = 0; c < 2; c++) {
+		const data = buffer.getChannelData(c)
+		const pre = Math.floor(rate * 0.008)
+		let low = 0
+		for (let i = pre; i < data.length; i++) {
+			const t = (i - pre) / (data.length - pre)
+			low += (0.85 - 0.7 * t) * (Math.random() * 2 - 1 - low)
+			data[i] = low * (1 - t) ** 3
+		}
+		for (const ms of [9, 14, 22, 31]) data[Math.floor((rate * (ms + c * 2.3)) / 1000)] += 0.5 * (Math.random() < 0.5 ? -1 : 1)
+	}
+	return buffer
+}
+
+// Into the speakers, and into the room by how shut in you are.
+function out(node) {
+	node.connect(master)
+	node.connect(room)
 }
 
 function noiseSource() {
@@ -90,7 +134,8 @@ function voice() {
 	motor.connect(filter)
 	sub.connect(subGain).connect(filter)
 	grit.connect(gritGain).connect(filter)
-	filter.connect(chug).connect(gain).connect(pan).connect(master)
+	filter.connect(chug).connect(gain).connect(pan)
+	out(pan)
 	motor.start()
 	sub.start()
 	pulse.start()
@@ -118,7 +163,8 @@ function burst(frequency, amount, duration) {
 	const gain = context.createGain()
 	gain.gain.setValueAtTime(amount, context.currentTime)
 	gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration)
-	source.connect(filter).connect(gain).connect(master)
+	source.connect(filter).connect(gain)
+	out(gain)
 	source.start()
 	source.stop(context.currentTime + duration)
 	source.onended = () => {
@@ -146,7 +192,8 @@ function engine(car) {
 		filter.Q.value = 1.4
 		const gain = context.createGain()
 		gain.gain.value = 0
-		source.connect(filter).connect(gain).connect(master)
+		source.connect(filter).connect(gain)
+		out(gain)
 		source.start()
 		squeal = { source, filter, gain }
 	}
@@ -232,7 +279,8 @@ function horns() {
 		osc.connect(filter)
 		osc.start()
 	}
-	filter.connect(gain).connect(pan).connect(master)
+	filter.connect(gain).connect(pan)
+	out(pan)
 	return { gain, pan }
 }
 
@@ -243,7 +291,8 @@ function play(buffer, name, amount, rate = 1, delay = 0) {
 	source.buffer = buffer
 	source.playbackRate.value = rate
 	gain.gain.value = amount
-	source.connect(gain).connect(master)
+	source.connect(gain)
+	out(gain)
 	source.start(context.currentTime + delay)
 	source.onended = () => {
 		source.disconnect()
@@ -331,7 +380,8 @@ function street(cars, player, view, dt) {
 			source.buffer = buffer
 			source.loop = true
 			gain.gain.value = 0
-			source.connect(gain).connect(master)
+			source.connect(gain)
+			out(gain)
 			source.start()
 			city = { source, gain }
 		})
@@ -345,10 +395,21 @@ addEventListener('visibilitychange', () => {
 })
 let lastClink = -Infinity
 
+// Look at the walls round the listener a few times a second and send more to
+// the room the more they close in.
+function listen(world, x, y, inside) {
+	if (!context || context.currentTime - lookAt < LOOK_EVERY) return
+	lookAt = context.currentTime
+	shut = Math.max(enclosure(world, x, y), inside ? ROOM : 0)
+	smooth(room.gain, SEND * shut, 0.4)
+}
+
 export const sound = {
 	start,
-	// The context and master for music from the street, once sound has started.
-	audio: () => context && { context, master, muted, duck: ducking },
+	listen,
+	enclosure: () => shut,
+	// The context, master and room for music from the street, once sound has started.
+	audio: () => context && { context, master, room, muted, duck: ducking },
 	engine,
 	street,
 	async door() {
@@ -409,6 +470,8 @@ export const sound = {
 			traffic: [...neighbours.values()].map((v) => ({ hz: v.motor.frequency.value, gain: v.gain.gain.value, pan: v.pan.pan.value })),
 			trafficVoices: neighbours.size + spareTraffic.length,
 			city: city?.gain.gain.value ?? 0,
+			enclosure: shut,
+			room: room?.gain.value ?? 0,
 			events: [...events],
 		}
 	},

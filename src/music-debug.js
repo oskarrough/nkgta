@@ -8,7 +8,7 @@ import { KINDS, reach } from './music.js'
 const icon = new Image()
 icon.src = '/icons/speaker-source.png'
 
-export function drawMusicDebug(ctx, { sources, gains }, toScreen, scale) {
+export function drawMusicDebug(ctx, { sources, gains, enclosure = 0 }, toScreen, scale) {
 	const dpr = devicePixelRatio
 	const { width, height } = ctx.canvas
 	const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 120)
@@ -29,13 +29,14 @@ export function drawMusicDebug(ctx, { sources, gains }, toScreen, scale) {
 		const s = size * (1 + 0.35 * on * pulse)
 		if (icon.complete) ctx.drawImage(icon, sx - s / 2, sy - s / 2, s, s)
 	}
-	// What's playing, loudest first.
-	const lines = [...gains].sort((a, b) => b[1] - a[1]).map(([src, gain]) => `${src.kind} · ${src.score} · ${gain.toFixed(2)}`)
+	// What's playing, loudest first, and how shut in you are (the reverb send).
+	const playing = [...gains].sort((a, b) => b[1] - a[1]).map(([src, gain]) => `${src.kind} · ${src.score} · ${gain.toFixed(2)}`)
+	const lines = [`Raum ${enclosure.toFixed(2)}`, ...(playing.length ? playing : ['Musik: still'])]
 	ctx.font = `800 ${13 * dpr}px system-ui, sans-serif`
 	ctx.fillStyle = '#fff'
 	ctx.shadowColor = '#000'
 	ctx.shadowOffsetY = 2 * dpr
-	for (const [i, line] of (lines.length ? lines : ['Musik: still']).entries()) ctx.fillText(line, 16 * dpr, height - (16 + 18 * i) * dpr)
+	for (const [i, line] of lines.entries()) ctx.fillText(line, 16 * dpr, height - (16 + 18 * i) * dpr)
 	ctx.shadowColor = 'transparent'
 	ctx.shadowOffsetY = 0
 }

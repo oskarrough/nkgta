@@ -8,6 +8,7 @@
 // all round you.
 import { compile } from './jukebox/score.js'
 import { createSynth } from './jukebox/synth.js'
+import { muffling } from './space.js'
 import { T } from './tiles.js'
 
 export const SCORES = [
@@ -287,12 +288,13 @@ export function synthFor(context, master) {
 
 // How a source of `kind` sounds `d` tiles away: level, reverb send and
 // lowpass cutoff. Your own car's radio plays clear; sitting in a car muffles
-// everyone else's.
-export function shape(kind, d, own = false, inCar = false) {
+// everyone else's, and so does a building in the way (`walled`, 0–1).
+export function shape(kind, d, own = false, inCar = false, walled = 0) {
 	const k = KINDS[kind]
 	const near = 1 - Math.min(1, d / reach(kind))
 	const shut = inCar && !own ? 0.45 : 1
-	return { level: k.level * near * near * shut, wet: k.wet * near * shut, cutoff: own ? 6000 : k.cutoff * (0.35 + 0.65 * near) * shut }
+	const level = k.level * near * near * shut * (1 - 0.3 * walled)
+	return { level, wet: k.wet * near * shut, cutoff: own ? 6000 : k.cutoff * (0.35 + 0.65 * near) * shut * (1 - 0.65 * walled) }
 }
 
 // Starts a source's song through its own level, lowpass and pan, silent until
@@ -456,13 +458,14 @@ export function createMusic(world, shops, say = () => {}) {
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
-		const { context, master } = audio
+		const { context, master, room } = audio
 		if (!bus) {
 			bus = { gain: context.createGain(), tone: context.createBiquadFilter() }
 			bus.gain.gain.value = 0
 			bus.tone.type = 'lowpass'
 			bus.tone.frequency.value = 18000
 			bus.gain.connect(bus.tone).connect(master)
+			bus.tone.connect(room)
 		}
 		synth ??= synthFor(context, bus.gain)
 		const now = context.currentTime
@@ -486,8 +489,10 @@ export function createMusic(world, shops, say = () => {}) {
 		heard = sources
 		const want = nearest(sources, listener.x, listener.y).filter((src) => songs.has(src.score))
 		for (const p of playing.values()) if (!want.includes(p.src) || p.song !== songs.get(p.src.score)) stop(p, context)
+		// A shop's wall already muffles the whole bus; here only the street's walls count.
+		const walled = (src) => (inside || own.includes(src) || src.kind === 'field' ? 0 : muffling(world, src, listener))
 		const shapes = lead(
-			want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar)),
+			want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar, walled(src))),
 			want.map((src) => src.kind),
 		)
 		for (const [i, src] of want.entries()) {
