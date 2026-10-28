@@ -1,15 +1,24 @@
-// Keyboard, wheel and touch. Held keys are polled; one-shot actions fire
-// callbacks. Touch controls answer the same axis, turbo and drive questions,
-// so the game loop only ever talks to one input source.
+// Keyboard, wheel, touch and gamepad. Held keys are polled; one-shot actions
+// fire callbacks. Touch and the pad answer the same axis, turbo and drive
+// questions, so the game loop only ever talks to one input source, and the
+// sources add up rather than taking over from each other.
 import { createTouch } from './touch.js'
+import { createGamepad } from './gamepad.js'
 
 import { sound } from './sound.js'
 
 const norm = (key) => (key.length === 1 ? key.toLowerCase() : key)
+const clamp = (v) => Math.max(-1, Math.min(1, v))
+// A thumb on the glass, a stick in hand and the keys all push the same way;
+// together they sum, and a source that isn't pushing adds nothing.
+const mix = (...axes) => ({ x: clamp(axes.reduce((x, a) => x + a.x, 0)), y: clamp(axes.reduce((y, a) => y + a.y, 0)) })
 
 export function createInput(actions) {
 	const keys = new Set()
 	const touch = createTouch(actions)
+	// While the menu is up the pad is mute, as the keys are; Start still gets
+	// through, so the same button that opened it closes it.
+	const gamepad = createGamepad(actions, () => actions.menuOpen())
 	addEventListener('keydown', (e) => {
 		if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault()
 		const key = norm(e.key)
@@ -69,21 +78,33 @@ export function createInput(actions) {
 	return {
 		// Let go of every held key, e.g. when the menu opens.
 		release: () => keys.clear(),
-		// Direction the player is pushing, each axis -1…1. A key wins if one
-		// is held; otherwise the thumbstick's analogue deflection.
-		axis: () => actions.move(keyDown() ? keyAxis() : touch.axis()),
-		// Overhead keyboard movement follows the player; touch stays directional.
+		// Direction the player is pushing, each axis -1…1. Keys push all or
+		// nothing; the sticks add their analogue deflection on top.
+		axis: () => {
+			const pushed = keyDown() ? keyAxis() : { x: 0, y: 0 }
+			return actions.move(mix(pushed, touch.axis(), gamepad.axis()))
+		},
+		// Overhead keyboard movement follows the player; the sticks stay
+		// directional, pointing where you want to go.
 		steer: () => (!actions.cameraActive() && keyDown() ? keyAxis() : null),
-		// Testing: hold space for turbo; the touch boost button does the same.
-		turbo: () => keys.has(' ') || touch.turbo(),
-		// In a car: the keyboard's up/down/left/right, or the stick translated
-		// into throttle, turn and handbrake.
+		// Testing: hold space for turbo; the touch boost button and the pad's B
+		// do the same.
+		turbo: () => keys.has(' ') || touch.turbo() || gamepad.turbo(),
+		// In a car: the keyboard's up/down/left/right, or a stick translated
+		// into throttle, turn and handbrake. Triggers and a thumb can be held
+		// at once, so the strongest push of each wins.
 		drive: (car) => {
 			if (keyDown()) {
 				const axis = keyAxis()
 				return { throttle: -axis.y, turn: axis.x, handbrake: keys.has(' ') }
 			}
-			return touch.drive(car)
+			const pad = gamepad.drive(car)
+			const thumb = touch.drive(car)
+			return {
+				throttle: clamp(pad.throttle + thumb.throttle),
+				turn: clamp(pad.turn + thumb.turn),
+				handbrake: pad.handbrake || thumb.handbrake,
+			}
 		},
 		setUse: touch.setUse,
 		setDriving: touch.setDriving,

@@ -125,6 +125,9 @@ const actions = {
 		showWalls = city3d.showsWalls()
 	},
 	nextStation: () => music.nextStation(!!player.car),
+	// Start on a gamepad opens and closes the menu, the way Esc does.
+	menuOpen: () => !menu.hidden,
+	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 }

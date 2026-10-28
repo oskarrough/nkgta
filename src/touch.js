@@ -1,7 +1,8 @@
 // Touch controls: a thumbstick that appears under the thumb on the left half,
 // and E and turbo/handbrake buttons on the right. The stick is an absolute
 // direction, like pointing at the map; the car's own physics stays untouched,
-// the stick is translated into its throttle, turn and handbrake here.
+// the stick is translated into its throttle, turn and handbrake here. A
+// gamepad's left stick drives the same way, through the same translation.
 import { forwardSpeed } from './car.js'
 
 const RANGE = 56 // pixels from the centre for full deflection
@@ -10,6 +11,25 @@ const PINCH = 1.25 // px of two-finger distance before the zoom follows
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a))
+
+// A stick pointed at a direction on the map, as throttle, turn and
+// handbrake. Shared by the thumbstick and a gamepad.
+export function stickDrive(car, axis, handbrake) {
+	const mag = Math.min(1, Math.hypot(axis.x, axis.y))
+	if (!mag) return { throttle: 0, turn: 0, handbrake }
+	const want = Math.atan2(axis.y, axis.x)
+	const diff = wrap(want - car.angle)
+	const align = Math.cos(diff)
+	// Pointing against the nose brakes first, then reverses. Pointing
+	// across it still creeps forward, so a stopped car can turn.
+	let throttle = Math.abs(align) < 0.08 ? 0 : mag * clamp(align * 1.4, -1, 1)
+	if (align > -0.05 && align < 0.7) throttle = Math.max(throttle, mag * 0.4)
+	// Heading error steers; reversing flips the sign, because the front
+	// wheels turn the nose the other way while backing up.
+	const backwards = forwardSpeed(car) < -0.1 || (Math.abs(forwardSpeed(car)) <= 0.1 && throttle < 0)
+	const turn = clamp(diff / 0.9, -1, 1) * (backwards ? -1 : 1)
+	return { throttle, turn, handbrake }
+}
 
 export function createTouch(actions) {
 	const root = document.getElementById('touch')
@@ -153,23 +173,7 @@ export function createTouch(actions) {
 		axis: stickAxis,
 		// On foot and on the bike: turbo while the boost button is held.
 		turbo: () => boostHeld,
-		drive(car) {
-			const { x, y } = stickAxis()
-			const mag = Math.min(1, Math.hypot(x, y))
-			if (!mag) return { throttle: 0, turn: 0, handbrake: boostHeld }
-			const want = Math.atan2(y, x)
-			const diff = wrap(want - car.angle)
-			const align = Math.cos(diff)
-			// Pointing against the nose brakes first, then reverses. Pointing
-			// across it still creeps forward, so a stopped car can turn.
-			let throttle = Math.abs(align) < 0.08 ? 0 : mag * clamp(align * 1.4, -1, 1)
-			if (align > -0.05 && align < 0.7) throttle = Math.max(throttle, mag * 0.4)
-			// Heading error steers; reversing flips the sign, because the front
-			// wheels turn the nose the other way while backing up.
-			const backwards = forwardSpeed(car) < -0.1 || (Math.abs(forwardSpeed(car)) <= 0.1 && throttle < 0)
-			const turn = clamp(diff / 0.9, -1, 1) * (backwards ? -1 : 1)
-			return { throttle, turn, handbrake: boostHeld }
-		},
+		drive: (car) => stickDrive(car, stickAxis(), boostHeld),
 		// The E button shows a picture of what it does, the same as the HUD's.
 		setUse(action) {
 			if (use.dataset.action === (action ?? '')) return
