@@ -15,6 +15,7 @@ import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
 import { HILLS } from './terrain.js'
+import { daylight, START_HOUR } from './daylight.js'
 
 // Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
 const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
@@ -34,11 +35,11 @@ const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
 // The flats behind the upper windows, only in the chase camera: depth in
 // tiles, the share of rooms with the lamp on, how dark the others are by
 // day, and what they're papered, floored and hung with.
+// The share of rooms with the lamp on comes from the clock (daylight.js).
 const ROOMS = {
 	depth: 1.4,
-	lit: 0.3,
 	lamp: '#ffd59a',
-	glow: 0.5, // how much of a lit room shines by itself
+	glow: 0.5, // how much of a lit room shines by itself by day; at night all of it
 	dim: 0.35,
 	glass: 0.15, // the pane's own dark tint over the room
 	glint: 0.35, // the reflection across the pane, fainter so the room shows
@@ -69,17 +70,11 @@ const inChunk = (c, { x, y }) => x >= c.x && y >= c.y && x < c.x + c.w && y < c.
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
 
-// Look knobs, all of them here.
-// Sky light against sun light, which together give one full tone.
-const AMBIENT = { color: '#c6ccd6', intensity: 1.0 }
-const SUN = { color: '#fff4e2', intensity: 2.55, direction: [-0.5, -0.6, 0.8] }
+// Look knobs, all of them here. The light, the sky and the ground's sun and
+// shade follow the clock, see daylight.js.
 // Flat bands instead of a falloff, from grazing sun to full sun. Faces turned
 // away from the sun get none at all, so they can't flicker in and out of shadow.
 const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
-// What the map's own colours are multiplied by in sun and in shadow: warm
-// light, deep cool shade.
-const GROUND_SUN = '#fffaf0'
-const GROUND_SHADE = '#98a4c0'
 // What the ground is made of, drawn on top of the map's flat colours by
 // world position, so it stays sharp at every zoom and costs nothing per
 // building. Each is how much darker or lighter a pattern makes the ground.
@@ -107,6 +102,9 @@ const FOOT = [0.12, 0.3, 0.72, 0.86]
 // Cars are too small for the shadow map: a flat quad away from the sun keeps
 // their shadow crisp and stops them speckling.
 const CAR_SHADOW = { opacity: 0.42, offset: 0.34, stretch: 1.15 }
+// At night shopfronts and awnings glow this much by themselves, lit from
+// inside, and this share of shops is still open.
+const SHOP_GLOW = { awning: 0.45, window: 0.9, open: 0.65 }
 
 export function createScene(canvas, world, shops = []) {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -127,13 +125,24 @@ export function createScene(canvas, world, shops = []) {
 	// their filtered, anisotropic textures.
 	const gradient = toonGradient()
 	const time = { value: 0 }
-	const wallLook = wallMaterial(world.tileM, gradient)
+	// What the clock sets, shared by every material that needs it: the
+	// ground's sun and shade, the sky at the map edge, where the light comes
+	// from, how night it is and the share of flats with the lamp on.
+	const sky = {
+		sun: { value: new THREE.Color() },
+		shade: { value: new THREE.Color() },
+		deck: { value: new THREE.Color(DECK) },
+		toSun: { value: new THREE.Vector3(0, 0, 1) },
+		night: { value: 0 },
+		home: { value: 0 },
+	}
+	const wallLook = wallMaterial(world.tileM, gradient, sky)
 	// A generator, so chunks can be built a building at a time between frames.
 	const city = createChunks(world, renderer, function* (chunk) {
 		const group = new THREE.Group()
 		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
 		plane.receiveShadow = true
-		plane.material.uniforms.time = time
+		Object.assign(plane.material.uniforms, { time, sun: sky.sun, shade: sky.shade, deck: sky.deck, toSun: sky.toSun })
 		group.add(plane)
 		const houses = []
 		const wallParts = []
@@ -171,7 +180,9 @@ export function createScene(canvas, world, shops = []) {
 		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
 		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
 		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			group.add(createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt))
+			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt)
+			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
+			group.add(signs)
 			yield
 		}
 		// Trees in cells, so the view skips most of them, or one plain blob
@@ -222,12 +233,15 @@ export function createScene(canvas, world, shops = []) {
 	const cars = carMeshes(gradient, world)
 	const skids = skidMarks(world)
 	scene.add(...cars.meshes, skids.mesh)
-	// Sky light, then sun from the south-west, so south and west walls are bright.
-	scene.add(new THREE.AmbientLight(AMBIENT.color, AMBIENT.intensity))
-	const sun = new THREE.DirectionalLight(SUN.color, SUN.intensity)
+	// Sky light, then the sun, or the moon at night.
+	const ambient = new THREE.AmbientLight()
+	scene.add(ambient)
+	const sun = new THREE.DirectionalLight()
 	sun.castShadow = true
 	sun.shadow.mapSize.set(SHADOW.size, SHADOW.size)
 	sun.shadow.bias = SHADOW.bias
+	// Drawn only while there are shadows to see, so not at night.
+	sun.shadow.autoUpdate = false
 	const sunTarget = new THREE.Object3D()
 	sun.target = sunTarget
 	scene.add(sun, sunTarget)
@@ -235,9 +249,9 @@ export function createScene(canvas, world, shops = []) {
 	// The shadow camera follows the view and stays just big enough for it, so
 	// the map is spent on what's on screen. It snaps to whole shadow texels,
 	// otherwise the edges crawl as you walk.
-	const sunDir = new THREE.Vector3(...SUN.direction).normalize()
-	const sunRight = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), sunDir).normalize()
-	const sunUp = new THREE.Vector3().crossVectors(sunDir, sunRight).normalize()
+	const sunDir = new THREE.Vector3(0, 0, 1)
+	const sunRight = new THREE.Vector3()
+	const sunUp = new THREE.Vector3()
 	const focus = new THREE.Vector3()
 	function focusSun(x, y, radius) {
 		const texel = (radius * 2) / SHADOW.size
@@ -258,7 +272,35 @@ export function createScene(canvas, world, shops = []) {
 		shadow.updateProjectionMatrix()
 	}
 
-	const ink = createInk(renderer, [skids.mesh], [skids.mesh, clouds.layer, ...cars.shadows])
+	// The time of day, see daylight.js. Clouds keep their bands however dim
+	// the light: it's measured against the light at noon.
+	const brightness = ([color, intensity]) => (color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722) * intensity
+	const noon = daylight(12)
+	const fullLight = brightness(noon.ambient) + brightness(noon.sun)
+	function setHour(hour) {
+		const now = daylight(hour)
+		ambient.color.copy(now.ambient[0])
+		ambient.intensity = now.ambient[1]
+		sun.color.copy(now.sun[0])
+		sun.intensity = now.sun[1]
+		sun.shadow.intensity = now.shadow
+		sunDir.copy(now.direction)
+		sunRight.crossVectors(new THREE.Vector3(0, 1, 0), sunDir).normalize()
+		sunUp.crossVectors(sunDir, sunRight).normalize()
+		sky.toSun.value.copy(sunDir)
+		sky.sun.value.copy(now.ground[0])
+		sky.shade.value.copy(now.ground[1])
+		sky.deck.value.copy(now.sky)
+		scene.background.copy(now.sky)
+		streetFog.color.copy(now.sky)
+		sky.night.value = now.night
+		sky.home.value = now.home
+		clouds.light(now.clouds, fullLight / (brightness(now.ambient) + brightness(now.sun)))
+		cars.light(sunDir, now.shadow, now.night)
+	}
+	setHour(START_HOUR)
+
+	const ink = createInk(renderer, [skids.mesh, ...cars.beams], [skids.mesh, clouds.layer, ...cars.shadows, ...cars.beams])
 	timePasses(renderer, ['color', 'ink', 'blit'])
 
 	// The look, cycled with P; see looks.js for what each one does.
@@ -330,6 +372,7 @@ export function createScene(canvas, world, shops = []) {
 		}
 		const { width, height } = ink.frame
 		focusSun(view.position.x, view.position.y, cam.third ? 32 : Math.hypot(width, height) / cam.scale / 2)
+		sun.shadow.needsUpdate = sun.shadow.intensity > 0
 		clouds.layer.visible = !cam.third
 		if (!cam.third) clouds.follow(view)
 		time.value = performance.now() / 1000
@@ -347,6 +390,7 @@ export function createScene(canvas, world, shops = []) {
 
 	return {
 		render,
+		setHour,
 		renderer,
 		scene,
 		aim,
@@ -376,6 +420,20 @@ export function createScene(canvas, world, shops = []) {
 	}
 }
 
+// At night a material glows this much of its own colour, lit from inside.
+function glowAtNight(material, strength, night) {
+	material.onBeforeCompile = (shader) => {
+		shader.uniforms.night = night
+		shader.fragmentShader =
+			'uniform float night;\n' +
+			shader.fragmentShader.replace(
+				'#include <emissivemap_fragment>',
+				`#include <emissivemap_fragment>
+			totalEmissiveRadiance += diffuseColor.rgb * night * ${strength.toFixed(2)};`,
+			)
+	}
+}
+
 // Paint, glass and tyres take the same flat bands as the walls; lamps stay
 // lit, and the rim is plain ink.
 function carMaterial(kind, gradient) {
@@ -394,10 +452,20 @@ const CAR_HEADLIGHT = '#fff3c8'
 // Cars are too low for the ink pass to find their edges, so they sit on a
 // dark rim this much wider than the body, in tiles. Tyres poke out past it.
 const CAR_RIM = { color: '#1a1e1b', width: 0.045 }
+// At night the headlights throw a beam on the road ahead: length and width
+// at its far end in tiles, and how bright, near half and far half.
+const BEAM = { length: 2.6, width: 1.9, near: 0.32, far: 0.15 }
 function carMeshes(gradient, world) {
 	const box = (l, w, h, x, z, y = 0) => new THREE.BoxGeometry(l, w, h).translate(x, y, z + h / 2)
 	// Away from the sun, in scene units, and a flat quad to cast it.
-	const away = new THREE.Vector2(-SUN.direction[0], -SUN.direction[1]).normalize().multiplyScalar(CAR_SHADOW.offset)
+	const away = new THREE.Vector2()
+	const beamMaterial = new THREE.MeshBasicMaterial({
+		color: CAR_HEADLIGHT,
+		alphaMap: beamTexture(),
+		transparent: true,
+		blending: THREE.AdditiveBlending,
+		depthWrite: false,
+	})
 	const shadowMaterial = new THREE.MeshBasicMaterial({
 		color: '#000',
 		transparent: true,
@@ -431,7 +499,14 @@ function carMeshes(gradient, world) {
 		)
 		shadow.count = 0
 		shadow.frustumCulled = false
-		return { model: m, parts, shadow }
+		const beam = new THREE.InstancedMesh(
+			new THREE.PlaneGeometry(BEAM.length, BEAM.width).translate(m.length / 2 + BEAM.length / 2, 0, 0),
+			beamMaterial,
+			MAX_CARS,
+		)
+		beam.count = 0
+		beam.frustumCulled = false
+		return { model: m, parts, shadow, beam }
 	})
 	const m = new THREE.Matrix4()
 	const ms = new THREE.Matrix4()
@@ -446,10 +521,21 @@ function carMeshes(gradient, world) {
 	const lit = new THREE.Color('#ff2a1a')
 	const dim = new THREE.Color('#5a0d0a')
 	return {
-		meshes: kinds.flatMap((k) => [...k.parts.map((p) => p.mesh), k.shadow]),
+		meshes: kinds.flatMap((k) => [...k.parts.map((p) => p.mesh), k.shadow, k.beam]),
 		shadows: kinds.map((k) => k.shadow),
+		beams: kinds.map((k) => k.beam),
+		// Shadows fall away from the light and fade with it; beams come on at night.
+		light(toSun, shadow, night) {
+			away.set(-toSun.x, -toSun.y).normalize().multiplyScalar(CAR_SHADOW.offset)
+			shadowMaterial.opacity = CAR_SHADOW.opacity * shadow
+			beamMaterial.opacity = night
+			for (const k of kinds) {
+				k.shadow.visible = shadow > 0
+				k.beam.visible = night > 0
+			}
+		},
 		update(cars) {
-			for (const { model, parts, shadow } of kinds) {
+			for (const { model, parts, shadow, beam } of kinds) {
 				let n = 0
 				for (const car of cars) {
 					if (car.model !== model || n >= MAX_CARS) continue
@@ -464,6 +550,7 @@ function carMeshes(gradient, world) {
 					m.compose(at.set(car.x, -car.y, ground), q, one)
 					ms.compose(at.set(car.x + away.x, -car.y + away.y, world.heightAt(car.x + away.x, car.y - away.y) + 0.03), q, one)
 					shadow.setMatrixAt(n, ms)
+					beam.setMatrixAt(n, ms.compose(at.set(car.x, -car.y, ground + 0.04), q, one))
 					c.set(car.color)
 					for (const { kind, mesh } of parts) {
 						mesh.setMatrixAt(n, m)
@@ -474,6 +561,8 @@ function carMeshes(gradient, world) {
 				}
 				shadow.count = n
 				shadow.instanceMatrix.needsUpdate = true
+				beam.count = n
+				beam.instanceMatrix.needsUpdate = true
 				for (const { mesh } of parts) {
 					mesh.count = n
 					mesh.instanceMatrix.needsUpdate = true
@@ -482,6 +571,30 @@ function carMeshes(gradient, world) {
 			}
 		},
 	}
+}
+
+// A headlight beam from above: a wedge widening from the car's front, in two
+// flat steps of brightness rather than a falloff. Along x, away from the car.
+function beamTexture() {
+	const canvas = Object.assign(document.createElement('canvas'), { width: 32, height: 32 })
+	const g = canvas.getContext('2d')
+	const wedge = (x0, x1, alpha) => {
+		const half = (x) => 4 + (12 * x) / 32
+		const v = Math.round(alpha * 255)
+		g.fillStyle = `rgb(${v}, ${v}, ${v})`
+		g.beginPath()
+		g.moveTo(x0, 16 - half(x0))
+		g.lineTo(x1, 16 - half(x1))
+		g.lineTo(x1, 16 + half(x1))
+		g.lineTo(x0, 16 + half(x0))
+		g.fill()
+	}
+	wedge(0, 14, BEAM.near)
+	wedge(14, 32, BEAM.far)
+	const tex = new THREE.CanvasTexture(canvas)
+	tex.minFilter = tex.magFilter = THREE.NearestFilter
+	tex.generateMipmaps = false
+	return tex
 }
 
 // Rubber on the road: a ring of thin quads, the oldest painted over first.
@@ -548,16 +661,17 @@ function groundGeometry(chunk, world) {
 }
 
 // The map image keeps its own colours: the ground samples the shadow map and
-// multiplies by one fixed shade, so nothing is lit twice.
+// multiplies by the hour's sun or shade, so nothing is lit twice.
 function groundMaterial(map, world) {
 	const uniforms = THREE.UniformsUtils.merge([
 		THREE.UniformsLib.lights,
 		{
-			sun: { value: new THREE.Color(GROUND_SUN) },
+			sun: { value: new THREE.Color() },
 			deck: { value: new THREE.Color(DECK) },
 			time: { value: 0 },
 			size: { value: new THREE.Vector2(world.W, world.H) },
-			shade: { value: new THREE.Color(GROUND_SHADE) },
+			shade: { value: new THREE.Color() },
+			toSun: { value: new THREE.Vector3(0, 0, 1) },
 		},
 	])
 	uniforms.map = { value: map }
@@ -565,6 +679,7 @@ function groundMaterial(map, world) {
 		lights: true,
 		uniforms,
 		vertexShader: `
+			uniform vec3 toSun;
 			varying vec2 vUv;
 			varying vec2 vTile;
 			varying float vHill;
@@ -574,9 +689,9 @@ function groundMaterial(map, world) {
 
 			void main() {
 				vUv = uv;
-				// Slopes towards the sun a touch brighter, away from it darker.
-				vec3 toSun = normalize(vec3(${SUN.direction.join(', ')}));
-				vHill = 1.0 + (dot(normal, toSun) / toSun.z - 1.0) * ${d(HILLSHADE)};
+				// Slopes towards the sun a touch brighter, away from it darker,
+				// and no more so when the sun is low.
+				vHill = 1.0 + (dot(normal, toSun) - toSun.z) / max(toSun.z, 0.6) * ${d(HILLSHADE)};
 				#include <beginnormal_vertex>
 				#include <defaultnormal_vertex>
 				vNormal = transformedNormal;
@@ -1064,22 +1179,24 @@ const tarPaper = `
 `
 
 // Walls draw their own windows: one per 3 m along the wall and per storey up
-// it, wider shop windows on the ground floor, a ledge between storeys and now
-// and then a lit window. Sheds and garages stay blank. In the chase camera
-// (`material.userData.rooms`) each upper window looks into a room.
-function wallMaterial(tileM, gradient) {
+// it, wider shop windows on the ground floor, a ledge between storeys and the
+// flats with the lamp on lit, more of them as night falls, always the same
+// ones first. At night those glow, and so do open shops. Sheds and garages
+// stay blank. In the chase camera (`material.userData.rooms`) each upper
+// window looks into a room.
+function wallMaterial(tileM, gradient, sky) {
 	const material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradient })
 	const storey = (3.2 / tileM).toFixed(3)
 	const rooms = { value: 0 }
 	material.userData.rooms = rooms
-	// What a room averages out to once its window is under a pixel.
+	// What a room averages out to once its window is under a pixel, lamp off and on.
 	const paper = mean(ROOMS.papers)
-	const farRoom = paper
-		.clone()
-		.multiplyScalar(ROOMS.dim)
-		.lerp(paper.clone().multiply(new THREE.Color(ROOMS.lamp)), ROOMS.lit)
+	const darkRoom = paper.clone().multiplyScalar(ROOMS.dim)
+	const litRoom = paper.clone().multiply(new THREE.Color(ROOMS.lamp))
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.rooms = rooms
+		shader.uniforms.night = sky.night
+		shader.uniforms.home = sky.home
 		const decl = 'varying vec3 vWall;\nvarying float vZ;\nvarying vec3 vRoomP;\nvarying vec2 vTan;\n'
 		shader.vertexShader =
 			'attribute vec3 wall;\nattribute float foot;\n' +
@@ -1093,7 +1210,7 @@ function wallMaterial(tileM, gradient) {
 				vTan = normalize(vec2(-normal.y, normal.x));`,
 			)
 		shader.fragmentShader =
-			'uniform float rooms;\n' +
+			'uniform float rooms;\nuniform float night;\nuniform float home;\n' +
 			decl +
 			pulse +
 			shader.fragmentShader.replace(
@@ -1119,21 +1236,29 @@ function wallMaterial(tileM, gradient) {
 					// and the hash would blow that up into speckle.
 					float wallId = floor(vWall.y + 0.5) + floor(vWall.z * 8.0 + 0.5);
 					float bay = fract(sin(dot(vec3(floor(along), f, wallId), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-					// Dark glass with a pale glint across its top corner, now and
-					// then a lit window.
+					// Dark glass with a pale glint across its top corner. Each storey
+					// is rooms two or three windows wide, and a room has the lamp on
+					// once the share of flats at home passes its own number, so the
+					// same flats light up first every evening. An open shop's window
+					// is lit at night.
 					float wu = (u - 0.5 + halfW) / (2.0 * halfW);
 					float wv = (fz - lo) / (hi - lo);
 					float glint = step(abs(wu - wv - 0.15), 0.12) * (1.0 - shop);
-					vec3 glass = bay > 0.94 ? ${glsl(WALL.lit)} : ${glsl(WALL.glass)};
-					vec3 far = mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, 0.06);
-					float glow = 0.0;
+					float fh = fract(sin(f * 41.3 + wallId * 7.13) * 43758.5453);
+					float span = fh < 0.5 ? 2.0 : 3.0;
+					float phase = floor(fract(fh * 13.7) * span);
+					float x0 = floor((along + phase) / span) * span - phase;
+					float room = fract(sin(dot(vec3(x0, f, wallId), vec3(12.9898, 78.233, 37.719)) + 1.7) * 43758.5453);
+					float open = step(${(1 - SHOP_GLOW.open).toFixed(2)}, fract(bay * 5.1)) * step(0.05, night);
+					float on = shop > 0.5 ? open : step(1.0 - home, fract(room * 5.37));
+					float share = shop > 0.5 ? ${SHOP_GLOW.open.toFixed(2)} * step(0.05, night) : home;
+					vec3 glass = on > 0.5 ? ${glsl(WALL.lit)} : ${glsl(WALL.glass)};
+					vec3 far = mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, share);
+					float glow = on * night * ${SHOP_GLOW.window.toFixed(2)};
+					float farGlow = share * night * ${SHOP_GLOW.window.toFixed(2)};
 					if (rooms > 0.5 && shop < 0.5) {
 						// Follow the view ray into a box behind the wall: a room two or
 						// three windows wide, so its walls stand behind the piers.
-						float fh = fract(sin(f * 41.3 + wallId * 7.13) * 43758.5453);
-						float span = fh < 0.5 ? 2.0 : 3.0;
-						float phase = floor(fract(fh * 13.7) * span);
-						float x0 = floor((along + phase) / span) * span - phase;
 						vec3 ray = normalize(vRoomP - cameraPosition);
 						vec3 d = vec3(dot(ray.xy, vTan), ray.z, max(abs(dot(ray.xy, vec2(vTan.y, -vTan.x))), 0.05));
 						vec2 o = vec2(along, fz * ${storey});
@@ -1141,14 +1266,12 @@ function wallMaterial(tileM, gradient) {
 						float ty = (d.y > 0.0 ? ${storey} - o.y : o.y) / max(abs(d.y), 0.0001);
 						float tz = ${ROOMS.depth.toFixed(2)} / d.z;
 						float t = min(tz, min(tx, ty));
-						float room = fract(sin(dot(vec3(x0, f, wallId), vec3(12.9898, 78.233, 37.719)) + 1.7) * 43758.5453);
 						float pick = fract(room * 7.31);
 						vec3 paper = pick < 0.25 ? ${glsl(ROOMS.papers[0])} : pick < 0.5 ? ${glsl(ROOMS.papers[1])} : pick < 0.75 ? ${glsl(ROOMS.papers[2])} : ${glsl(ROOMS.papers[3])};
 						vec3 hit = vec3(o + d.xy * t, d.z * t);
 						// Where on the room's wall or ceiling the ray lands, 0 to 1.
 						vec2 back = vec2((hit.x - x0) / span, hit.y / ${storey});
 						vec2 up = vec2((hit.x - x0) / span, hit.z / ${ROOMS.depth.toFixed(2)});
-						float on = step(${(1 - ROOMS.lit).toFixed(2)}, fract(room * 5.37));
 						vec3 c = t == tz ? paper : t == tx ? paper * 0.62 : d.y > 0.0 ? paper * 1.08 : ${glsl(ROOMS.floor)};
 						if (t == tz) {
 							// A door to the hall on one side, a picture on the other.
@@ -1169,14 +1292,16 @@ function wallMaterial(tileM, gradient) {
 						vec3 cloth = cp < 0.25 ? ${glsl(ROOMS.cloths[0])} : cp < 0.5 ? ${glsl(ROOMS.cloths[1])} : cp < 0.75 ? ${glsl(ROOMS.cloths[2])} : ${glsl(ROOMS.cloths[3])};
 						c = mix(c, cloth * (on > 0.5 ? 0.9 : 0.5), min(curtain, 1.0));
 						glass = mix(c, ${glsl(WALL.glass)}, ${ROOMS.glass.toFixed(2)});
-						glow = on * ${ROOMS.glow.toFixed(2)};
+						float lamp = mix(${ROOMS.glow.toFixed(2)}, 1.0, night);
+						glow = on * lamp;
 						glint *= ${ROOMS.glint.toFixed(2)};
-						far = mix(${glsl(farRoom)}, ${glsl(WALL.glass)}, ${ROOMS.glass.toFixed(2)});
+						far = mix(mix(${glsl(darkRoom)}, ${glsl(litRoom)}, home), ${glsl(WALL.glass)}, ${ROOMS.glass.toFixed(2)});
+						farGlow = home * lamp;
 					}
-					glass = mix(glass, ${glsl(WALL.glint)}, glint * near);
+					glass = mix(glass, ${glsl(WALL.glint)}, glint * near * (1.0 - on * night));
+					totalEmissiveRadiance += mix(far * farGlow, glass * glow, near) * wx * wz;
 					glass = mix(far, glass, near);
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
-					totalEmissiveRadiance += glass * glow * near * wx * wz;
 					// A pale sill under each upper window.
 					float sill = box(fz, lo - ${WALL.sill.toFixed(3)}, lo, aa.y) * pulse(u, 0.46 - halfW, 0.54 + halfW, aa.x) * (1.0 - shop);
 					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8);
@@ -1186,6 +1311,7 @@ function wallMaterial(tileM, gradient) {
 					vec3 cloth = pick < 0.25 ? ${glsl(AWNINGS[0])} : pick < 0.5 ? ${glsl(AWNINGS[1])} : pick < 0.75 ? ${glsl(AWNINGS[2])} : ${glsl(AWNINGS[3])};
 					if (fract(bay * 3.7) < 0.5) cloth = mix(cloth, ${glsl(WALL.stucco)}, pulse(along * 5.0, 0.0, 0.5, aa.x * 5.0));
 					diffuseColor.rgb = mix(diffuseColor.rgb, cloth, awning);
+					totalEmissiveRadiance += cloth * awning * open * night * ${SHOP_GLOW.awning.toFixed(2)};
 					float ledge = mix(0.025, 1.0 - smoothstep(0.0, 0.05, fz), near);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
 				}

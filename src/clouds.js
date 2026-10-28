@@ -6,9 +6,7 @@
 // slow noise decides where they grow big, so the mass runs parallel to nothing.
 import * as THREE from 'three'
 
-export const DECK = '#8d9cb1' // the sky colour past the clouds
-// Cloud tones by light: full sun, the faintest sun, and shade.
-const TONES = ['#ffffff', '#dce3ea', '#b4c1d0']
+export const DECK = '#8d9cb1' // the sky colour past the clouds by day
 const SPACING = 5.5 // tiles between cloud centres
 const REACH = 1.5 // how far a cloud may hang over the map edge, tiles
 const BAND = 44 // how far out the puffs go before only the deck is left
@@ -40,21 +38,26 @@ function noise(x, y) {
 	return mix(a, b, fy)
 }
 
-// Lit like everything else, then each light band swapped for a cloud tone,
-// so the shade side goes cool blue instead of grey.
+// Lit like everything else, then each light band swapped for a cloud tone:
+// full sun, the faintest sun, and shade, so the shade side goes cool blue
+// instead of grey. The tones come from the time of day, and `gain` makes up
+// for dimmer light, so the bands stay where they are at night.
 function cloudMaterial(gradient) {
 	const material = new THREE.MeshToonMaterial({ color: '#fff', gradientMap: gradient })
-	const tone = (hex) => {
-		const c = new THREE.Color(hex)
-		return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`
-	}
+	const tones = { value: [new THREE.Color(), new THREE.Color(), new THREE.Color()] }
+	const gain = { value: 1 }
+	material.userData = { tones, gain }
 	material.onBeforeCompile = (shader) => {
-		shader.fragmentShader = shader.fragmentShader.replace(
-			'#include <opaque_fragment>',
-			`float light = dot(outgoingLight, vec3(0.3333));
-			outgoingLight = light > 0.75 ? ${tone(TONES[0])} : light > 0.3 ? ${tone(TONES[1])} : ${tone(TONES[2])};
-			#include <opaque_fragment>`,
-		)
+		shader.uniforms.tones = tones
+		shader.uniforms.gain = gain
+		shader.fragmentShader =
+			'uniform vec3 tones[3];\nuniform float gain;\n' +
+			shader.fragmentShader.replace(
+				'#include <opaque_fragment>',
+				`float light = dot(outgoingLight, vec3(0.3333)) * gain;
+				outgoingLight = light > 0.75 ? tones[0] : light > 0.3 ? tones[1] : tones[2];
+				#include <opaque_fragment>`,
+			)
 	}
 	return material
 }
@@ -130,6 +133,10 @@ export function createClouds(world, gradient) {
 	// sits above the roofs.
 	return {
 		layer,
+		light(tones, gain) {
+			tones.forEach((c, i) => material.userData.tones.value[i].copy(c))
+			material.userData.gain.value = gain
+		},
 		follow(camera) {
 			const z = Math.min(HEIGHT, camera.position.z * 0.6)
 			const k = (camera.position.z - z) / camera.position.z

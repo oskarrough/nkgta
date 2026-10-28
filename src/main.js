@@ -7,6 +7,7 @@ import { createWasted } from './wasted.js'
 import { createPfand } from './pfand.js'
 import { createCamera, ZOOM } from './camera.js'
 import { tuneZoom } from './tune.js'
+import { createClock, tuneClock } from './daylight.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useAction, useHint } from './hud.js'
@@ -35,6 +36,8 @@ const canvas = document.getElementById('overlay')
 const shops = shopsOf(world)
 phase('shops')
 const city3d = createScene(document.getElementById('city'), world, shops)
+// The time of day, running by itself from late afternoon.
+const clock = createClock()
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
@@ -138,6 +141,7 @@ const menu = document.getElementById('menu')
 const menuButton = document.getElementById('menu-button')
 // `: the debug menu, the same kind of panel, open from the start with ?tune.
 const debug = document.getElementById('debug')
+tuneClock(document.getElementById('clock'), clock)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 // Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
@@ -287,6 +291,8 @@ function frame(now) {
 	sound.listen(world, street.x, street.y, inside)
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
+	clock.tick(dt)
+	city3d.setHour(clock.hour)
 	visit.render(cam, traffic.cars, dt)
 	draw({
 		cam,
@@ -322,4 +328,4 @@ loading.remove()
 requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.
-if (import.meta.env.DEV) window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound }
+if (import.meta.env.DEV) window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound, clock }
