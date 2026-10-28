@@ -615,7 +615,7 @@ function groundMaterial(map, world) {
 				vec2 gp = (fract(vTile / ${d(GROUND_DETAIL.glintCell)}) - 0.25 - 0.5 * vec2(gHash(gc + 3.1), gHash(gc + 7.7))) * ${d(GROUND_DETAIL.glintCell)};
 				float flash = step(fract(gHash(gc) * 13.0 + time * 0.4), ${d(GROUND_DETAIL.glints)});
 				float spot = step(abs(gp.x) + abs(gp.y), ${d(GROUND_DETAIL.glintSize)});
-				float seen = 1.0 - step(${d(GROUND_DETAIL.glintSize)}, length(fwidth(vTile)) * 1.2);
+				float seen = 1.0 - smoothstep(${d(GROUND_DETAIL.glintSize * 0.5)}, ${d(GROUND_DETAIL.glintSize)}, length(fwidth(vTile)) * 1.2);
 				color = mix(color, ${glsl(GLINT)}, gWater * step(0.5, lit) * flash * spot * seen);
 				// The last few tiles fade into the sky under the clouds.
 				vec2 edge = min(vTile * vec2(1.0, -1.0), size - vTile * vec2(1.0, -1.0));
@@ -627,12 +627,31 @@ function groundMaterial(map, world) {
 	})
 }
 
+// Patterns fade to their average before they're smaller than a pixel, never
+// into noise (after Slop New York). `pulse` is how much of a pixel `w` wide
+// around `x` falls where fract(x) is in [a, b]: a box filter of a repeating
+// band, exact. `box` is the same for a single band, [a, b] once.
+const pulse = `
+float pulse(float x, float a, float b, float w) {
+	float hw = max(w, 0.0001) * 0.5;
+	float hi = floor(x + hw) * (b - a) + clamp(fract(x + hw), a, b) - a;
+	float lo = floor(x - hw) * (b - a) + clamp(fract(x - hw), a, b) - a;
+	return (hi - lo) / (2.0 * hw);
+}
+
+float box(float x, float a, float b, float w) {
+	float hw = max(w, 0.0001) * 0.5;
+	return clamp((min(x + hw, b) - max(x - hw, a)) / (2.0 * hw), 0.0, 1.0);
+}
+`
+
 // The ground's materials, told apart by the colour the map painted: green
 // is lawn, dark grey is tarmac, pale grey is pavement, the khaki between is
 // courtyards and bare ground. Every pattern comes in hard steps, like paint,
 // and fades out before its stones get smaller than a pixel.
 const d = (v) => v.toFixed(3)
 const groundDetail = `
+${pulse}
 float gHash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -677,6 +696,15 @@ float gSetts(vec2 p) {
 	return sqrt(f2) - sqrt(f1);
 }
 
+// How much of a pavement slab pattern is joint, as gStones draws it, filtered
+// over a pixel w tiles wide so the joints thin into a tone, not a flicker.
+float gJoints(vec2 p, float edge, vec2 w) {
+	float half_ = (1.0 - edge) * 0.5;
+	float jx = pulse(p.x + floor(p.y) * 0.5 + half_, 0.0, 2.0 * half_, w.x);
+	float jy = pulse(p.y + half_, 0.0, 2.0 * half_, w.y);
+	return 1.0 - (1.0 - jx) * (1.0 - jy);
+}
+
 // Set by groundDetail: how much of this point is water.
 float gWater = 0.0;
 
@@ -699,6 +727,8 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	float px = length(fwidth(p));
 	float fine = 1.0 - smoothstep(0.05, 0.1, px);
 	float mid = 1.0 - smoothstep(0.15, 0.3, px);
+	// Cobble joints are thinner, so they go sooner.
+	float joint = 1.0 - smoothstep(0.025, 0.06, px);
 	// Blotches turn into camouflage across a whole park, so far out the
 	// ground goes back to flat fills.
 	float near = 1.0 - smoothstep(0.05, 0.12, px);
@@ -711,16 +741,15 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	vec2 q = p * vec2(0.9, 2.6);
 	q.x += time * ${d(GROUND_DETAIL.waveDrift)} * 0.9 * (mod(floor(q.y), 2.0) * 2.0 - 1.0);
 	vec2 wf = fract(q);
-	f += water * (1.0 - step(0.2, lum)) * mid * step(0.72, gHash(floor(q))) * step(abs(wf.y - 0.5), 0.13) * step(abs(wf.x - 0.5), 0.3) * ${d(GROUND_DETAIL.waves)};
+	f += water * (1.0 - step(0.2, lum)) * mix(0.044, step(0.72, gHash(floor(q))) * step(abs(wf.y - 0.5), 0.13) * step(abs(wf.x - 0.5), 0.3), fine) * ${d(GROUND_DETAIL.waves)};
 
 	f -= lawn * (1.0 - pitch) * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} * near + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
 
 	float wear = gBlots(p * 0.45 + 3.7);
 	float setts = gSetts(p * 4.0);
-	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} * near + step(setts, 0.1) * ${d(GROUND_DETAIL.yardJoints)} * fine);
+	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} * near + mix(0.18, step(setts, 0.1), joint) * ${d(GROUND_DETAIL.yardJoints)});
 
-	vec2 slab = gStones(p * 2.0);
-	f -= pavement * step(0.86, slab.y) * ${d(GROUND_DETAIL.pavingJoints)} * mid;
+	f -= pavement * gJoints(p * 2.0, 0.86, fwidth(p) * 2.0) * ${d(GROUND_DETAIL.pavingJoints)};
 
 	float repair = gBlots(p * 0.3 + 11.3);
 	f -= tarmac * step(0.73, repair) * ${d(GROUND_DETAIL.asphaltPatches)};
@@ -989,15 +1018,15 @@ function roofMaterial(rect, gradient, tex) {
 			)
 		shader.fragmentShader =
 			decl +
+			pulse +
 			'float tarHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
 			shader.fragmentShader.replace(
 				'#include <map_fragment>',
 				`#include <map_fragment>
 				if (vRoofNormal.z < 0.97) {
 					float row = vRoofPos.z / ${ROOF_TILES.row.toFixed(3)};
-					float aa = fwidth(row);
-					float course = 1.0 - smoothstep(${ROOF_TILES.line.toFixed(2)} - aa, ${ROOF_TILES.line.toFixed(2)} + aa, fract(row));
-					diffuseColor.rgb *= 1.0 - (1.0 - smoothstep(0.25, 0.5, aa)) * course * ${ROOF_TILES.ink.toFixed(2)};
+					float course = pulse(row, 0.0, ${ROOF_TILES.line.toFixed(2)}, fwidth(row));
+					diffuseColor.rgb *= 1.0 - course * ${ROOF_TILES.ink.toFixed(2)};
 				} else if (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)) < 0.05) {
 					${tarPaper}
 				}`,
@@ -1024,7 +1053,7 @@ const tarPaper = `
 	vec2 side = vec2(-ax.y, ax.x);
 	vec2 uv = vec2(dot(vRoofPos.xy, ax), dot(vRoofPos.xy, side));
 	float fine = 1.0 - smoothstep(0.05, 0.1, length(fwidth(uv)));
-	float f = 1.0 + step(fract(uv.y / ${TAR.seam.toFixed(3)}), 0.1) * ${TAR.seamLight.toFixed(2)} * fine;
+	float f = 1.0 + pulse(uv.y / ${TAR.seam.toFixed(3)}, 0.0, 0.1, fwidth(uv.y / ${TAR.seam.toFixed(3)})) * ${TAR.seamLight.toFixed(2)};
 	float patch_ = tarHash(floor(uv / vec2(${TAR.patch[0].toFixed(2)}, ${TAR.patch[1].toFixed(2)})));
 	f += (step(0.86, patch_) - step(patch_, 0.12)) * ${TAR.patchTone.toFixed(2)};
 	diffuseColor.rgb *= f;
@@ -1032,18 +1061,6 @@ const tarPaper = `
 	vec2 vcell = floor(uv / ${TAR.ventCell.toFixed(1)});
 	vec2 vd = uv - (vcell + 0.25 + 0.5 * vec2(tarHash(vcell + 3.3), tarHash(vcell + 4.4))) * ${TAR.ventCell.toFixed(1)};
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
-`
-
-// How much of a pixel `w` wide around `x` falls where fract(x) is in [a, b]:
-// a box filter of a repeating band, exact, so far windows settle into their
-// average instead of shimmering (after Slop New York's filteredPulse).
-const pulse = `
-float pulse(float x, float a, float b, float w) {
-	float hw = max(w, 0.0001) * 0.5;
-	float hi = floor(x + hw) * (b - a) + clamp(fract(x + hw), a, b) - a;
-	float lo = floor(x - hw) * (b - a) + clamp(fract(x - hw), a, b) - a;
-	return (hi - lo) / (2.0 * hw);
-}
 `
 
 // Walls draw their own windows: one per 3 m along the wall and per storey up
@@ -1084,6 +1101,7 @@ function wallMaterial(tileM, gradient) {
 				`#include <color_fragment>
 				float along = vWall.x;
 				vec2 aa = fwidth(vec2(along, vZ / ${storey}));
+				float az = aa.y * ${storey};
 				if (vWall.z > 2.0 && along > 0.0 && along < vWall.y && vZ < vWall.z - 0.3) {
 					float f = floor(vZ / ${storey});
 					float fz = fract(vZ / ${storey});
@@ -1160,26 +1178,27 @@ function wallMaterial(tileM, gradient) {
 					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
 					totalEmissiveRadiance += glass * glow * near * wx * wz;
 					// A pale sill under each upper window.
-					float sill = step(lo - ${WALL.sill.toFixed(3)}, fz) * step(fz, lo) * step(abs(u - 0.5), halfW + 0.04) * (1.0 - shop);
-					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8 * near);
+					float sill = box(fz, lo - ${WALL.sill.toFixed(3)}, lo, aa.y) * pulse(u, 0.46 - halfW, 0.54 + halfW, aa.x) * (1.0 - shop);
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8);
 					// Shopfronts: an awning over some, plain or striped.
-					float awning = shop * step(bay, ${WALL.awnings.toFixed(2)}) * step(hi + 0.03, fz) * step(fz, 0.97) * step(abs(u - 0.5), halfW + 0.06);
+					float awning = shop * step(bay, ${WALL.awnings.toFixed(2)}) * box(fz, hi + 0.03, 0.97, aa.y) * pulse(u, 0.44 - halfW, 0.56 + halfW, aa.x);
 					float pick = fract(bay * 7.31);
 					vec3 cloth = pick < 0.25 ? ${glsl(AWNINGS[0])} : pick < 0.5 ? ${glsl(AWNINGS[1])} : pick < 0.75 ? ${glsl(AWNINGS[2])} : ${glsl(AWNINGS[3])};
-					if (fract(bay * 3.7) < 0.5) cloth = mix(cloth, ${glsl(WALL.stucco)}, mix(0.5, step(fract(along * 5.0), 0.5), near));
+					if (fract(bay * 3.7) < 0.5) cloth = mix(cloth, ${glsl(WALL.stucco)}, pulse(along * 5.0, 0.0, 0.5, aa.x * 5.0));
 					diffuseColor.rgb = mix(diffuseColor.rgb, cloth, awning);
-					float ledge = 1.0 - smoothstep(0.0, 0.05 + aa.y, fz);
+					float ledge = mix(0.025, 1.0 - smoothstep(0.0, 0.05, fz), near);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
 				}
 				// Cornice: a pale stucco band under the roof with a dark line of
 				// its own shadow beneath.
 				if (vWall.z > 2.0) {
 					float down = vWall.z - vZ;
-					diffuseColor.rgb = down < 0.0 ? diffuseColor.rgb : down < ${WALL.cornice[0].toFixed(3)} ? mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45) : down < ${WALL.cornice[1].toFixed(3)} ? diffuseColor.rgb * 0.62 : diffuseColor.rgb;
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45 * box(down, 0.0, ${WALL.cornice[0].toFixed(3)}, az));
+					diffuseColor.rgb *= 1.0 - 0.38 * box(down, ${WALL.cornice[0].toFixed(3)}, ${WALL.cornice[1].toFixed(3)}, az);
 				}
 				// Darker towards the foot, in two steps, where the street's
 				// grime and the ground's shade reach up the wall.
-				diffuseColor.rgb *= vZ < ${FOOT[0].toFixed(3)} ? ${FOOT[2].toFixed(2)} : vZ < ${FOOT[1].toFixed(3)} ? ${FOOT[3].toFixed(2)} : 1.0;`,
+				diffuseColor.rgb *= 1.0 + (${FOOT[2].toFixed(2)} - 1.0) * box(vZ, -100.0, ${FOOT[0].toFixed(3)}, az) + (${FOOT[3].toFixed(2)} - 1.0) * box(vZ, ${FOOT[0].toFixed(3)}, ${FOOT[1].toFixed(3)}, az);`,
 			)
 	}
 	return material
