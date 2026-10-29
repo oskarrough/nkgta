@@ -6,6 +6,7 @@
 // A song can belong to a street or a kind of place (`at doener`, `at feld`);
 // sources there mostly play its songs. A big open field plays too, softly, from
 // all round you.
+import { shuffled } from './random.js'
 import { compile, parse } from 'jukebox/score'
 import { AHEAD, HEAR, KINDS, begin, end, feed, reach, shape as soundAt, synthFor, tune } from 'jukebox/player'
 import { SONGS } from 'jukebox/songs'
@@ -167,11 +168,7 @@ const STATIONS = [
 // The pool in a fresh random order that doesn't open with `last`, so a song
 // never plays twice running, not even across the turn of the round.
 export function shuffle(pool, rand, last) {
-	const order = [...pool]
-	for (let i = order.length - 1; i > 0; i--) {
-		const j = Math.floor(rand() * (i + 1))
-		;[order[i], order[j]] = [order[j], order[i]]
-	}
+	const order = shuffled(pool, rand)
 	if (order.length > 1 && order[0] === last) {
 		const j = 1 + Math.floor(rand() * (order.length - 1))
 		;[order[0], order[j]] = [order[j], order[0]]
