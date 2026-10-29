@@ -549,7 +549,7 @@ function carMaterial(kind, gradient) {
 // (see models.js), plus brake lights, headlights and an ink rim on the road
 // round it. Boxes of one kind are merged, so it's one instanced mesh each.
 const MAX_CARS = 256
-const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', tyre: '#303231' }
+const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', sign: '#f2d13a', tyre: '#303231' }
 const CAR_HEADLIGHT = '#fff3c8'
 // Cars are too low for the ink pass to find their edges, so they sit on a
 // dark rim this much wider than the body, in tiles. Tyres poke out past it.

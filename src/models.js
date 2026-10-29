@@ -100,6 +100,136 @@ export const MODELS = {
 			['glass', 0.08, 1, 0.025, -0.46, 0.3], // wing
 		],
 	},
+	golf: {
+		name: 'Golf',
+		noun: 'Golf',
+		pace: 1.05,
+		driver: { a: 0.8, b: 1.1, T: 1.1, s0: 0.6 },
+		length: 1.45,
+		width: 0.66,
+		mass: 1.1,
+		engine: 5.2,
+		brake: 6,
+		rolling: 0.05,
+		drag: 0.026,
+		lateral: 1.5,
+		steer: 0.6,
+		steerFade: 0.15,
+		colors: ['#e8e8e4', '#e8e8e4', '#1d1f22', '#b8bcc2', '#23365c', '#a3231f', '#6b6f75'],
+		look: [
+			// A hatchback: bonnet, glass cabin with the roof set back, a short boot.
+			['paint', 1, 0.92, 0.24, 0, 0.07],
+			['tyre', 0.2, 1.1, 0.16, 0.3, 0],
+			['tyre', 0.2, 1.1, 0.16, -0.3, 0],
+			['glass', 0.5, 0.88, 0.2, -0.08, 0.31],
+			['paint', 0.34, 0.9, 0.03, -0.1, 0.51],
+		],
+	},
+	taxi: {
+		name: 'Taxi',
+		noun: 'Taxi',
+		pace: 1.1,
+		driver: { a: 0.9, b: 1.2, T: 0.9, s0: 0.5 },
+		length: 1.6,
+		width: 0.7,
+		mass: 1.4,
+		engine: 5.5,
+		brake: 6,
+		rolling: 0.05,
+		drag: 0.026,
+		lateral: 1.5,
+		steer: 0.6,
+		steerFade: 0.15,
+		colors: ['#efe6c4'], // Mercedes ivory
+		look: [
+			// An E-Klasse saloon: long bonnet, a boot, and the sign on the roof.
+			['paint', 1, 0.92, 0.24, 0, 0.07],
+			['tyre', 0.2, 1.1, 0.16, 0.3, 0],
+			['tyre', 0.2, 1.1, 0.16, -0.3, 0],
+			['glass', 0.5, 0.88, 0.2, -0.08, 0.31],
+			['paint', 0.36, 0.9, 0.03, -0.08, 0.51],
+			['sign', 0.12, 0.4, 0.06, -0.06, 0.54],
+		],
+	},
+	sprinter: {
+		name: 'Sprinter',
+		noun: 'Transporter',
+		pace: 0.95,
+		driver: { a: 0.7, b: 1, T: 1.3, s0: 0.7 },
+		length: 2,
+		width: 0.74,
+		mass: 2.4,
+		engine: 4,
+		brake: 5,
+		rolling: 0.055,
+		drag: 0.03,
+		lateral: 1.35,
+		steer: 0.55,
+		steerFade: 0.15,
+		colors: ['#f4f3ee', '#f4f3ee', '#f4f3ee', '#b8bcc2', '#23365c', '#111214'],
+		look: [
+			// One tall slab, the cab a short step down at the front.
+			['paint', 1, 0.94, 0.4, 0, 0.08],
+			['tyre', 0.16, 1.08, 0.2, 0.32, 0],
+			['tyre', 0.16, 1.08, 0.2, -0.3, 0],
+			['glass', 0.22, 0.9, 0.12, 0.32, 0.46],
+			['paint', 0.76, 0.94, 0.08, -0.12, 0.48],
+			['roofbox', 0.5, 0.06, 0.04, -0.14, 0.56, 0.3],
+			['roofbox', 0.5, 0.06, 0.04, -0.14, 0.56, -0.3],
+		],
+	},
+	bsr: {
+		name: 'BSR-Müllwagen',
+		noun: 'Müllwagen',
+		pace: 0.8,
+		driver: { a: 0.5, b: 0.9, T: 1.4, s0: 0.8 },
+		length: 2.5,
+		width: 0.84,
+		mass: 4.5,
+		engine: 2.8,
+		brake: 4,
+		rolling: 0.055,
+		drag: 0.032,
+		lateral: 1.35,
+		steer: 0.55,
+		steerFade: 0.12,
+		colors: ['#ff6a00'], // BSR orange
+		look: [
+			// A cab at the front and a long tall box behind it with a hopper at the back.
+			['paint', 1, 0.94, 0.34, 0, 0.1],
+			['tyre', 0.1, 1.06, 0.22, 0.34, 0],
+			['tyre', 0.1, 1.06, 0.22, -0.28, 0],
+			['glass', 0.2, 0.9, 0.12, 0.38, 0.44],
+			['paint', 0.66, 0.96, 0.28, -0.14, 0.44],
+			['roofbox', 0.2, 0.7, 0.06, -0.4, 0.72],
+			['roofbox', 0.3, 0.5, 0.04, -0.1, 0.72],
+		],
+	},
+	trabi: {
+		name: 'Trabi',
+		noun: 'Trabi',
+		pace: 0.75,
+		driver: { a: 0.6, b: 1, T: 1.4, s0: 0.6 },
+		length: 1.2,
+		width: 0.6,
+		mass: 0.8,
+		engine: 3.4,
+		brake: 5,
+		rolling: 0.05,
+		drag: 0.028,
+		lateral: 1.4,
+		steer: 0.6,
+		steerFade: 0.15,
+		colors: ['#c9b98a', '#8aa0b4', '#7a9a6a', '#d8d2c0', '#b8553a'],
+		look: [
+			// A small square box, glass all round, the roof set well forward.
+			['paint', 1, 0.9, 0.22, 0, 0.07],
+			['tyre', 0.2, 1.1, 0.15, 0.3, 0],
+			['tyre', 0.2, 1.1, 0.15, -0.3, 0],
+			['glass', 0.6, 0.86, 0.2, -0.06, 0.29],
+			['paint', 0.5, 0.88, 0.03, -0.06, 0.49],
+		],
+	},
 	bus: {
 		name: 'Bus',
 		noun: 'Bus',
@@ -128,11 +258,16 @@ export const MODELS = {
 	},
 }
 
-// One in so many cars that pass is something special.
-export function pickModel(bigRoad) {
-	const r = Math.random()
-	if (bigRoad && r < 0.08) return MODELS.bus
-	if (r < 0.2) return MODELS.suv
-	if (r < 0.24) return MODELS.lambo
+// One in so many cars that pass is something special. Parked cars choose
+// the same way from their own roll, and leave out the ones that don't park.
+export function pickModel(bigRoad, r = Math.random(), parked = false) {
+	if (bigRoad && !parked && r < 0.08) return MODELS.bus
+	if (r < 0.12) return MODELS.suv
+	if (r < 0.15) return MODELS.lambo
+	if (r < 0.25) return MODELS.golf
+	if (r < 0.32) return MODELS.sprinter
+	if (r < (bigRoad ? 0.4 : 0.36)) return MODELS.taxi
+	if (r < 0.39 && !parked) return MODELS.bsr
+	if (r < 0.43) return MODELS.trabi
 	return MODELS.car
 }

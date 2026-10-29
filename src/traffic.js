@@ -118,7 +118,7 @@ export function createTraffic(world, say = () => {}) {
 		for (const spot of spots) {
 			if ((spot.car && !spot.car.gone) || (started && inView(view, spot.x, spot.y, 2))) continue
 			const r = spotHash(spot.seed, 1)
-			const model = r < 0.2 ? MODELS.suv : r < 0.23 ? MODELS.lambo : MODELS.car
+			const model = pickModel(false, r, true)
 			if (!standsClear(world, spot.x, spot.y, spot.angle, model) || occupied(spot.x, spot.y, spot.angle, model)) continue
 			const color = model.colors[Math.floor(spotHash(spot.seed, 2) * model.colors.length)]
 			spot.car = createCar({ x: spot.x, y: spot.y, angle: spot.angle, model, color })
