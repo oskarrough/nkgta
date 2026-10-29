@@ -312,7 +312,7 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car)
-	hud.update({ player, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door, action }, dt)
+	hud.update({ player, cam, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door, action }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
 	if (FPS) fpsMeter(now)
 	last = now

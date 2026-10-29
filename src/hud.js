@@ -4,6 +4,8 @@ import { bottleIcon } from './sprites.js'
 import { nearBike } from './player.js'
 import { euro } from './pfand.js'
 import { T } from './tiles.js'
+import { createMinimap } from './minimap.js'
+import './minimap.css'
 
 // What E does right now, for the HUD and the touch button.
 export function useHint(player, car) {
@@ -31,6 +33,7 @@ const STOP_DOT = { ubahn: '#115d91', bus: '#f5d000' }
 const PRIVATE_DOT = '#9d9484'
 
 export function createHud(world) {
+	const minimap = createMinimap(world)
 	// Only touch the DOM when text changes; writing it every frame costs a layout.
 	const shown = {}
 	function set(id, text) {
@@ -67,7 +70,8 @@ export function createHud(world) {
 		say: (text) => (toast = { text, t: 3 }),
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door.
-		update({ player, bag, showTransit, wasted, inside, door, action }, dt) {
+		update({ player, cam, bag, showTransit, wasted, inside, door, action }, dt) {
+			minimap(player, !!cam.third, inside)
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
 			// A door that's open already just names the shop.

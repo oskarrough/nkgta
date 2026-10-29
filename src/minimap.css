@@ -1,0 +1,19 @@
+#minimap {
+	inset: auto auto calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+	width: 192px;
+	height: 192px;
+	pointer-events: none;
+	image-rendering: pixelated;
+	filter: drop-shadow(2px 4px 0 #1a1e1b);
+}
+
+#minimap[hidden] {
+	display: none;
+}
+
+body.touch #minimap {
+	top: calc(4.5rem + env(safe-area-inset-top));
+	bottom: auto;
+	width: min(128px, 25dvh);
+	height: min(128px, 25dvh);
+}
