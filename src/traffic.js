@@ -66,6 +66,22 @@ export function createTraffic(world, say = () => {}) {
 		return true
 	}
 
+	// Test the actual footprints, so close diagonal/across slots still fit.
+	function occupied(x, y, angle, model) {
+		return cars.some((c) => {
+			const dx = c.x - x
+			const dy = c.y - y
+			const reach = (Math.hypot(model.length, model.width) + Math.hypot(c.model.length, c.model.width)) / 2 + 0.05
+			if (Math.hypot(dx, dy) > reach) return false
+			// A gap along either car's length or width separates the rectangles.
+			for (const axis of [angle, angle + Math.PI / 2, c.angle, c.angle + Math.PI / 2]) {
+				const span = (m, a) => (Math.abs(Math.cos(a - axis)) * m.length + Math.abs(Math.sin(a - axis)) * m.width) / 2
+				if (Math.abs(dx * Math.cos(axis) + dy * Math.sin(axis)) >= span(model, angle) + span(c.model, c.angle) + 0.05) return false
+			}
+			return true
+		})
+	}
+
 	// A spot on a random lane inside the ring, out of sight.
 	function spawn(near, ring, view) {
 		for (let tries = 0; tries < 20; tries++) {
@@ -103,7 +119,7 @@ export function createTraffic(world, say = () => {}) {
 			if ((spot.car && !spot.car.gone) || (started && inView(view, spot.x, spot.y, 2))) continue
 			const r = spotHash(spot.seed, 1)
 			const model = r < 0.2 ? MODELS.suv : r < 0.23 ? MODELS.lambo : MODELS.car
-			if (!standsClear(world, spot.x, spot.y, spot.angle, model)) continue
+			if (!standsClear(world, spot.x, spot.y, spot.angle, model) || occupied(spot.x, spot.y, spot.angle, model)) continue
 			const color = model.colors[Math.floor(spotHash(spot.seed, 2) * model.colors.length)]
 			spot.car = createCar({ x: spot.x, y: spot.y, angle: spot.angle, model, color })
 			cars.push(spot.car)

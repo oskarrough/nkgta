@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { freeRoad, follow, stopAt, pedal, moverOf, threatTime, dodge } from '../src/traffic.js'
+import { createTraffic, freeRoad, follow, stopAt, pedal, moverOf, threatTime, dodge } from '../src/traffic.js'
 import { signalPhase, waveOffset } from '../src/junctions.js'
 import { createCar, driveCar, forwardSpeed } from '../src/car.js'
 import { MODELS } from '../src/models.js'
+import { roadGraph } from '../src/roads.js'
+import { PARK, parkingSpots } from '../src/kerbs.js'
 import { T, SOLID } from '../src/tiles.js'
 
 const d = MODELS.car.driver
@@ -140,4 +142,36 @@ describe('drivers dodge you', () => {
 		const { car } = street()
 		expect(threatTime(car, you(0, 1.5, 0, 3.6))).toBe(Infinity)
 	})
+})
+
+describe('occupied parking spots', () => {
+	for (const kind of [PARK.parallel, PARK.diagonal, PARK.perpendicular]) {
+		test(`parking ${kind} never spawns into an existing car, including one you kept`, () => {
+			const world = {
+				W: 100,
+				H: 100,
+				roadNodes: [20, 50, 80, 50],
+				roads: [{ nodes: [0, 1], w: 3, oneway: 1, park: [PARK.none, kind] }],
+				tileAt: () => T.ROAD,
+			}
+			const spots = parkingSpots(roadGraph(world)[0], () => false, 4)
+			expect(spots.length).toBeGreaterThan(10)
+			const open = createTraffic(world)
+			open.update(0, { x: 50, y: 50 }, { x0: 0, y0: 0, x1: 1, y1: 1 })
+			const parked = open.cars.filter((c) => !c.ai)
+			expect(parked.length).toBeGreaterThan(10)
+			if (kind !== PARK.parallel)
+				expect(parked.some((a, i) => parked.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < 1.3))).toBe(true)
+			const traffic = createTraffic(world)
+			const blockers = spots.map((s, i) => Object.assign(createCar({ ...s, model: i % 2 ? MODELS.suv : MODELS.car }), { kept: true }))
+			traffic.cars.push(...blockers)
+			const player = { x: 50, y: 50, car: blockers[0] }
+			const view = { x0: 0, y0: 0, x1: 1, y1: 1 }
+			traffic.update(0, player, view)
+			expect(traffic.cars.filter((c) => !c.ai)).toHaveLength(blockers.length)
+			// Also when filling spots later, after the player comes back.
+			traffic.update(0, player, view)
+			expect(traffic.cars.filter((c) => !c.ai)).toHaveLength(blockers.length)
+		})
+	}
 })
