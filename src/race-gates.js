@@ -3,7 +3,7 @@
 // round badge above, big enough to read from the overhead camera and seen
 // through the houses in the chase camera. The next gate's badge is yellow
 // and pulses. The ghost is your best run as a see-through stand-in of the
-// vehicle you rode it in.
+// vehicle you rode it in; a shared race adds the sender's, in orange.
 import * as THREE from 'three'
 import { MODELS } from './models.js'
 import { postsOf } from './race.js'
@@ -14,7 +14,8 @@ const FLAG = { every: 0.32, width: 0.22, drop: 0.28 }
 const BUNTING = ['#e23b2e', '#e8c21a', '#e7e7e5', '#115d91', '#2f6b3c']
 const BADGE = { size: 1.5, next: 2.2, lift: 0.9 }
 const COLORS = { next: '#e8c21a', later: '#e7e7e5', start: '#e8c21a' }
-const GHOST = { color: '#8fe3ff', opacity: 0.5 }
+const GHOST = { color: '#8fe3ff', rival: '#ffb25c', opacity: 0.5 }
+const NAME = { width: 4, lift: 1.6 }
 
 const badges = new Map()
 function badge(text, state) {
@@ -39,6 +40,29 @@ function badge(text, state) {
 	texture.colorSpace = THREE.SRGBColorSpace
 	const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true })
 	badges.set(key, material)
+	return material
+}
+
+const tags = new Map()
+function nameTag(name) {
+	if (tags.has(name)) return tags.get(name)
+	const canvas = document.createElement('canvas')
+	canvas.width = 512
+	canvas.height = 128
+	const g = canvas.getContext('2d')
+	g.font = `900 64px ${POSTER_FONT}`
+	g.textAlign = 'center'
+	g.textBaseline = 'middle'
+	g.lineJoin = 'round'
+	g.lineWidth = 16
+	g.strokeStyle = INK
+	g.strokeText(name, 256, 68, 490)
+	g.fillStyle = '#ffb25c'
+	g.fillText(name, 256, 68, 490)
+	const texture = new THREE.CanvasTexture(canvas)
+	texture.colorSpace = THREE.SRGBColorSpace
+	const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true })
+	tags.set(name, material)
 	return material
 }
 
@@ -130,34 +154,59 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		items = []
 	}
 
-	// The ghost: one see-through box shape per kind of vehicle, swapped as needed.
-	const ghostMaterial = new THREE.MeshBasicMaterial({ color: GHOST.color, transparent: true, opacity: GHOST.opacity, depthWrite: false })
-	const ghost = new THREE.Group()
-	ghost.visible = false
-	root.add(ghost)
-	let ghostKind = null
-	function ghostShape(kind) {
-		ghost.clear()
-		const add = (l, w, h, x = 0, z = 0) => {
-			const mesh = new THREE.Mesh(box, ghostMaterial)
-			mesh.scale.set(l, w, h)
-			mesh.position.set(x, 0, z + h / 2)
-			ghost.add(mesh)
+	// A ghost: one see-through box shape per kind of vehicle, swapped as needed.
+	// Yours is pale blue; a shared race's rival is orange, with their name above.
+	function createGhost(color, named) {
+		const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: GHOST.opacity, depthWrite: false })
+		const group = new THREE.Group()
+		group.visible = false
+		root.add(group)
+		const body = new THREE.Group()
+		group.add(body)
+		let label = null
+		let kind = null
+		let shownName = null
+		function shape(vehicle) {
+			body.clear()
+			const add = (l, w, h, x = 0, z = 0) => {
+				const mesh = new THREE.Mesh(box, material)
+				mesh.scale.set(l, w, h)
+				mesh.position.set(x, 0, z + h / 2)
+				body.add(mesh)
+			}
+			const model = MODELS[vehicle]
+			if (model) {
+				add(model.length, model.width, 0.3, 0, 0.06)
+				add(model.length * 0.55, model.width * 0.85, 0.2, -model.length * 0.08, 0.36)
+			} else if (vehicle === 'bike') {
+				add(0.62, 0.1, 0.32, 0, 0.05)
+				add(0.18, 0.22, 0.42, -0.05, 0.37)
+				add(0.14, 0.14, 0.14, -0.02, 0.8)
+			} else {
+				add(0.22, 0.3, 0.5, 0, 0)
+				add(0.16, 0.16, 0.16, 0, 0.52)
+			}
+			kind = vehicle
 		}
-		const model = MODELS[kind]
-		if (model) {
-			add(model.length, model.width, 0.3, 0, 0.06)
-			add(model.length * 0.55, model.width * 0.85, 0.2, -model.length * 0.08, 0.36)
-		} else if (kind === 'bike') {
-			add(0.62, 0.1, 0.32, 0, 0.05)
-			add(0.18, 0.22, 0.42, -0.05, 0.37)
-			add(0.14, 0.14, 0.14, -0.02, 0.8)
-		} else {
-			add(0.22, 0.3, 0.5, 0, 0)
-			add(0.16, 0.16, 0.16, 0, 0.52)
+		return (pose, name) => {
+			group.visible = !!pose
+			if (!pose) return
+			if (pose.vehicle !== kind) shape(pose.vehicle)
+			if (named && name !== shownName) {
+				shownName = name
+				if (label) group.remove(label)
+				label = new THREE.Sprite(nameTag(name))
+				label.renderOrder = 10
+				label.scale.set(NAME.width, NAME.width / 4, 1)
+				label.position.set(0, 0, NAME.lift)
+				group.add(label)
+			}
+			group.position.set(pose.x, -pose.y, heightAt(pose.x, pose.y))
+			group.rotation.z = -pose.angle
 		}
-		ghostKind = kind
 	}
+	const showGhost = createGhost(GHOST.color, false)
+	const showRival = createGhost(GHOST.rival, true)
 
 	let pulse = 0
 	return {
@@ -170,14 +219,10 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 				items = gates.map((g) => build(g.gate, g.label, g.state))
 			}
 		},
-		// The ghost's pose, { x, y, angle, vehicle }, or null to hide it.
-		ghost(pose) {
-			ghost.visible = !!pose
-			if (!pose) return
-			if (pose.vehicle !== ghostKind) ghostShape(pose.vehicle)
-			ghost.position.set(pose.x, -pose.y, heightAt(pose.x, pose.y))
-			ghost.rotation.z = -pose.angle
-		},
+		// Poses, { x, y, angle, vehicle }, or null to hide: yours, and the
+		// rival's of a shared race, tagged with their name.
+		ghost: showGhost,
+		rival: showRival,
 		update(dt, hidden) {
 			root.visible = !hidden
 			pulse += dt

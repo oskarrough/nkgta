@@ -2,13 +2,16 @@
 // (or calls off a run), Q puts you back at the start in the same vehicle for
 // another go. Riding into any race's first gate starts it too: you're set
 // down just behind the line, held for 3-2-1, then the clock runs until the
-// last gate. The city carries on round you the whole time.
+// last gate. The city carries on round you the whole time. A race can be
+// shared as a link with your best ghost; opening one adds the race to the
+// list, with the sender's ghost to beat next to yours, and starts it.
 import { MODELS } from './models.js'
 import { SOLID } from './tiles.js'
 import { crossing, ghostAt, letter, loadRaces, makeGate, saveRaces, startRun, stepRun, submit } from './race.js'
 import { createRaceGates } from './race-gates.js'
 import { createRaceHud } from './race-hud.js'
 import { createRaceList } from './race-list.js'
+import { cleanName, nickname, raceFromHash, shareLink } from './race-share.js'
 
 const COUNTDOWN = 3 // seconds
 const TELEPORT = 6 // tiles in a frame: a respawn, not a ride through a gate
@@ -21,6 +24,38 @@ const storage = (() => {
 	}
 })()
 
+const NAME_KEY = 'nk-name'
+let nameNow = null // the player's name on shared ghosts: set once, a Kiez nickname until then
+const myName = () => {
+	if (!nameNow) {
+		nameNow = cleanName(storage.getItem(NAME_KEY))
+		if (!nameNow) setName(nickname())
+	}
+	return nameNow
+}
+function setName(name) {
+	nameNow = cleanName(name) || nameNow || nickname()
+	try {
+		storage.setItem(NAME_KEY, nameNow)
+	} catch {
+		// The name lasts until the tab closes.
+	}
+}
+
+async function copy(text) {
+	try {
+		await navigator.clipboard.writeText(text)
+		return true
+	} catch {
+		const field = Object.assign(document.createElement('textarea'), { value: text })
+		document.body.append(field)
+		field.select()
+		const ok = document.execCommand('copy')
+		field.remove()
+		return ok
+	}
+}
+
 export function createRacing({ world, player, scene, gradient, area, say, snapCamera }) {
 	const races = loadRaces(storage, area)
 	const gates3d = createRaceGates(scene, gradient, world.heightAt)
@@ -32,12 +67,14 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 	let start = null // where a run starts: { x, y, angle, vehicle, car }
 	let result = null
 
-	const hud = createRaceHud({ placeGate, finish, restart })
+	const hud = createRaceHud({ placeGate, finish, restart, share: () => race && share(race) })
 	const list = createRaceList({
 		world,
 		player,
 		races: () => races,
 		start: (r) => begin(r),
+		share,
+		name: { get: myName, set: setName },
 		create() {
 			// A new race from the list, even from the middle of a run.
 			if (phase === 'countdown' || phase === 'running') phase = 'idle'
@@ -53,6 +90,37 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			}
 		},
 	})
+	// Copies a link to the race with your best ghost, as far as it fits.
+	async function share(r) {
+		const { url, ghost } = shareLink(r, myName(), location.origin + location.pathname + location.search)
+		const copied = await copy(url)
+		if (!copied) return void prompt('Link zum Teilen', url)
+		say(
+			!r.best
+				? 'Link kopiert: nur die Tore, noch keine Zeit'
+				: ghost
+					? 'Link kopiert, mit deinem Geist'
+					: 'Link kopiert, ohne Geist: zu lang',
+		)
+	}
+
+	// A race from a link: added to the list (or, if you have it, given a new
+	// rival) and started.
+	function receive(shared) {
+		let r = races.find((x) => x.id === shared.id)
+		if (!r) races.push((r = { id: shared.id, gates: shared.gates, times: [], best: null }))
+		if (shared.rival) r.rival = shared.rival
+		save()
+		const from = shared.rival?.name
+		say(
+			!shared.rival
+				? 'Rennen geladen'
+				: shared.rival.ghost
+					? `Rennen von ${from}: schlag den Geist`
+					: `Rennen von ${from}, ohne Geist: zu lang`,
+		)
+		begin(r)
+	}
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
 	const save = () => saveRaces(storage, area, races)
 
@@ -164,6 +232,16 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		return races.map((r) => ({ gate: r.gates[0], label: letter(0), state: 'start' }))
 	}
 
+	// A link opened here, or pasted into a tab that's already playing.
+	function openLink() {
+		if (!location.hash.startsWith('#race=')) return
+		const shared = raceFromHash(location.hash)
+		history.replaceState(null, '', location.pathname + location.search)
+		if (shared) receive(shared)
+	}
+	openLink()
+	addEventListener('hashchange', openLink)
+
 	return {
 		placeGate,
 		finish,
@@ -193,7 +271,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 					const previous = race.best?.time
 					const { place, best } = submit(race, run)
 					save()
-					result = { time: run.t, best, place, times: race.times, previous }
+					result = { time: run.t, best, place, times: race.times, previous, rival: race.rival }
 					hud.result(result)
 					phase = 'done'
 				}
@@ -202,11 +280,10 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 				const next = races.find((r) => crosses(r.gates[0], from, to))
 				if (next) begin(next)
 			}
-			const ghost =
-				race?.best?.ghost && (phase === 'running' || phase === 'countdown')
-					? ghostAt(race.best.ghost, phase === 'running' ? run.t : 0)
-					: null
-			gates3d.ghost(ghost)
+			const riding = phase === 'running' || phase === 'countdown'
+			const at = phase === 'running' ? run.t : 0
+			gates3d.ghost(race?.best?.ghost && riding ? ghostAt(race.best.ghost, at) : null)
+			gates3d.rival(race?.rival?.ghost && riding ? ghostAt(race.rival.ghost, at) : null, race?.rival?.name || 'Geist')
 			gates3d.show(shownGates())
 			gates3d.update(dt, inside)
 			hud.update(view(), dt)

@@ -12,14 +12,14 @@ import { sound } from './sound.js'
 
 const SPLIT = 2.5 // seconds a split stays up
 const SHOWN = 6 // places on the finish card
-const CARD = 10 // seconds the finish card stays up
+const CARD = 15 // seconds the finish card stays up
 
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
 const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
 const vehicleTag = (v) =>
 	`<img class="icon" src="/icons/${vehicleIcon(v)}.png" alt="${vehicleName(v)}" title="${vehicleName(v)}">${MODELS[v] && v !== 'car' ? `<small>${vehicleName(v)}</small>` : ''}`
 
-export function createRaceHud({ placeGate, finish, restart }) {
+export function createRaceHud({ placeGate, finish, restart, share }) {
 	const el = document.createElement('div')
 	el.id = 'race'
 	el.innerHTML = `
@@ -47,6 +47,12 @@ export function createRaceHud({ placeGate, finish, restart }) {
 		e.stopPropagation()
 		sound.start()
 		;(nextStep.dataset.step === 'finish' ? finish : placeGate)()
+	})
+	card.addEventListener('pointerdown', (e) => {
+		if (!e.target.closest('.share')) return
+		e.preventDefault()
+		e.stopPropagation()
+		share()
 	})
 	const buttons = { gate: $('.gate'), finish: $('.finish'), restart: $('.restart') }
 	const press = { gate: placeGate, finish, restart }
@@ -143,7 +149,7 @@ export function createRaceHud({ placeGate, finish, restart }) {
 		},
 
 		// Over the line: the time, and where it landed among the race's times.
-		result({ time: t, best, place, times, previous }) {
+		result({ time: t, best, place, times, previous, rival }) {
 			const rows = times
 				.slice(0, SHOWN)
 				.map(
@@ -152,7 +158,10 @@ export function createRaceHud({ placeGate, finish, restart }) {
 				)
 				.join('')
 			const head = best ? '<em class="best">Bestzeit!</em>' : `<em class="behind">${gap(t - previous)}</em>`
-			card.innerHTML = `<b class="final">${clock(t)}</b>${head}<ol>${rows}</ol><p><img class="icon" src="/icons/race-restart.png" alt="Nochmal"><kbd>Q</kbd></p>`
+			const vs = !rival
+				? ''
+				: `<small class="vs ${t < rival.time ? 'ahead' : 'behind'}">${t < rival.time ? 'Schneller' : 'Langsamer'} als ${rival.name || 'der Geist'}: ${gap(t - rival.time)}</small>`
+			card.innerHTML = `<b class="final">${clock(t)}</b>${head}${vs}<ol>${rows}</ol><button type="button" class="share">${rival && t < rival.time ? 'Link zurückschicken' : 'Link teilen'}</button><p><img class="icon" src="/icons/race-restart.png" alt="Nochmal"><kbd>Q</kbd></p>`
 			card.hidden = false
 			cardFor = CARD
 			chime(best ? [880, 1109, 1319, 1760] : [880, 1109, 1319])

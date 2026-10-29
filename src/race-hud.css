@@ -452,3 +452,50 @@ body.touch #races .how {
 	color: inherit;
 	font: inherit;
 }
+
+/* Sharing: the finish card's link button, a rival's gap, the list's share and name. */
+#race .card .share {
+	display: block;
+	width: auto;
+	height: auto;
+	margin: 0.5rem auto 0;
+	padding: 0.35rem 0.8rem;
+	border: 2px solid var(--yellow);
+	border-radius: 0.8rem;
+	background: rgba(232, 194, 26, 0.25);
+	color: var(--cream);
+	font:
+		800 0.85rem / 1 system-ui,
+		sans-serif;
+	cursor: pointer;
+	pointer-events: auto;
+}
+#race .card .vs {
+	display: block;
+	margin-bottom: 0.4rem;
+	font-weight: 800;
+}
+#race .card .vs.ahead {
+	color: var(--ahead);
+}
+#race .card .vs.behind {
+	color: var(--behind);
+}
+#races .name {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 0.7rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+}
+#races .name input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.3rem 0.5rem;
+	border: 2px solid rgba(255, 255, 255, 0.4);
+	border-radius: 0.6rem;
+	background: rgba(0, 0, 0, 0.35);
+	color: #e7e7e5;
+	font: inherit;
+}

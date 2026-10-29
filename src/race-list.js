@@ -10,7 +10,7 @@ import { clock } from './race.js'
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
 const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
 
-export function createRaceList({ world, player, races, start, remove, create }) {
+export function createRaceList({ world, player, races, start, remove, create, share, name }) {
 	const el = document.createElement('div')
 	el.id = 'races'
 	el.className = 'panel'
@@ -37,9 +37,10 @@ export function createRaceList({ world, player, races, start, remove, create }) 
 					? `<img class="icon" src="/icons/${vehicleIcon(r.best.vehicle)}.png" alt="${vehicleName(r.best.vehicle)}" title="${vehicleName(r.best.vehicle)}"><b>${clock(r.best.time)}</b>`
 					: '<b class="none">–</b>'
 				return `<li>
-					<span class="route"><strong>${route(r, i)}</strong><small>${r.gates.length} Tore · ${away(r.gates[0])}</small></span>
+					<span class="route"><strong>${route(r, i)}</strong><small>${r.gates.length} Tore · ${away(r.gates[0])}${r.rival ? ` · ${r.rival.name || 'Geist'} ${clock(r.rival.time)}` : ''}</small></span>
 					<span class="best">${best}</span>
 					<button type="button" class="go" data-i="${i}" title="Zum Start">Los</button>
+					<button type="button" class="share" data-i="${i}" title="Link teilen, mit deinem Geist" aria-label="Link teilen">Teilen</button>
 					<button type="button" class="del ${armed === r ? 'armed' : ''}" data-i="${i}" title="Löschen" aria-label="Löschen">${armed === r ? 'Weg?' : '✕'}</button>
 				</li>`
 			})
@@ -48,6 +49,7 @@ export function createRaceList({ world, player, races, start, remove, create }) 
 			<h2><img class="icon" src="/icons/race-finish.png" alt="">Rennen</h2>
 			${rows ? `<ol>${rows}</ol>` : '<p class="empty">Noch keine Rennen hier.</p>'}
 			<button type="button" class="new"><img class="icon" src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>
+			<label class="name">Dein Name auf geteilten Geistern <input maxlength="24" value="${name.get()}" spellcheck="false" autocomplete="off"></label>
 			<p class="how"><span><kbd>G</kbd> Tor setzen, wo du stehst</span><span><kbd>F</kbd> letztes Tor ist das Ziel, los</span><span><kbd>Q</kbd> nochmal von vorn</span></p>`
 	}
 
@@ -65,6 +67,8 @@ export function createRaceList({ world, player, races, start, remove, create }) 
 		if (button.classList.contains('new')) {
 			close()
 			create()
+		} else if (button.classList.contains('share') && r) {
+			share(r)
 		} else if (button.classList.contains('go') && r) {
 			close()
 			start(r)
@@ -76,6 +80,14 @@ export function createRaceList({ world, player, races, start, remove, create }) 
 			render()
 		}
 	})
+	// Typing a name is not playing: keys stop at the box.
+	el.addEventListener('change', (e) => {
+		if (e.target.matches('.name input')) {
+			name.set(e.target.value)
+			e.target.value = name.get()
+		}
+	})
+	for (const type of ['keydown', 'keyup']) el.addEventListener(type, (e) => e.target.matches('input') && e.stopPropagation())
 	addEventListener('pointerdown', (e) => {
 		if (!el.hidden && !e.target.closest('#races, #menu')) close()
 	})
@@ -84,6 +96,7 @@ export function createRaceList({ world, player, races, start, remove, create }) 
 		'keydown',
 		(e) => {
 			if (el.hidden) return
+			if (e.target.matches?.('input')) return
 			e.stopImmediatePropagation()
 			if (e.key === 'Escape') close()
 			else if (e.key.toLowerCase() === 'g') {
