@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>NK GTA · Hof</title>
+		<style>
+			:root {
+				--ink: #1b1814;
+				--paper: #f2ead7;
+				--paper2: #e7dcc3;
+				--red: #b8352c;
+				--mustard: #d9a326;
+				--blue: #2f4f7a;
+				--soft: #6d6253;
+			}
+			body {
+				margin: 0;
+				background: var(--paper);
+				color: var(--ink);
+				font:
+					14px/1.45 Inter,
+					system-ui,
+					sans-serif;
+			}
+			main {
+				max-width: 900px;
+				margin: 0 auto;
+				padding: 24px 16px;
+			}
+			h1 {
+				font-size: 27px;
+				margin: 0 0 8px;
+			}
+			p {
+				max-width: 640px;
+			}
+			canvas {
+				display: block;
+				width: 100%;
+				aspect-ratio: 660 / 300;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				touch-action: none;
+			}
+			.controls {
+				display: flex;
+				gap: 12px;
+				align-items: center;
+				flex-wrap: wrap;
+				margin: 8px 0;
+			}
+			button {
+				font: inherit;
+				font-weight: 700;
+				background: var(--paper);
+				color: var(--ink);
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				padding: 5px 11px;
+				cursor: pointer;
+				box-shadow: 2px 2px 0 var(--ink);
+			}
+			button.on {
+				background: var(--mustard);
+			}
+			#out {
+				font:
+					12px ui-monospace,
+					monospace;
+				color: var(--soft);
+			}
+			.soft {
+				color: var(--soft);
+				font-size: 12px;
+			}
+			a {
+				color: var(--blue);
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>Hear the Hinterhof</h1>
+			<p>
+				Sixteen probes guess how boxed in you are and send the sound to one shared reverb by that much. Three rays to the source decide how
+				muffled it is. Move through the Durchfahrt into the courtyards and turn the Späti radio on.
+			</p>
+			<canvas id="hof"></canvas>
+			<div class="controls">
+				<button id="play">▶ Späti radio</button>
+				<span id="out"></span>
+			</div>
+			<p class="soft">
+				The game does the same from its walk grid: yards and passages echo, sound from behind buildings comes muffled.
+				<a href="./">Back to the game</a>
+			</p>
+		</main>
+		<script type="module">
+			const $ = (s) => document.querySelector(s)
+			const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+			const lerp = (a, b, t) => a + (b - a) * t
+
+			const cv = $('#hof')
+			const ctx = cv.getContext('2d')
+			const T = 15
+			const C = 44
+			const R = 20
+			const W = C * T
+			const H = R * T
+			const g = Array.from({ length: R }, () => new Uint8Array(C))
+			const fill = (x0, y0, x1, y1, v = 1) => {
+				for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (g[y] && x >= 0 && x < C) g[y][x] = v
+			}
+			// Weserstraße on top, a Berliner Block below: Vorderhaus, Seitenflügel, Quergebäude, two Höfe; a side street on the right
+			fill(0, 4, 37, 6)
+			fill(18, 4, 20, 6, 0) // Durchfahrt
+			fill(0, 7, 3, 19)
+			fill(34, 7, 37, 19)
+			fill(4, 12, 33, 13)
+			fill(25, 12, 27, 13, 0) // second Durchfahrt
+			fill(0, 18, 37, 19)
+			fill(8, 15, 11, 16) // Müllhäuschen
+			const LABELS = [
+				['Weserstraße', 8, 2],
+				['1. Hof', 12, 9.8],
+				['2. Hof', 15, 15.7],
+				['Durchfahrt', 15.6, 5.6],
+				['Seitenstr.', 38.6, 9],
+			]
+			const solid = (x, y) => (x < 0 || y < 0 || x >= C || y >= R ? 0 : g[y | 0][x | 0])
+			const src = { x: 30 * T, y: 2.4 * T }
+			const PROBES = 16
+			const RMAX = 11 * T
+			let L = { x: 10 * T, y: 2 * T }
+			let audio = null
+			let encl = 0
+			let block = 0
+
+			function ray(x, y, dx, dy, max) {
+				for (let d = 0; d < max; d += 3) if (solid((x + dx * d) / T, (y + dy * d) / T)) return d
+				return Infinity
+			}
+			function line(a, b, c, d) {
+				ctx.beginPath()
+				ctx.moveTo(a, b)
+				ctx.lineTo(c, d)
+				ctx.stroke()
+			}
+
+			cv.addEventListener('pointermove', (e) => {
+				const p = { x: (e.offsetX / cv.clientWidth) * W, y: (e.offsetY / cv.clientHeight) * H }
+				if (!solid(p.x / T, p.y / T)) L = p
+			})
+
+			function draw() {
+				const dpr = devicePixelRatio || 1
+				if (cv.width !== Math.round(cv.clientWidth * dpr)) {
+					cv.width = Math.round(cv.clientWidth * dpr)
+					cv.height = Math.round(cv.clientHeight * dpr)
+				}
+				const s = cv.width / W
+				ctx.setTransform(s, 0, 0, s, 0, 0)
+				ctx.fillStyle = '#cfc6b3'
+				ctx.fillRect(0, 0, W, H)
+				ctx.fillStyle = '#b9ad96'
+				ctx.fillRect(4 * T, 7 * T, 30 * T, 5 * T)
+				ctx.fillRect(4 * T, 14 * T, 30 * T, 4 * T)
+				for (let y = 0; y < R; y++)
+					for (let x = 0; x < C; x++)
+						if (g[y][x]) {
+							ctx.fillStyle = (x + y) % 2 ? '#c98f72' : '#c4896c'
+							ctx.fillRect(x * T, y * T, T, T)
+						}
+				ctx.strokeStyle = '#1b1814'
+				ctx.lineWidth = 1.5
+				for (let y = 0; y < R; y++)
+					for (let x = 0; x < C; x++) {
+						if (!g[y][x]) continue
+						if (!solid(x, y - 1)) line(x * T, y * T, (x + 1) * T, y * T)
+						if (!solid(x, y + 1)) line(x * T, (y + 1) * T, (x + 1) * T, (y + 1) * T)
+						if (!solid(x - 1, y)) line(x * T, y * T, x * T, (y + 1) * T)
+						if (!solid(x + 1, y)) line((x + 1) * T, y * T, (x + 1) * T, (y + 1) * T)
+					}
+				ctx.fillStyle = '#1b1814'
+				ctx.font = '700 11px Inter, system-ui, sans-serif'
+				for (const [t, x, y] of LABELS) ctx.fillText(t, x * T, y * T)
+
+				// enclosure: how many probes hit a wall, and how close
+				let sum = 0
+				for (let i = 0; i < PROBES; i++) {
+					const a = (i / PROBES) * Math.PI * 2
+					const dx = Math.cos(a)
+					const dy = Math.sin(a)
+					const d = ray(L.x, L.y, dx, dy, RMAX)
+					const hit = d !== Infinity
+					if (hit) sum += 1 - (d / RMAX) * 0.6
+					ctx.strokeStyle = hit ? 'rgba(184,53,44,.8)' : 'rgba(47,79,122,.35)'
+					ctx.lineWidth = hit ? 1.6 : 1
+					const e = hit ? d : RMAX
+					line(L.x, L.y, L.x + dx * e, L.y + dy * e)
+					if (hit) {
+						ctx.fillStyle = '#b8352c'
+						ctx.beginPath()
+						ctx.arc(L.x + dx * d, L.y + dy * d, 2.5, 0, 7)
+						ctx.fill()
+					}
+				}
+				encl = lerp(encl, sum / PROBES, 0.15)
+
+				// occlusion: three offset rays to the source
+				let blocked = 0
+				const dx = src.x - L.x
+				const dy = src.y - L.y
+				const dist = Math.hypot(dx, dy)
+				const nx = -dy / dist
+				const ny = dx / dist
+				for (const o of [-6, 0, 6]) {
+					const x0 = L.x + nx * o
+					const y0 = L.y + ny * o
+					const x1 = src.x + nx * o
+					const y1 = src.y + ny * o
+					const b = ray(x0, y0, (x1 - x0) / dist, (y1 - y0) / dist, dist) !== Infinity
+					if (b) blocked++
+					ctx.setLineDash([4, 4])
+					ctx.strokeStyle = b ? 'rgba(27,24,20,.5)' : 'rgba(47,107,60,.9)'
+					ctx.lineWidth = 1.4
+					line(x0, y0, x1, y1)
+					ctx.setLineDash([])
+				}
+				block = lerp(block, blocked / 3, 0.15)
+
+				// source and listener
+				ctx.fillStyle = '#d9a326'
+				ctx.strokeStyle = '#1b1814'
+				ctx.lineWidth = 2
+				ctx.beginPath()
+				ctx.roundRect(src.x - 9, src.y - 7, 18, 14, 3)
+				ctx.fill()
+				ctx.stroke()
+				ctx.fillStyle = '#1b1814'
+				ctx.fillText('Späti', src.x + 12, src.y + 4)
+				if (audio) {
+					const k = (performance.now() / 300) % 1
+					ctx.strokeStyle = `rgba(217,163,38,${1 - k})`
+					ctx.beginPath()
+					ctx.arc(src.x, src.y, 10 + k * 26, 0, 7)
+					ctx.stroke()
+				}
+				ctx.fillStyle = '#f1c40f'
+				ctx.beginPath()
+				ctx.arc(L.x, L.y, 6, 0, 7)
+				ctx.fill()
+				ctx.stroke()
+
+				const cutoff = Math.round(lerp(16000, 650, block))
+				$('#out').textContent =
+					`enclosure ${Math.round(encl * 100)}% → reverb send ${encl.toFixed(2)} · ` +
+					`${Math.round(block * 3)}/3 rays blocked → lowpass ${cutoff} Hz`
+				if (audio) {
+					const t = audio.ctx.currentTime
+					audio.wet.gain.setTargetAtTime(0.15 + encl * 1.6, t, 0.1)
+					audio.dry.gain.setTargetAtTime(clamp(1.3 - dist / 520, 0.15, 1) * (1 - encl * 0.35), t, 0.1)
+					audio.lp.frequency.setTargetAtTime(cutoff, t, 0.1)
+				}
+				requestAnimationFrame(draw)
+			}
+
+			function startAudio() {
+				const ac = new AudioContext()
+				const len = ac.sampleRate * 2.2
+				const ir = ac.createBuffer(2, len, ac.sampleRate)
+				for (let c = 0; c < 2; c++) {
+					const d = ir.getChannelData(c)
+					for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2) * (i < 600 ? i / 600 : 1)
+				}
+				const conv = ac.createConvolver()
+				conv.buffer = ir
+				const lp = ac.createBiquadFilter()
+				lp.type = 'lowpass'
+				lp.frequency.value = 16000
+				const dry = ac.createGain()
+				const wet = ac.createGain()
+				const master = ac.createGain()
+				master.gain.value = 0.35
+				wet.gain.value = 0.2
+				lp.connect(dry)
+				dry.connect(master)
+				lp.connect(conv)
+				conv.connect(wet)
+				wet.connect(master)
+				master.connect(ac.destination)
+
+				// a little Hicaz loop: D Eb F# G A Bb C D
+				const scale = [0, 1, 4, 5, 7, 8, 10, 12]
+				const phrase = [0, 1, 2, 3, 4, 3, 2, 1, 2, 1, 0, -1, 0, 4, 3, 2]
+				let step = 0
+				let next = ac.currentTime + 0.05
+				const timer = setInterval(() => {
+					while (next < ac.currentTime + 0.25) {
+						const n = phrase[step % phrase.length]
+						const f = 293.66 * Math.pow(2, (n < 0 ? -2 : scale[n]) / 12)
+						const o = ac.createOscillator()
+						const o2 = ac.createOscillator()
+						const e = ac.createGain()
+						o.type = 'sawtooth'
+						o2.type = 'triangle'
+						o.frequency.value = f
+						o2.frequency.value = f * 2.003
+						e.gain.setValueAtTime(0, next)
+						e.gain.linearRampToValueAtTime(0.22, next + 0.008)
+						e.gain.exponentialRampToValueAtTime(0.001, next + 0.42)
+						const tone = ac.createBiquadFilter()
+						tone.type = 'lowpass'
+						tone.frequency.value = 2400
+						o.connect(tone)
+						o2.connect(tone)
+						tone.connect(e)
+						e.connect(lp)
+						o.start(next)
+						o2.start(next)
+						o.stop(next + 0.45)
+						o2.stop(next + 0.45)
+						if (step % 4 === 0) {
+							const k = ac.createOscillator()
+							const ke = ac.createGain()
+							k.frequency.setValueAtTime(140, next)
+							k.frequency.exponentialRampToValueAtTime(45, next + 0.12)
+							ke.gain.setValueAtTime(0.5, next)
+							ke.gain.exponentialRampToValueAtTime(0.001, next + 0.2)
+							k.connect(ke)
+							ke.connect(lp)
+							k.start(next)
+							k.stop(next + 0.22)
+						}
+						if (step % 4 === 2) {
+							const b = ac.createBuffer(1, 2400, ac.sampleRate)
+							const bd = b.getChannelData(0)
+							for (let i = 0; i < 2400; i++) bd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / 2400, 4)
+							const ns = ac.createBufferSource()
+							const hp = ac.createBiquadFilter()
+							hp.type = 'highpass'
+							hp.frequency.value = 1800
+							ns.buffer = b
+							ns.connect(hp)
+							hp.connect(lp)
+							ns.start(next)
+						}
+						next += 0.19
+						step++
+					}
+				}, 60)
+				return { ctx: ac, lp, dry, wet, timer }
+			}
+
+			$('#play').onclick = () => {
+				if (audio) {
+					clearInterval(audio.timer)
+					audio.ctx.close()
+					audio = null
+				} else audio = startAudio()
+				$('#play').textContent = audio ? '■ radio off' : '▶ Späti radio'
+				$('#play').classList.toggle('on', !!audio)
+			}
+
+			requestAnimationFrame(draw)
+		</script>
+	</body>
+</html>
