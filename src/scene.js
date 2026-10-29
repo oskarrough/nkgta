@@ -451,6 +451,10 @@ export function createScene(canvas, world, shops = []) {
 		if (!cam.third) clouds.follow(view)
 		time.value = performance.now() / 1000
 		city.update(viewOf(cam), cam.scale)
+		sun.updateMatrixWorld()
+		sunTarget.updateMatrixWorld()
+		sun.shadow.updateMatrices(sun)
+		city.cull(view, sun.shadow.needsUpdate && renderer.shadowMap.enabled ? sun.shadow.getFrustum() : null)
 		ink.render(scene, view, target)
 	}
 

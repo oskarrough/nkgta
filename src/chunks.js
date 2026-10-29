@@ -120,6 +120,8 @@ export function createChunks(world, renderer, build) {
 	let crisp = false
 	let bytes = 0
 	const probe = new THREE.PerspectiveCamera() // shaders don't depend on the camera
+	const frustum = new THREE.Frustum()
+	const projection = new THREE.Matrix4()
 
 	// As one string: cloning the shapes object by object costs far more.
 	const shared = JSON.stringify({ shapes: world.shapes, buildings: world.buildings })
@@ -254,6 +256,7 @@ export function createChunks(world, renderer, build) {
 		// Bake world transforms once, then skip the whole static subtree on
 		// each render (matrixAutoUpdate alone still walks every descendant).
 		c.parts.group.updateWorldMatrix(true, true)
+		c.bounds = new THREE.Box3().setFromObject(c.parts.group)
 		c.parts.group.updateMatrixWorld = () => {}
 		// Its shaders compile now, alongside the game, rather than stalling
 		// the frame it first shows up in.
@@ -330,6 +333,15 @@ export function createChunks(world, renderer, build) {
 	return {
 		group,
 		update,
+		// Reject whole static subtrees before three walks their meshes. A
+		// chunk outside the view can still cast a shadow into it.
+		cull(camera, shadow) {
+			camera.updateMatrixWorld()
+			frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+			for (const c of chunks) {
+				if (c.parts) c.parts.group.visible = frustum.intersectsBox(c.bounds) || !!shadow?.intersectsBox(c.bounds)
+			}
+		},
 		// Resolves once the chunks in view show a texture, coarse or finer.
 		ready(view, scale) {
 			return new Promise((resolve) => {
