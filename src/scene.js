@@ -17,6 +17,7 @@ import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
 import { createFascia } from './fascia.js'
+import { createLandmarks } from './landmarks.js'
 import { HILLS } from './terrain.js'
 import { daylight, START_HOUR } from './daylight.js'
 import { STOREY } from './build-map.js'
@@ -197,6 +198,8 @@ export function createScene(canvas, world, shops = []) {
 		home: { value: 0 },
 	}
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
+	// Before the chunks and firewalls: a landmark lowers the plain block under it.
+	const landmarks = createLandmarks(world, gradient, sky)
 	const firewalls = createFirewalls(world)
 	const murals = createMurals(world, firewalls, gradient)
 	// A generator, so chunks can be built a building at a time between frames.
@@ -298,7 +301,7 @@ export function createScene(canvas, world, shops = []) {
 			},
 		}
 	})
-	scene.add(city.group)
+	scene.add(city.group, landmarks)
 	const clouds = createClouds(world, gradient)
 	scene.add(clouds.layer)
 	const cars = carMeshes(gradient, world)
