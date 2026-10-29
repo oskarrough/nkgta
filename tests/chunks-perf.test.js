@@ -193,13 +193,13 @@ test('settled idle chunk frames allocate no render resources and request no writ
 	}))
 
 // A plain canvas fill plus a fixed number of box meshes calibrates both native
-// painting and JS geometry work. The 12× ceiling allows about twice the
+// painting and JS geometry work. The 6× ceiling allows about three times the
 // initial cost; it catches large regressions, not small timing noise.
 // No absolute millisecond limit or CPU model.
 function baseline() {
 	const canvas = createCanvas(2048, 1536)
 	const context = canvas.getContext('2d')
-	for (let i = 0; i < 512; i++) {
+	for (let i = 0; i < 64; i++) {
 		context.fillStyle = i % 2 ? '#333' : '#ddd'
 		context.fillRect(0, 0, canvas.width, canvas.height)
 		const geometry = new THREE.BoxGeometry(12, 12, 6)
@@ -215,7 +215,7 @@ test('a decorated chunk builds and paints within the relative CPU budget', () =>
 		dispose(build())
 		baseline()
 		const ratios = []
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 3; i++) {
 			const start = performance.now()
 			baseline()
 			const baseMs = performance.now() - start
@@ -226,6 +226,6 @@ test('a decorated chunk builds and paints within the relative CPU budget', () =>
 			dispose(city)
 		}
 		const ratio = median(ratios)
-		console.info(`Chunk CPU budget: ${ratio.toFixed(2)}× baseline (limit 12×)`)
-		expect(ratio).toBeLessThan(12)
+		console.info(`Chunk CPU budget: ${ratio.toFixed(2)}× baseline (limit 6×)`)
+		expect(ratio).toBeLessThan(6)
 	}))
