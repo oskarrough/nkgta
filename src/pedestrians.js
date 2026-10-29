@@ -7,6 +7,7 @@ import { T, SOLID } from './tiles.js'
 import { offsetLine, pointAt } from './roads.js'
 import { LENGTH } from './car.js'
 import { pushFromTrunks } from './trees.js'
+import { createPets } from './pets.js'
 
 const PAVE = 0.55 // tiles past the kerb people walk
 const SPACING = 0.45 // tiles from one person to the next in a queue, centre to centre
@@ -40,6 +41,7 @@ let streetWorld = null
 export function createPedestrians(world, junctions) {
 	streetWorld = world
 	const people = []
+	const updatePets = createPets(world)
 	const paths = new Map() // edge → its tracks, worked out when first near
 	const junctionAt = new Map() // road node → its junction
 	const entryJunction = new Map()
@@ -129,6 +131,7 @@ export function createPedestrians(world, junctions) {
 		for (const c of crosswalks) c.busy = 0
 		walk(people, dt, (t, waited) => mayCross(t, waited, cars), next, scare)
 		if (scare) for (const p of people) keepClear(p, scare.threats, scare.ok)
+		updatePets(people, dt, cars, scare)
 		crosswalks = people.filter((p) => p.track.edge && !p.kerb).map((p) => p.track)
 		for (const c of crosswalks) c.busy++
 	}

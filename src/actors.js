@@ -5,6 +5,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { inkOutside } from './ink.js'
+import { createPetActors } from './pets.js'
 
 // What a person wears, from their seed. From above what shows is hair,
 // shoulders and the odd hat or backpack, so those vary the most. Nobody wears
@@ -256,6 +257,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	}
 
 	const people = inkOutside(new THREE.MeshToonMaterial({ gradientMap }))
+	const pets = createPetActors(root, people, standOut, heightAt)
 	// The player gets a crowd of one, to take inside a shop.
 	const you = crowd(people, 1)
 	let crowds = crowd(people, 128)
@@ -349,6 +351,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			}
 			peds.forEach((p, i) => pose(crowds, i, lookFor(p), p.x, p.y, heightAt(p.x, p.y), p.dir, p.stride ?? p.t * 12, grow, p.lie ?? 0))
 			done(crowds, peds.length)
+			pets(peds, grow, lookFor)
 
 			street.visible = !!cam.third
 			if (!cam.third) return

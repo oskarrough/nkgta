@@ -407,7 +407,7 @@ export function createTraffic(world, say = () => {}) {
 			shout: (p) => {
 				if (shouted < 3 || Math.hypot(p.x - player.x, p.y - player.y) > SHOUT_RANGE) return
 				shouted = 0
-				say(DIVE_SHOUTS[Math.floor(Math.random() * DIVE_SHOUTS.length)])
+				say(p.pet?.kind === 'dog' ? 'Wau! Wau!' : DIVE_SHOUTS[Math.floor(Math.random() * DIVE_SHOUTS.length)])
 			},
 		}
 
