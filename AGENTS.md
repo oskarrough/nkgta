@@ -44,6 +44,7 @@ Agents often work in parallel, each in its own bb worktree, with a GitHub issue 
 - Land your own work: commit, `git fetch && git rebase origin/main`, resolve any conflicts (you know your change best), `bun run check` and `bun test`, then `git push origin HEAD:main`. If the push is rejected, rebase and push again. Worktrees are plain git, not jj.
 - A failed deploy is fine; fix it forward straight away.
 - Run `bun install` first, and start your own dev server on a free port (`bunx vite --port <5300-5399> --strictPort`); :5277 belongs to the main checkout.
+- Before your final message, stop every dev server, chromium and agent-browser session you started. Leftovers from finished workers once pushed the shared machine to a load of 28 and made every perf reading worthless.
 - Stay inside your task. src/scene.js is shared by most look changes: touch as few of its lines as you can and put new things in their own module, so parallel work merges cleanly.
 - Finish with: the pushed commit, one line per change the player notices, perf before/after if it draws anything, a before/after screenshot at an absolute path if it shows on screen, and what Oskar should check by eye.
 
