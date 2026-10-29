@@ -130,7 +130,7 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			if ((mode !== 'done' || (cardFor -= dt) < 0) && !card.hidden) card.hidden = true
 		},
 
-		split({ gate, time: t, delta, finish: last }) {
+		split({ time: t, delta, finish: last }) {
 			split.textContent = delta === null ? clock(t) : gap(delta)
 			split.className = `split on ${delta === null ? '' : delta < 0 ? 'ahead' : 'behind'}`
 			splitFor = SPLIT

@@ -28,7 +28,7 @@ export const nextLook = (name) => {
 
 // One game pixel per PX_PER_TILE tiles: 3 m / 10 = 0.3 m. The upscale to the
 // screen is a whole number of device pixels, so nothing gets smoothed.
-export const PX_PER_TILE = 10
+const PX_PER_TILE = 10
 export const gameUpscale = (scale) => Math.max(1, Math.round(scale / PX_PER_TILE))
 
 // Device pixels per drawn pixel at `scale` device pixels per tile. The other

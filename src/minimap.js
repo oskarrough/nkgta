@@ -9,9 +9,9 @@ const SCALE = RADIUS / RANGE
 const INK = '#1a1e1b'
 
 // Map y points south; an actor's zero heading points east.
-export const radarRotation = (heading, chase) => (chase ? -heading - Math.PI / 2 : 0)
+const radarRotation = (heading, chase) => (chase ? -heading - Math.PI / 2 : 0)
 
-export function radarPoint(point, player, rotation) {
+function radarPoint(point, player, rotation) {
 	const x = (point.x - player.x) * SCALE
 	const y = (point.y - player.y) * SCALE
 	const k = Math.min(1, (RADIUS - 5) / (Math.hypot(x, y) || 1))

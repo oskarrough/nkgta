@@ -6,7 +6,7 @@ const SERVERS = [
 	'https://overpass.kumi.systems/api/interpreter',
 ]
 
-export function overpassQuery({ south, west, north, east }) {
+function overpassQuery({ south, west, north, east }) {
 	const b = `${south},${west},${north},${east}`
 	return `[out:json][timeout:180];
 (

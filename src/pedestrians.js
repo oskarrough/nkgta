@@ -3,7 +3,7 @@
 // whoever's ahead on it, waits at the kerb to cross, and at the end of one
 // track takes another that starts there, or turns round. After the people of
 // Slop New York, who also get out of the way: see `dodge`.
-import { T, SOLID } from './tiles.js'
+import { T } from './tiles.js'
 import { offsetLine, pointAt } from './roads.js'
 import { LENGTH } from './car.js'
 import { pushFromTrunks } from './trees.js'
@@ -32,7 +32,6 @@ const DIVE = { dist: 1.8, speed: 7 }
 const LEAP_MAX = 14 // tiles per second, fastest a person can throw themselves
 const LUNGE = 0.26 // seconds in the air for an ordinary dive
 const RISE = 0.6 // seconds to get up off the ground
-const VEHICLE = 1.5 // tiles per second: slower than this nobody needs to jump
 
 const walkable = (t) => t === T.SIDEWALK || t === T.GROUND
 

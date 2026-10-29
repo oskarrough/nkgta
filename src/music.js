@@ -158,7 +158,7 @@ export function stationPool(homes) {
 	return own.length ? own : PLACE_SCORES
 }
 // R turns the dial: the rock station, everything the Kiez plays, then off.
-export const STATIONS = [
+const STATIONS = [
 	{ name: 'Radio A100', pool: stationPool },
 	{ name: 'Kiezfunk', pool: (homes) => PLACE_SCORES.filter((n) => !stationPool(homes).includes(n)) },
 	{ name: null }, // off

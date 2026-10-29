@@ -3,7 +3,7 @@
 // every pixel to one of these, so its frame never shows a colour off the list.
 import * as THREE from 'three'
 
-export const PALETTE = [
+const PALETTE = [
 	'#1A1E1B',
 	'#303231',
 	'#493A31',
@@ -64,12 +64,6 @@ export const PALETTE_SIZE = PALETTE.length
 // pushes a pixel towards the next colour (0 is off, 1 is a whole table cell).
 export const LUT_SIZE = 32
 export const DITHER = 0
-
-export function paletteIndex(hex) {
-	const i = PALETTE.indexOf(hex.toUpperCase())
-	if (i < 0) throw new Error(`${hex} is not in the palette`)
-	return i
-}
 
 // The palette in one row, so the upscale pass can pick a colour by index.
 // Bytes are the plain sRGB values, so the texture decodes to exactly the hex.

@@ -5,7 +5,7 @@
 // best, the leaderboard, and the ghost of your best run, recorded at 10 Hz.
 
 export const GHOST_HZ = 10
-export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const WIDEST = 4 // tiles from the middle to a post, at most
 const NARROWEST = 0.8
 const KEEP = 10 // times on a race's leaderboard
@@ -77,7 +77,7 @@ export function stepRun(run, from, to, dt, pose) {
 }
 
 // A frame for every tick of the ghost's clock up to t.
-export function record(ghost, t, { x, y, angle, vehicle }) {
+function record(ghost, t, { x, y, angle, vehicle }) {
 	while (ghost.frames.length <= t * ghost.hz) ghost.frames.push([round(x), round(y), round(angle, 3), vehicle])
 }
 

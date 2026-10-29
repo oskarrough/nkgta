@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { roofHash, roofOf } from './map-image.js'
+import { roofOf } from './map-image.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { pulse } from './scene-shader.js'
 

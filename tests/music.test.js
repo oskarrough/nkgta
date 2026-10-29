@@ -159,7 +159,7 @@ describe('songs belong to kinds of places', () => {
 	test('döner shops mostly play the döner song, cafés the café song, Spätis anything', () => {
 		const shops = Array.from({ length: 1800 }, (_, i) => ({ kind: ['doener', 'cafe', 'spaeti'][i % 3], x: i, y: 0 }))
 		const sources = placeSources({ buildings: [] }, shops, homes)
-		const at = (kind) => sources.filter((s, i) => shops.find((shop) => shop.x === s.x).kind === kind).map((s) => s.score)
+		const at = (kind) => sources.filter((s) => shops.find((shop) => shop.x === s.x).kind === kind).map((s) => s.score)
 		expect(share(at('doener'), 'wriezener')).toBeGreaterThan(0.6)
 		expect(share(at('doener'), 'wriezener')).toBeLessThan(0.85)
 		expect(share(at('cafe'), 'hasenheide')).toBeGreaterThan(0.6)

@@ -37,7 +37,7 @@ const SPAETI_BAG = '#eeeeea'
 
 // Fair hair, so from above the player is yellow from head to shoulders, and
 // a dark backpack, so from above you can tell their back from their front.
-export const PLAYER_LOOK = {
+const PLAYER_LOOK = {
 	skin: '#d5a17b',
 	hair: '#e3bd5c',
 	hairStyle: 'short',
