@@ -121,6 +121,8 @@ const actions = {
 		camera.toggle(player)
 	},
 	use,
+	choose: (i) => visit.choose(i),
+	shiftChoice: (n) => visit.shiftChoice(n),
 	toggleMute,
 	zoom: camera.zoomBy,
 	toggleStreetNames: () => (showStreetNames = !showStreetNames),

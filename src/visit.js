@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
 import { shopAt } from './shops.js'
+import { createDoener } from './doener.js'
 
 const RADIUS = 1.25 // half-height of the open tear, tiles
 const TILT = (60 * Math.PI) / 180 // leaning back against the wall, from upright, so the camera sees it
@@ -22,6 +23,7 @@ const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
 export function createVisit({ city3d, shops, player, pfand, say, heightAt = () => 0 }) {
 	const interior = createInterior(city3d.gradient)
+	const doener = createDoener(pfand.bag, say)
 	const portal = createPortal(city3d.renderer, {
 		radius: RADIUS,
 		up: Z,
@@ -119,6 +121,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		// Once the tear has swallowed most of the view, the street's markers go.
 		indoors: () => inside || (!!warp && warp.t > 0.4),
 		shop: () => (inside ? shop : null),
+		choose: doener.choose,
+		shiftChoice: (n) => doener.shift(n),
 		// The shop's room while you're in it, for the player to stand in.
 		room: () => (inside ? interior.scene : null),
 		// The world the player moves in.
@@ -144,6 +148,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		use() {
 			if (warp) return true
 			if (inside) {
+				if (doener.use()) return true
 				startWarp()
 				return true
 			}
@@ -157,6 +162,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 
 		update(dt, axis) {
 			if (warp) {
+				doener.update(false)
 				warp.t += dt / WARP
 				const k = Math.min(1, warp.t)
 				// Drawn to the tear's foot, and the tear swells past the screen edges.
@@ -174,6 +180,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			}
 			const pushing = (n) => -(axis.x * n.x + axis.y * n.y) > 0.3
 			if (inside) {
+				doener.update(shop.kind === 'doener' && interior.atCounter(player.x, player.y))
 				const out = pushing({ x: DOOR.nx, y: DOOR.ny })
 				if (!out) armed = true
 				// Anywhere from just in front of the door to flat against it.
@@ -218,6 +225,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		hint() {
 			if (warp) return ''
 			if (inside) {
+				if (doener.active()) return ''
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) return pfand.bag.bottles ? '' : 'Pfand? Erst sammeln.'
 				return 'E: raus auf die Straße'
 			}

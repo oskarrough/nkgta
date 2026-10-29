@@ -13,6 +13,8 @@ const Y = 3
 const START = 9
 const UP = 12
 const DOWN = 13
+const LEFT = 14
+const RIGHT = 15
 const GAS = 7
 const BRAKE = 6
 
@@ -91,6 +93,8 @@ export function createGamepad(actions, blocked = () => false) {
 		if (fired(START)) actions.toggleMenu()
 		if (blocked()) return null
 		if (fired(A)) actions.use()
+		if (fired(LEFT)) actions.shiftChoice(-1)
+		if (fired(RIGHT)) actions.shiftChoice(1)
 		if (fired(X)) actions.toggleCamera()
 		if (fired(Y)) actions.nextStation()
 		if (fired(UP)) actions.zoom(1.25)

@@ -100,6 +100,19 @@ export function createInterior(gradient) {
 	at(item)
 	// The till.
 	at(new THREE.Mesh(box(7.4, 2.45, 8.1, 2.95, 0.62), toon('#363B44')))
+	// A clerk behind the counter in Dönerläden.
+	const clerk = new THREE.Group()
+	const clerkPart = (geometry, color, x, y, z) => {
+		const mesh = new THREE.Mesh(geometry, toon(color))
+		mesh.position.set(x, y, z)
+		mesh.castShadow = true
+		clerk.add(mesh)
+	}
+	clerkPart(new THREE.CylinderGeometry(0.32, 0.25, 0.8, 8), '#f3eee0', 6, -2.2, 0.7)
+	clerkPart(new THREE.SphereGeometry(0.26, 8, 6), '#a8734f', 6, -2.2, 1.34)
+	clerkPart(new THREE.SphereGeometry(0.27, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#292321', 6, -2.2, 1.43)
+	clerk.visible = false
+	scene.add(clerk)
 	// Lit glass down the fridge fronts.
 	at(new THREE.Mesh(box(WALL + 0.8, 2.1, WALL + 0.86, 6.3, 1.1), new THREE.MeshBasicMaterial({ color: '#B4C1D0' })), false)
 
@@ -133,6 +146,7 @@ export function createInterior(gradient) {
 	scene.add(lamp, lamp.target)
 
 	function setShop(shop) {
+		clerk.visible = shop.kind === 'doener'
 		const g = poster.getContext('2d')
 		const { width: w, height: h } = poster
 		g.fillStyle = BOARDS[shop.kind] ?? '#3D5E82'

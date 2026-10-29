@@ -25,6 +25,7 @@ export function createInput(actions) {
 		keys.add(key)
 		sound.start()
 		if (e.repeat) return
+		if (key === '1' || key === '2' || key === '3') actions.choose(Number(key) - 1)
 		if (key === 'v') actions.toggleCamera()
 		if (key === 'l') actions.toggleMute()
 		if (key === 'e' || key === 'Enter') actions.use()

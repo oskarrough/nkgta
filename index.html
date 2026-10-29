@@ -65,6 +65,56 @@
 				background: var(--bottle) center / contain no-repeat;
 				vertical-align: -0.15em;
 			}
+			#doener-carried {
+				top: calc(5.5rem + env(safe-area-inset-top));
+				right: calc(1.5rem + env(safe-area-inset-right));
+				font-size: 1.2rem;
+			}
+			#doener-dialog {
+				position: fixed;
+				left: 50%;
+				bottom: calc(5.5rem + env(safe-area-inset-bottom));
+				transform: translateX(-50%);
+				z-index: 12;
+				width: min(28rem, calc(100vw - 2rem));
+				box-sizing: border-box;
+				padding: 0.8rem;
+				border: 3px solid #f3d99a;
+				border-radius: 0.7rem;
+				background: #332923ed;
+				box-shadow: 0 4px 0 #17130f;
+				text-align: center;
+			}
+			#doener-dialog[hidden] {
+				display: none;
+			}
+			#doener-dialog .question {
+				font-size: 1.3rem;
+				font-weight: 800;
+				margin-bottom: 0.7rem;
+			}
+			#doener-dialog .choices {
+				display: flex;
+				flex-wrap: wrap;
+				justify-content: center;
+				gap: 0.4rem;
+			}
+			#doener-dialog button {
+				border: 2px solid #f3d99a;
+				border-radius: 0.35rem;
+				background: #634433;
+				color: white;
+				padding: 0.6rem;
+				font:
+					700 0.95rem system-ui,
+					sans-serif;
+			}
+			#doener-dialog button.selected {
+				background: #b5603f;
+			}
+			body.touch #doener-dialog {
+				bottom: calc(11rem + env(safe-area-inset-bottom));
+			}
 			#sound {
 				position: fixed;
 				top: calc(6rem + env(safe-area-inset-top));
@@ -429,7 +479,12 @@
 		<div class="hud" id="street"></div>
 		<div class="hud" id="money"></div>
 		<div class="hud" id="bag"></div>
+		<div class="hud" id="doener-carried"></div>
 		<div class="hud" id="place"></div>
+		<div id="doener-dialog" hidden>
+			<div class="question"></div>
+			<div class="choices"></div>
+		</div>
 		<div class="hud" id="use" hidden><img class="icon" src="/icons/key-e.png" alt="E" /><img class="icon" id="use-act" alt="" /></div>
 		<div class="hud" id="wasted"></div>
 		<div id="sound">
