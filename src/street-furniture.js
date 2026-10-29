@@ -129,6 +129,7 @@ export function createFurniture(world, gradient, chunk, night) {
 	].filter(Boolean)
 	const poller = place(k.bollard, k.poller, bollards)
 	return {
+		lamps,
 		meshes: [...lampMeshes, poller].filter(Boolean),
 		zoom(scale) {
 			for (const mesh of lampMeshes) mesh.visible = scale >= SHOW.lamps

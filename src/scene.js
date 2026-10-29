@@ -415,7 +415,6 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 	return createChunks(world, renderer, function* (chunk) {
 		const group = new THREE.Group()
 		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
-		weather.ground(plane.material, chunk)
 		plane.receiveShadow = true
 		Object.assign(plane.material.uniforms, { time, sun: sky.sun, shade: sky.shade, deck: sky.deck, toSun: sky.toSun })
 		group.add(plane)
@@ -485,6 +484,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const pools = createNightPools(world, chunk, shops, sky.night)
 		if (pools) group.add(pools)
 		const furniture = createFurniture(world, gradient, chunk, sky.night)
+		weather.ground(plane.material, chunk, furniture.lamps)
 		for (const mesh of furniture.meshes) group.add(mesh)
 		const uv = plane.geometry.attributes.uv
 		return {
