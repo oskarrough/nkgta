@@ -8,6 +8,7 @@ import { SOLID } from './tiles.js'
 import { crossing, ghostAt, letter, loadRaces, makeGate, saveRaces, startRun, stepRun, submit } from './race.js'
 import { createRaceGates } from './race-gates.js'
 import { createRaceHud } from './race-hud.js'
+import { createRaceList } from './race-list.js'
 
 const COUNTDOWN = 3 // seconds
 const TELEPORT = 6 // tiles in a frame: a respawn, not a ride through a gate
@@ -32,6 +33,26 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 	let result = null
 
 	const hud = createRaceHud({ placeGate, finish, restart })
+	const list = createRaceList({
+		world,
+		player,
+		races: () => races,
+		start: (r) => begin(r),
+		create() {
+			// A new race from the list, even from the middle of a run.
+			if (phase === 'countdown' || phase === 'running') phase = 'idle'
+			placeGate()
+		},
+		remove(r) {
+			races.splice(races.indexOf(r), 1)
+			save()
+			if (race === r) {
+				race = null
+				run = null
+				phase = 'idle'
+			}
+		},
+	})
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
 	const save = () => saveRaces(storage, area, races)
 
@@ -57,6 +78,8 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 				save()
 				say(`Rennen gespeichert: ${draft.length} Tore`)
 				hud.saved()
+				// Straight onto the start line, to ride what you just made.
+				begin(race)
 			}
 			draft = null
 		} else if (phase === 'countdown' || phase === 'running' || phase === 'done') {
@@ -123,7 +146,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			next: run?.next ?? 0,
 			t: run?.t ?? 0,
 			count,
-			canFinish: !!draft || phase !== 'idle',
+			canFinish: !draft && phase !== 'idle',
 			canRestart: !draft && !!race,
 		}
 	}
@@ -145,6 +168,9 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		placeGate,
 		finish,
 		restart,
+		// The panel of saved races, from the menu.
+		openList: list.open,
+		listOpen: list.isOpen,
 		// Called going down, so a run doesn't carry on from under a car.
 		abort() {
 			if (phase === 'countdown' || phase === 'running') phase = 'done'

@@ -24,7 +24,7 @@ export function createRaceHud({ placeGate, finish, restart }) {
 	el.id = 'race'
 	el.innerHTML = `
 		<div class="corner">
-		<div class="watch" hidden><div class="gates"></div><b class="time"></b><span class="split"></span></div>
+		<div class="watch" hidden><div class="gates"></div><b class="time"></b><span class="split"></span><button type="button" class="next-step"></button></div>
 		<div class="race-buttons">
 			<button type="button" class="restart" aria-label="Neustart (Q)" title="Neustart (Q)"><img class="icon" src="/icons/race-restart.png" alt=""><kbd>Q</kbd></button>
 			<button type="button" class="finish" aria-label="Rennen fertig (F)" title="Rennen fertig (F)"><img class="icon" src="/icons/race-finish.png" alt=""><kbd>F</kbd></button>
@@ -41,6 +41,13 @@ export function createRaceHud({ placeGate, finish, restart }) {
 	const split = $('.split')
 	const count = $('.count')
 	const card = $('.card')
+	const nextStep = $('.next-step')
+	nextStep.addEventListener('pointerdown', (e) => {
+		e.preventDefault()
+		e.stopPropagation()
+		sound.start()
+		;(nextStep.dataset.step === 'finish' ? finish : placeGate)()
+	})
 	const buttons = { gate: $('.gate'), finish: $('.finish'), restart: $('.restart') }
 	const press = { gate: placeGate, finish, restart }
 	for (const [name, button] of Object.entries(buttons)) {
@@ -83,11 +90,23 @@ export function createRaceHud({ placeGate, finish, restart }) {
 			})
 			set('badges', `${mode}:${view.gates}:${view.next}`, () => {
 				const badges = Array.from({ length: view.gates }, (_, i) => {
-					const state = mode === 'draft' ? 'set' : i < view.next ? 'taken' : i === view.next ? 'next' : ''
+					const last = mode === 'draft' && i === view.gates - 1 && i > 0 ? ' last' : ''
+					const state = (mode === 'draft' ? 'set' : i < view.next ? 'taken' : i === view.next ? 'next' : '') + last
 					return `<i class="${state}">${letter(i)}</i>`
 				})
 				if (mode === 'draft') badges.push('<i class="add">+</i>')
 				gatesEl.innerHTML = badges.join('')
+			})
+			// While dropping gates, what to do next: another gate, or with two
+			// or more, make the last one the finish and go.
+			const step = mode !== 'draft' ? '' : view.gates < 2 ? 'gate' : 'finish'
+			set('step', step, (s) => {
+				nextStep.dataset.step = s
+				nextStep.hidden = !s
+				nextStep.innerHTML =
+					s === 'gate'
+						? '<img class="icon" src="/icons/race-gate.png" alt=""><span>Nächstes Tor</span><kbd>G</kbd>'
+						: '<img class="icon" src="/icons/race-finish.png" alt=""><span>Ziel &amp; los</span><kbd>F</kbd>'
 			})
 			const t = mode === 'draft' ? '' : clock(view.t)
 			set('time', t, (v) => (time.textContent = v))

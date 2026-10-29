@@ -64,6 +64,40 @@
 	border-style: dashed;
 	opacity: 0.6;
 }
+#race .next-step {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin-top: 0.4rem;
+	padding: 0.15rem 0.5rem 0.15rem 0.2rem;
+	width: auto;
+	height: auto;
+	border: 2px solid var(--yellow);
+	border-radius: 0.6rem;
+	background: rgba(232, 194, 26, 0.18);
+	color: var(--cream);
+	font:
+		800 0.85rem / 1 system-ui,
+		sans-serif;
+	pointer-events: auto;
+	cursor: pointer;
+}
+#race .next-step[hidden] {
+	display: none;
+}
+#race .next-step .icon {
+	margin: 0;
+}
+#race .next-step kbd {
+	position: static;
+	margin-left: auto;
+}
+/* The last gate dropped is the finish, for now: chequered. */
+#race .gates i.last {
+	background: repeating-conic-gradient(var(--ink) 0 25%, var(--cream) 0 50%) 0 0 / 0.5rem 0.5rem;
+	color: transparent;
+	box-shadow: 0 0 0 2px var(--cream);
+}
 #race .time {
 	display: block;
 	margin-top: 0.15rem;
@@ -285,4 +319,136 @@ body.touch #race button {
 }
 body.touch #race kbd {
 	display: none;
+}
+body.touch #race .next-step {
+	width: auto;
+	height: auto;
+	background: rgba(232, 194, 26, 0.18);
+}
+
+/* The race list from the menu, in the menu's panel. */
+#races {
+	inset: 0;
+	margin: auto;
+	width: min(30rem, calc(100vw - 2rem));
+	max-height: calc(100dvh - 4rem);
+	overflow-y: auto;
+	box-sizing: border-box;
+	color: #e7e7e5;
+	font-family: system-ui, sans-serif;
+}
+#races h2 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.5rem;
+	font-size: 1.3rem;
+	font-weight: 900;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+#races .icon {
+	margin: 0;
+}
+#races ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+#races li {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.35rem 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+#races .route {
+	flex: 1;
+	min-width: 0;
+}
+#races .route strong,
+#races .route small {
+	display: block;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+#races .route strong {
+	font-weight: 800;
+}
+#races .route small {
+	opacity: 0.7;
+	font-weight: 700;
+}
+#races .best {
+	display: flex;
+	align-items: center;
+	gap: 0.2rem;
+	font-family: ui-monospace, monospace;
+	font-variant-numeric: tabular-nums;
+}
+#races .best .none {
+	opacity: 0.4;
+}
+#races button {
+	padding: 0.35rem 0.7rem;
+	border: 2px solid rgba(255, 255, 255, 0.4);
+	border-radius: 0.8rem;
+	background: rgba(0, 0, 0, 0.35);
+	color: #e7e7e5;
+	font:
+		800 0.9rem / 1 system-ui,
+		sans-serif;
+	cursor: pointer;
+}
+#races button.go {
+	border-color: #e8c21a;
+	background: rgba(232, 194, 26, 0.3);
+}
+#races button.del {
+	padding: 0.35rem 0.5rem;
+}
+#races button.del.armed {
+	border-color: #ec4335;
+	background: #ec4335;
+}
+#races button.new {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.6rem;
+	padding: 0.2rem 0.7rem 0.2rem 0.3rem;
+	border-color: #e8c21a;
+}
+#races kbd {
+	position: static;
+	margin-left: 0.2rem;
+}
+#races .empty {
+	margin: 0.3rem 0;
+	opacity: 0.8;
+	font-weight: 700;
+}
+#races .how {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem 1rem;
+	margin: 0.7rem 0 0;
+	font-size: 0.8rem;
+	font-weight: 700;
+	opacity: 0.85;
+}
+#races .how kbd {
+	margin: 0 0.25rem 0 0;
+}
+body.touch #races .how {
+	display: none;
+}
+#races .icon {
+	width: 32px;
+	height: 32px;
+}
+#races button span {
+	color: inherit;
+	font: inherit;
 }

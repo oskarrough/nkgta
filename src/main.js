@@ -162,7 +162,7 @@ const actions = {
 	},
 	nextStation: () => music.nextStation(!!player.car),
 	// Start on a gamepad opens and closes the menu, the way Esc does.
-	menuOpen: () => !menu.hidden,
+	menuOpen: () => !menu.hidden || racing.listOpen(),
 	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
 	placeGate: () => racing.placeGate(),
@@ -211,7 +211,7 @@ const menuItems = {
 	race: [
 		() => {
 			showMenu(false)
-			actions.placeGate()
+			racing.openList()
 		},
 		() => null,
 	],
