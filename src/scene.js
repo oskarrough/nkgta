@@ -80,9 +80,9 @@ const SHOPFRONT = {
 	open: 0.85,
 	wall: '#d6cfc0',
 	floor: '#8a7e70',
-	goods: ['#c8553d', '#e2c25a', '#5f8a5a', '#4e6a92', '#efe9dc', '#9a6a8a'],
-	shelves: 4, // rows up the window
-	items: 7, // per bay
+	goods: ['#a87a66', '#c4b285', '#8a977f', '#7f8a99', '#e2dccd', '#9b8a8c'], // muted, so the shelves read as a shop, not a poster
+	shelves: 5, // rows up the window
+	items: 12, // per bay
 	tint: 0.2, // the glass's dark tint over the shop
 	reflect: '#8d9aa8', // the sky in the glass, strongest at the top
 	glow: 0.24, // how bright the shop's lamps are by day; at night SHOP_GLOW.window
@@ -1415,7 +1415,7 @@ function wallMaterial(tileM, gradient, sky) {
 						float item = fract(sin(dot(floor(cell) + vec2(wallId, bay * 91.0), vec2(12.9898, 78.233))) * 43758.5453);
 						vec3 goods = item < 0.3 ? ${glsl(SHOPFRONT.wall)} : item < 0.42 ? ${glsl(SHOPFRONT.goods[0])} : item < 0.54 ? ${glsl(SHOPFRONT.goods[1])} : item < 0.66 ? ${glsl(SHOPFRONT.goods[2])} : item < 0.78 ? ${glsl(SHOPFRONT.goods[3])} : item < 0.9 ? ${glsl(SHOPFRONT.goods[4])} : ${glsl(SHOPFRONT.goods[5])};
 						vec2 ca = fwidth(cell);
-						goods *= 1.0 - 0.5 * box(fract(cell.y), 0.0, 0.16, ca.y);
+						goods *= (1.0 - 0.5 * box(fract(cell.y), 0.0, 0.16, ca.y)) * (1.0 - 0.2 * box(fract(cell.x), 0.0, 0.12, ca.x));
 						goods = mix(${glsl(shelfMean)}, goods, 1.0 - smoothstep(0.25, 0.6, max(ca.x, ca.y)));
 						float floorBand = box(wv, -1.0, 0.22, aa.y / (hi - lo));
 						float wallBand = box(wv, 0.85, 2.0, aa.y / (hi - lo));

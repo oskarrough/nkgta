@@ -1,7 +1,7 @@
 // What's painted on the firewalls (see firewalls.js): murals where OSM maps
 // one and on a few others, old painted ads, faded, and tags at the foot of
-// walls you can reach. All painted here, procedurally, in a handful of bold
-// toon colours, into one atlas; each chunk's paintings are one mesh, one draw.
+// walls you can reach. All painted here, procedurally, in a few strong
+// colours inked in black, into one atlas; each chunk's paintings are one mesh, one draw.
 // Mipmapped, so a painting far off is its average colour, not speckle.
 import * as THREE from 'three'
 
@@ -16,21 +16,12 @@ const SIZE = { margin: 0.25, plinth: 0.3, ad: 4.5, tags: 0.6, off: 0.015 }
 // patched, streaked by rain, here and there down to the brick.
 const FIRE = { grey: '#b3aca1', brick: '#9a5a46', mortar: '#c4baa9', patch: 0.16, bricks: 0.85 }
 
-// The toon colours they're painted in, and skin tones for faces.
-const INKS = [
-	'#C8302A',
-	'#E8C21A',
-	'#3D5E82',
-	'#3FA34D',
-	'#61ADC5',
-	'#B5603F',
-	'#E0A070',
-	'#2D333D',
-	'#E7E7E5',
-	'#689A3E',
-	'#E58FB0',
-	'#8D9CB1',
-]
+// What they're painted in: a few strong colours a wall, inked in black, and
+// chrome for throw-ups. Skin tones and hair for faces.
+const BOLD = ['#E4312B', '#F5C518', '#1F6FB2', '#2FA34A', '#F27D2A', '#E85A9B', '#6CC5E0', '#7A3FA0']
+const BLACK = '#161616'
+const WHITE = '#F4F1E8'
+const CHROME = '#C9CDD2'
 const SKINS = ['#E0A070', '#C97A52', '#B5603F', '#6E3A2A', '#E8C46A']
 const HAIR = ['#2D333D', '#6E3A2A', '#E8C21A', '#C8302A', '#3D5E82']
 const ADS = ['#6E3A2A', '#34502D', '#3D5E82', '#2D333D', '#8F4C35']
@@ -45,7 +36,10 @@ const AD_WORDS = [
 	['LEDER', 'KOFFER · TASCHEN'],
 ]
 const KINDS = ['face', 'creature', 'garden', 'shapes']
-const TAGS = ['44', 'NK', '12043', '12045', '12047', 'KIEZ', 'ROLLBERG', 'SONNE', 'KMS']
+// Throw-ups are short names in fat letters; tags are names in a quick hand.
+const THROWS = ['NK', '44', 'KMS', 'ZEK', 'OKS', 'KAOS', 'DUX', 'REMS', 'BOMA']
+const TAGS = ['nk44', '12043', '12047', 'kiez', 'rollberg', 'sonne', 'zek', 'oks!', 'dux', 'rems']
+const PIECES = ['NK', '44', 'KIEZ', 'SONNE', 'KMS']
 
 // Atlas layout in pixels: murals in square cells, then ads, then tag bands.
 const ATLAS = { w: 2048, h: 1536 }
@@ -62,18 +56,7 @@ export function createMurals(world, firewalls, gradient) {
 		const canvas = document.createElement('canvas')
 		canvas.width = ATLAS.w
 		canvas.height = ATLAS.h
-		const g = canvas.getContext('2d')
-		const cells = MURAL.cols * MURAL.rows
-		for (let i = 0; i < cells; i++) {
-			const own = i >= cells - MURAL.own
-			const m = own ? { seed: i * 977, of: KINDS[i % 4] } : mapped[i]
-			if (!m) continue
-			const { x, y } = muralCell(i)
-			// Untold, a mural shows whatever its seed says.
-			paintMural(g, x, y, MURAL.size, m.of || KINDS[m.seed % KINDS.length], rng(m.seed))
-		}
-		for (let i = 0; i < AD.cols * AD.rows; i++) paintAd(g, adCell(i), i, rng(i * 31 + 5))
-		for (let i = 0; i < TAG.cols * TAG.rows; i++) paintTags(g, tagCell(i), rng(i * 53 + 11))
+		paintAtlas(canvas.getContext('2d'), mapped)
 		const tex = new THREE.CanvasTexture(canvas)
 		tex.colorSpace = THREE.SRGBColorSpace
 		tex.anisotropy = 4
@@ -165,6 +148,22 @@ export function createMurals(world, firewalls, gradient) {
 	}
 }
 
+// Everything painted into the atlas: the mapped murals, the generic ones,
+// the ads and the tag bands.
+export function paintAtlas(g, mapped) {
+	const cells = MURAL.cols * MURAL.rows
+	for (let i = 0; i < cells; i++) {
+		const own = i >= cells - MURAL.own
+		const m = own ? { seed: i * 977, of: KINDS[i % 4] } : mapped[i]
+		if (!m) continue
+		const { x, y } = muralCell(i)
+		// Untold, a mural shows whatever its seed says.
+		paintMural(g, x, y, MURAL.size, m.of || KINDS[m.seed % KINDS.length], rng(m.seed))
+	}
+	for (let i = 0; i < AD.cols * AD.rows; i++) paintAd(g, adCell(i), i, rng(i * 31 + 5))
+	for (let i = 0; i < TAG.cols * TAG.rows; i++) paintTags(g, tagCell(i), rng(i * 53 + 11))
+}
+
 // The firewall's own look, for the wall shader: `head` before main, `body`
 // where the wall's colour is decided. A firewall has vWall.y < 0 and
 // vWall.x in bays along it.
@@ -225,183 +224,312 @@ function crop({ x, y, w, h }, aspect) {
 	return [(cx - cw / 2) / ATLAS.w, 1 - (cy + ch / 2) / ATLAS.h, (cx + cw / 2) / ATLAS.w, 1 - (cy - ch / 2) / ATLAS.h]
 }
 
-// A mural, bold flat shapes in a few colours, in a square of side s.
+// A mural in a square of side s: big confident shapes in three strong
+// colours, each inked round in black, on a sunburst, stripes or dots.
 function paintMural(g, x, y, s, of, rand) {
 	const pick = (list) => list[Math.floor(rand() * list.length)]
-	const inks = [...INKS].sort(() => rand() - 0.5)
+	const [bg, a, b, c] = [...BOLD].sort(() => rand() - 0.5)
 	g.save()
 	g.translate(x, y)
 	g.scale(s, s)
 	g.beginPath()
 	g.rect(0, 0, 1, 1)
 	g.clip()
-	g.fillStyle = inks[0]
-	g.fillRect(0, 0, 1, 1)
-	const circle = (cx, cy, r, c) => {
-		g.fillStyle = c
+	g.lineJoin = 'round'
+	g.lineCap = 'round'
+	// A path filled in colour f, then its outline inked; line 0 leaves it bare.
+	const shape = (path, f, line = 0.022) => {
 		g.beginPath()
-		g.arc(cx, cy, r, 0, Math.PI * 2)
-		g.fill()
+		path()
+		if (f) {
+			g.fillStyle = f
+			g.fill()
+		}
+		if (line) {
+			g.lineWidth = line
+			g.strokeStyle = BLACK
+			g.stroke()
+		}
 	}
-	const ellipse = (cx, cy, rx, ry, rot, c) => {
-		g.fillStyle = c
-		g.beginPath()
-		g.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2)
-		g.fill()
-	}
-	const poly = (pts, c) => {
-		g.fillStyle = c
+	const circle = (cx, cy, r, f, line) => shape(() => g.arc(cx, cy, r, 0, TAU), f, line)
+	const ellipse = (cx, cy, rx, ry, rot, f, line) => shape(() => g.ellipse(cx, cy, rx, ry, rot, 0, TAU), f, line)
+	const poly = (pts, f, line) =>
+		shape(
+			() => {
+				pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py)))
+				g.closePath()
+			},
+			f,
+			line,
+		)
+	const line = (pts, w = 0.022, col = BLACK) => {
 		g.beginPath()
 		pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py)))
-		g.fill()
+		g.lineWidth = w
+		g.strokeStyle = col
+		g.stroke()
 	}
-	// Big stripes or dots behind, for every kind.
-	if (rand() < 0.5)
-		for (let k = 0; k < 6; k += 2)
+	// A four-pointed sparkle.
+	const sparkle = (cx, cy, r) =>
+		poly(
+			[0, 1, 2, 3, 4, 5, 6, 7].map((k) => {
+				const d = k % 2 ? r * 0.28 : r
+				return [cx + Math.cos((k * TAU) / 8) * d, cy + Math.sin((k * TAU) / 8) * d]
+			}),
+			WHITE,
+			0.014,
+		)
+	g.fillStyle = bg
+	g.fillRect(0, 0, 1, 1)
+	const back = rand()
+	if (back < 0.5) {
+		const n = 18
+		const turn = rand()
+		for (let k = 0; k < n; k += 2) {
+			const t0 = ((k + turn) / n) * TAU
+			const t1 = ((k + 1 + turn) / n) * TAU
 			poly(
 				[
-					[0, k / 6],
-					[1, k / 6 - 0.15],
-					[1, (k + 1) / 6 - 0.15],
-					[0, (k + 1) / 6],
+					[0.5, 0.5],
+					[0.5 + Math.cos(t0) * 1.2, 0.5 + Math.sin(t0) * 1.2],
+					[0.5 + Math.cos(t1) * 1.2, 0.5 + Math.sin(t1) * 1.2],
 				],
-				inks[1],
+				c,
+				0,
 			)
-	else for (let k = 0; k < 9; k++) circle(rand(), rand(), 0.03 + rand() * 0.05, inks[1])
+		}
+	} else if (back < 0.75) {
+		for (let k = -1; k < 6; k += 2)
+			poly(
+				[
+					[0, k / 5],
+					[1, k / 5 - 0.3],
+					[1, (k + 1) / 5 - 0.3],
+					[0, (k + 1) / 5],
+				],
+				c,
+				0,
+			)
+	} else for (let k = 0; k < 7; k++) circle(rand(), rand(), 0.07 + rand() * 0.07, c, 0)
 	if (of === 'face') {
 		const skin = pick(SKINS)
-		circle(0.5, 0.44, 0.4, inks[2])
-		ellipse(0.5, 1.02, 0.42, 0.24, 0, inks[3])
-		g.fillStyle = skin
-		g.fillRect(0.43, 0.6, 0.14, 0.2)
 		const hair = pick(HAIR)
-		ellipse(0.5, 0.36, 0.25, 0.24, 0, hair)
-		if (rand() < 0.5) ellipse(0.5, 0.62, 0.26, 0.2, 0, hair)
-		ellipse(0.5, 0.46, 0.19, 0.25, 0, skin)
-		const closed = rand() < 0.4
-		for (const ex of [0.42, 0.58]) {
-			if (closed) {
-				g.strokeStyle = '#2D333D'
-				g.lineWidth = 0.018
-				g.beginPath()
-				g.arc(ex, 0.43, 0.04, 0.2, Math.PI - 0.2)
-				g.stroke()
-			} else {
-				ellipse(ex, 0.43, 0.045, 0.03, 0, '#E7E7E5')
-				circle(ex, 0.43, 0.02, '#2D333D')
+		ellipse(0.5, 1.05, 0.46, 0.3, 0, a)
+		shape(() => g.rect(0.42, 0.62, 0.16, 0.2), skin)
+		const long = rand() < 0.5
+		if (long) ellipse(0.5, 0.56, 0.3, 0.3, 0, hair)
+		ellipse(0.5, 0.36, 0.26, 0.22, 0, hair)
+		ellipse(0.5, 0.47, 0.2, 0.25, 0, skin)
+		// A cap on some, a fringe on the rest.
+		if (rand() < 0.35) {
+			shape(() => g.arc(0.5, 0.33, 0.21, Math.PI, TAU), b)
+			ellipse(0.38, 0.33, 0.17, 0.035, -0.1, b)
+		} else shape(() => g.ellipse(0.5, 0.29, 0.2, 0.1, 0, Math.PI * 0.95, TAU * 1.02), hair)
+		if (rand() < 0.4) {
+			// Shades, the sky in them.
+			for (const ex of [0.42, 0.58]) ellipse(ex, 0.44, 0.07, 0.05, 0, BLACK)
+			line([
+				[0.49, 0.43],
+				[0.51, 0.43],
+			])
+			for (const ex of [0.4, 0.56])
+				line(
+					[
+						[ex, 0.425],
+						[ex + 0.03, 0.415],
+					],
+					0.014,
+					WHITE,
+				)
+		} else
+			for (const ex of [0.42, 0.58]) {
+				ellipse(ex, 0.44, 0.055, 0.045, 0, WHITE)
+				circle(ex + 0.01, 0.445, 0.026, BLACK, 0)
+				circle(ex + 0.02, 0.432, 0.009, WHITE, 0)
 			}
-		}
-		g.strokeStyle = '#6E3A2A'
-		g.lineWidth = 0.014
-		g.beginPath()
-		g.moveTo(0.5, 0.45)
-		g.lineTo(0.48, 0.53)
-		g.lineTo(0.51, 0.53)
-		g.stroke()
-		ellipse(0.5, 0.6, 0.06, 0.022, 0, '#C8302A')
+		line([
+			[0.5, 0.47],
+			[0.48, 0.53],
+			[0.51, 0.535],
+		])
+		shape(() => g.arc(0.5, 0.58, 0.07, 0.15, Math.PI - 0.15), '#B3262A')
+		circle(0.37, 0.53, 0.03, '#E85A9B', 0)
+		circle(0.63, 0.53, 0.03, '#E85A9B', 0)
 	} else if (of === 'creature') {
-		const body = inks[2]
-		const fish = rand() < 0.5
-		const tilt = (rand() - 0.5) * 0.6
 		g.save()
-		g.translate(0.5, 0.5)
-		g.rotate(tilt)
-		if (fish) {
+		g.translate(0.5, 0.52)
+		g.rotate((rand() - 0.5) * 0.5)
+		if (rand() < 0.5) {
 			poly(
 				[
-					[0.25, 0],
-					[0.48, -0.2],
-					[0.48, 0.2],
+					[0.28, 0],
+					[0.5, -0.24],
+					[0.46, 0],
+					[0.5, 0.24],
 				],
-				inks[3],
+				a,
 			)
-			ellipse(0, 0, 0.32, 0.2, 0, body)
-			for (let k = 0; k < 4; k++) ellipse(-0.05 + k * 0.08, 0, 0.03, 0.14, 0, inks[3])
-			circle(-0.2, -0.04, 0.045, '#E7E7E5')
-			circle(-0.21, -0.04, 0.022, '#2D333D')
-			for (let k = 0; k < 3; k++) circle(-0.4 + k * 0.03, -0.2 - k * 0.1, 0.02 + k * 0.01, '#E7E7E5')
+			poly(
+				[
+					[-0.05, -0.2],
+					[0.12, -0.34],
+					[0.15, -0.18],
+				],
+				a,
+			)
+			ellipse(0, 0, 0.36, 0.23, 0, b)
+			for (let k = 0; k < 4; k++)
+				line(
+					[
+						[-0.02 + k * 0.08, -0.12],
+						[0.03 + k * 0.08, 0],
+						[-0.02 + k * 0.08, 0.12],
+					],
+					0.016,
+				)
+			circle(-0.21, -0.05, 0.065, WHITE)
+			circle(-0.22, -0.05, 0.032, BLACK, 0)
+			circle(-0.23, -0.06, 0.01, WHITE, 0)
+			shape(() => g.arc(-0.3, 0.06, 0.05, 0.2, Math.PI - 0.2), null, 0.016)
+			for (let k = 0; k < 3; k++) circle(-0.42 + k * 0.04, -0.22 - k * 0.1, 0.025 + k * 0.012, WHITE, 0.012)
 		} else {
 			poly(
 				[
-					[0.15, 0.05],
-					[0.45, 0.3],
-					[0.38, 0.38],
-					[0.1, 0.15],
+					[0.12, 0.05],
+					[0.46, 0.28],
+					[0.36, 0.4],
+					[0.06, 0.18],
 				],
-				inks[3],
+				a,
 			)
-			ellipse(0, 0.05, 0.28, 0.18, -0.3, body)
-			circle(-0.22, -0.16, 0.13, body)
+			ellipse(0, 0.06, 0.3, 0.2, -0.3, b)
+			circle(-0.22, -0.16, 0.15, b)
 			poly(
 				[
-					[-0.33, -0.18],
-					[-0.46, -0.12],
-					[-0.33, -0.12],
+					[-0.35, -0.2],
+					[-0.52, -0.12],
+					[-0.34, -0.1],
 				],
-				'#E8C21A',
+				'#F5C518',
 			)
-			ellipse(0.04, 0.02, 0.18, 0.08, -0.6, inks[4])
-			circle(-0.25, -0.19, 0.03, '#E7E7E5')
-			circle(-0.26, -0.19, 0.015, '#2D333D')
+			ellipse(0.06, 0.03, 0.2, 0.09, -0.6, a)
+			circle(-0.25, -0.2, 0.05, WHITE)
+			circle(-0.26, -0.2, 0.025, BLACK, 0)
+			circle(-0.27, -0.21, 0.008, WHITE, 0)
 		}
 		g.restore()
-		for (let k = 0; k < 5; k++) ellipse(rand(), rand() < 0.5 ? 0.9 : 0.1, 0.12, 0.04, rand() * 3, '#3FA34D')
+		sparkle(0.15, 0.15, 0.07)
+		sparkle(0.85, 0.82, 0.05)
 	} else if (of === 'garden') {
-		g.fillStyle = pick(['#61ADC5', '#8D9CB1', '#E8C46A'])
-		g.fillRect(0, 0, 1, 0.6)
-		circle(0.3 + rand() * 0.4, 0.25, 0.12, '#E8C21A')
-		for (const [k, c] of [
-			[0.55, '#689A3E'],
-			[0.68, '#3FA34D'],
-			[0.82, '#34502D'],
-		]) {
-			g.fillStyle = c
-			g.beginPath()
-			g.moveTo(0, 1)
-			for (let px = 0; px <= 1.001; px += 0.05) g.lineTo(px, k + Math.sin(px * 6 + rand() * 0.2 + k * 9) * 0.04)
-			g.lineTo(1, 1)
-			g.fill()
+		// A jungle of big leaves round one giant flower.
+		circle(0.78, 0.2, 0.12, '#F5C518')
+		const greens = ['#2FA34A', '#1E6B35', '#7CC242']
+		for (let k = 0; k < 7; k++) {
+			const lx = (k / 6) * 1.1 - 0.05
+			const ly = 0.75 + rand() * 0.2
+			const rot = (lx - 0.5) * 1.6 + (rand() - 0.5) * 0.4 - Math.PI / 2
+			ellipse(lx, ly, 0.24, 0.09, rot, greens[k % 3])
+			line(
+				[
+					[lx, ly],
+					[lx + Math.cos(rot) * 0.2, ly + Math.sin(rot) * 0.2],
+				],
+				0.012,
+			)
 		}
-		for (let k = 0; k < 3; k++) {
-			const fx = 0.2 + k * 0.3 + (rand() - 0.5) * 0.1
-			const fy = 0.62 + rand() * 0.12
-			g.strokeStyle = '#34502D'
-			g.lineWidth = 0.02
-			g.beginPath()
-			g.moveTo(fx, fy)
-			g.lineTo(fx, 1)
-			g.stroke()
-			const petal = pick(['#C8302A', '#E58FB0', '#E7E7E5', '#E8C21A'])
-			for (let a = 0; a < 6; a++) circle(fx + Math.cos(a) * 0.06, fy + Math.sin(a) * 0.06, 0.045, petal)
-			circle(fx, fy, 0.04, '#E8C21A')
+		const fx = 0.4 + rand() * 0.2
+		const fy = 0.45
+		line(
+			[
+				[fx, fy],
+				[fx + 0.04, 1],
+			],
+			0.045,
+			'#1E6B35',
+		)
+		for (let k = 0; k < 8; k++) {
+			const t = (k / 8) * TAU
+			ellipse(fx + Math.cos(t) * 0.13, fy + Math.sin(t) * 0.13, 0.12, 0.065, t, a)
 		}
+		circle(fx, fy, 0.09, b)
+		for (let k = 0; k < 5; k++) circle(fx - 0.03 + rand() * 0.06, fy - 0.03 + rand() * 0.06, 0.01, BLACK, 0)
 	} else {
-		for (let k = 0; k < 6; k++) {
-			const c = inks[2 + (k % (inks.length - 2))]
-			const cx = rand()
-			const cy = rand()
-			const r = 0.12 + rand() * 0.22
-			const kind = Math.floor(rand() * 3)
-			if (kind === 0) circle(cx, cy, r, c)
-			else if (kind === 1)
-				poly(
-					[
-						[cx, cy - r],
-						[cx + r, cy + r],
-						[cx - r, cy + r],
-					],
-					c,
-				)
-			else {
-				g.strokeStyle = c
-				g.lineWidth = 0.05
-				g.beginPath()
-				for (let z = 0; z < 6; z++) g.lineTo(cx - r + z * r * 0.4, cy + (z % 2 ? r * 0.3 : -r * 0.3))
-				g.stroke()
-			}
-		}
+		// A piece: a word in fat letters, a sparkle on it.
+		g.save()
+		g.scale(1 / s, 1 / s)
+		throwUp(g, pick(PIECES), s * 0.5, s * 0.52, s * 0.46, a, b, rand, s * 0.9)
+		g.restore()
+		sparkle(0.2, 0.25, 0.08)
+		sparkle(0.8, 0.75, 0.06)
 	}
 	g.restore()
+}
+
+// A name in fat bubbly letters that run into each other: a drop shadow in
+// shade, a black outline and the fill, with a shine. Centred on cx, cy, at
+// most max wide. Returns how wide it came out.
+function throwUp(g, word, cx, cy, size, fill, shade, rand, max = Infinity) {
+	g.save()
+	g.font = `900 ${size}px sans-serif`
+	g.textBaseline = 'middle'
+	g.lineJoin = 'round'
+	g.lineCap = 'round'
+	const letters = [...word]
+	const steps = letters.map((ch) => g.measureText(ch).width * 0.8)
+	const wide = steps.reduce((sum, w) => sum + w, 0) + size * 0.4
+	const k = Math.min(1, max / wide)
+	g.translate(cx, cy)
+	g.scale(k, k)
+	let px = -(wide - size * 0.4) / 2
+	const at = letters.map((ch, i) => {
+		const spot = [px, (rand() - 0.5) * size * 0.2, (rand() - 0.5) * 0.3]
+		px += steps[i]
+		return spot
+	})
+	const each = (fn) =>
+		letters.forEach((ch, i) => {
+			g.save()
+			g.translate(at[i][0], at[i][1])
+			g.rotate(at[i][2])
+			fn(ch)
+			g.restore()
+		})
+	g.save()
+	g.translate(size * 0.1, size * 0.12)
+	g.strokeStyle = BLACK
+	each((ch) => {
+		g.lineWidth = size * 0.34
+		g.strokeText(ch, 0, 0)
+	})
+	g.strokeStyle = shade
+	each((ch) => {
+		g.lineWidth = size * 0.24
+		g.strokeText(ch, 0, 0)
+	})
+	g.restore()
+	g.strokeStyle = BLACK
+	each((ch) => {
+		g.lineWidth = size * 0.26
+		g.strokeText(ch, 0, 0)
+	})
+	g.strokeStyle = fill
+	g.fillStyle = fill
+	each((ch) => {
+		g.lineWidth = size * 0.12
+		g.strokeText(ch, 0, 0)
+		g.fillText(ch, 0, 0)
+	})
+	g.strokeStyle = WHITE
+	g.lineWidth = size * 0.05
+	each((ch) => {
+		const w = g.measureText(ch).width
+		g.beginPath()
+		g.moveTo(w * 0.15, -size * 0.27)
+		g.lineTo(w * 0.4, -size * 0.3)
+		g.stroke()
+	})
+	g.restore()
+	return wide * k
 }
 
 // An old painted ad, faded into the wall: a dark field, a pale border and
@@ -434,42 +562,69 @@ function paintAd(g, { x, y, w, h }, i, rand) {
 	g.restore()
 }
 
-// A band of tags: names in fat letters, outlined, and a scribble or two.
+// A band of what's sprayed where a hand can reach: chrome or coloured
+// throw-ups and names in a quick slanted hand, dripping, crowding each other.
 function paintTags(g, { x, y, w, h }, rand) {
 	g.save()
 	g.translate(x, y)
 	g.beginPath()
 	g.rect(0, 0, w, h)
 	g.clip()
-	g.textBaseline = 'middle'
-	g.lineJoin = 'round'
-	let at = 20
-	while (at < w - 120) {
-		const word = TAGS[Math.floor(rand() * TAGS.length)]
-		const size = Math.round(h * (0.45 + rand() * 0.35))
-		g.save()
-		g.translate(at, h * (0.45 + (rand() - 0.5) * 0.2))
-		g.rotate((rand() - 0.5) * 0.3)
-		g.font = `italic 900 ${size}px sans-serif`
-		g.lineWidth = size * 0.12
-		g.strokeStyle = rand() < 0.5 ? '#1A1E1B' : '#E7E7E5'
-		g.fillStyle = INKS[Math.floor(rand() * INKS.length)]
-		g.strokeText(word, 0, 0)
-		g.fillText(word, 0, 0)
-		const wide = g.measureText(word).width
-		g.restore()
-		at += wide + 30 + rand() * 120
-	}
-	g.strokeStyle = '#1A1E1B'
-	g.lineWidth = 4
-	for (let k = 0; k < 2; k++) {
-		g.beginPath()
-		let px = rand() * w
-		g.moveTo(px, h * (0.2 + rand() * 0.6))
-		for (let s = 0; s < 5; s++) g.lineTo((px += 15 + rand() * 25), h * (0.2 + rand() * 0.6))
-		g.stroke()
+	let at = 10
+	while (at < w - 80) {
+		if (rand() < 0.5) {
+			const word = THROWS[Math.floor(rand() * THROWS.length)]
+			const fill = rand() < 0.5 ? CHROME : rand() < 0.5 ? WHITE : BOLD[Math.floor(rand() * BOLD.length)]
+			const shade = BOLD[Math.floor(rand() * BOLD.length)]
+			const size = h * (0.5 + rand() * 0.12)
+			g.save()
+			g.font = `900 ${size}px sans-serif`
+			const guess = [...word].reduce((sum, ch) => sum + g.measureText(ch).width * 0.8, size * 0.4)
+			g.restore()
+			at += throwUp(g, word, at + guess / 2, h * 0.5, size, fill, shade, rand) - size * 0.1
+		} else at += handTag(g, TAGS[Math.floor(rand() * TAGS.length)], at, h * (0.62 + rand() * 0.15), h * (0.4 + rand() * 0.2), rand) + 10
+		at += rand() * 40
 	}
 	g.restore()
+}
+
+// A name in a quick hand: tall narrow letters leaning forward, a swoosh
+// under them and the paint running. Returns how wide it came out.
+function handTag(g, word, x, y, size, rand) {
+	const col = rand() < 0.7 ? BLACK : rand() < 0.5 ? '#3A57C4' : '#C8302A'
+	g.save()
+	g.translate(x, y)
+	g.font = `500 ${size}px sans-serif`
+	g.textBaseline = 'alphabetic'
+	const wide = g.measureText(word).width * 0.6
+	g.save()
+	g.transform(0.6, 0, -0.3, 1, 0, 0)
+	g.fillStyle = col
+	g.fillText(word, 0, 0)
+	g.restore()
+	g.strokeStyle = col
+	g.fillStyle = col
+	g.lineCap = 'round'
+	g.lineWidth = size * 0.05
+	g.beginPath()
+	g.moveTo(-size * 0.1, size * 0.12)
+	g.quadraticCurveTo(wide * 0.5, size * 0.28, wide + size * 0.2, size * 0.02)
+	g.lineTo(wide + size * 0.05, size * 0.1)
+	g.stroke()
+	for (let k = 0; k < 3; k++) {
+		const dx = rand() * wide
+		const long = size * (0.1 + rand() * 0.4)
+		g.lineWidth = size * 0.025
+		g.beginPath()
+		g.moveTo(dx, -size * 0.05)
+		g.lineTo(dx, long)
+		g.stroke()
+		g.beginPath()
+		g.arc(dx, long, size * 0.025, 0, TAU)
+		g.fill()
+	}
+	g.restore()
+	return wide + size * 0.2
 }
 
 // Seeded randomness, so every wall paints the same each time.
@@ -484,4 +639,5 @@ function rng(seed) {
 	}
 }
 
+const TAU = Math.PI * 2
 const hash = (n) => ((Math.imul(Math.round(n) + 1, 2654435761) >>> 0) % 10007) / 10007
