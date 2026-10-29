@@ -234,10 +234,13 @@
 		sans-serif;
 }
 
-/* The buttons: under the watch on a keyboard, only when they do something;
-   on a phone in a column over the E button, the flag always there. */
+/* A column over the phone's E button, smaller with key hints on a keyboard. */
 #race .race-buttons {
+	position: fixed;
+	right: calc(1rem + env(safe-area-inset-right));
+	bottom: calc(7.5rem + env(safe-area-inset-bottom));
 	display: flex;
+	flex-direction: column;
 	gap: 0.5rem;
 }
 #race button {
@@ -275,24 +278,11 @@ body.touch #race .card {
 	top: calc(9.5rem + env(safe-area-inset-top));
 	right: calc(1rem + env(safe-area-inset-right));
 }
-body.touch #race .race-buttons {
-	position: fixed;
-	right: calc(1rem + env(safe-area-inset-right));
-	bottom: calc(7.5rem + env(safe-area-inset-bottom));
-	flex-direction: column;
-}
 body.touch #race button {
 	width: 4rem;
 	height: 4rem;
 	background: rgba(26, 30, 27, 0.55);
 }
-body.touch #race button.gate {
-	display: block;
-}
 body.touch #race kbd {
-	display: none;
-}
-body.touch #race[data-mode='countdown'] button.gate,
-body.touch #race[data-mode='running'] button.gate {
 	display: none;
 }

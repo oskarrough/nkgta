@@ -92,7 +92,7 @@ export function createRaceHud({ placeGate, finish, restart }) {
 			const t = mode === 'draft' ? '' : clock(view.t)
 			set('time', t, (v) => (time.textContent = v))
 			set('restart', view.canRestart, (on) => buttons.restart.classList.toggle('can', on))
-			set('gate', mode === 'draft', (on) => buttons.gate.classList.toggle('can', on))
+			set('gate', mode !== 'countdown' && mode !== 'running', (on) => buttons.gate.classList.toggle('can', on))
 			set('finish', view.canFinish, (on) => buttons.finish.classList.toggle('can', on))
 			// 3, 2, 1 with a beep each, then LOS! on a higher one.
 			if (mode === 'countdown') {

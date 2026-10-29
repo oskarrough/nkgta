@@ -188,6 +188,13 @@ const menuItems = {
 	camera: [actions.toggleCamera, () => camera.selected()],
 	music: [actions.toggleMusicDebug, () => showMusic],
 	sound: [toggleMute, () => !sound.isMuted()],
+	race: [
+		() => {
+			showMenu(false)
+			actions.placeGate()
+		},
+		() => null,
+	],
 	area: [actions.pickArea, () => null],
 }
 function showMenuState() {
