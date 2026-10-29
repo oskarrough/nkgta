@@ -40,6 +40,20 @@ export function createJunctions(edges, signals = []) {
 		j.offset = main ? waveOffset(j, main.heading) : 0
 	}
 
+	// Junctions never move. File their full bounds once, so each car only
+	// checks junctions covering its cell, including wide and merged ones.
+	const CELL = 16
+	const cells = new Map()
+	for (const j of junctions) {
+		for (let y = Math.floor((j.y - j.r) / CELL); y <= Math.floor((j.y + j.r) / CELL); y++) {
+			for (let x = Math.floor((j.x - j.r) / CELL); x <= Math.floor((j.x + j.r) / CELL); x++) {
+				const key = `${x},${y}`
+				if (!cells.has(key)) cells.set(key, [])
+				cells.get(key).push(j)
+			}
+		}
+	}
+
 	let time = 0
 	const waited = new WeakMap() // car → seconds stood at a stop line
 
@@ -51,7 +65,8 @@ export function createJunctions(edges, signals = []) {
 			j.inside = []
 		}
 		for (const c of cars) {
-			for (const j of junctions) if (Math.abs(c.x - j.x) < j.r && Math.abs(c.y - j.y) < j.r && dist(c, j) < j.r) j.inside.push(c)
+			for (const j of cells.get(`${Math.floor(c.x / CELL)},${Math.floor(c.y / CELL)}`) ?? [])
+				if (Math.abs(c.x - j.x) < j.r && Math.abs(c.y - j.y) < j.r && dist(c, j) < j.r) j.inside.push(c)
 			if (!c.ai) continue
 			const { edge, next, s } = c.ai
 			for (const [e, gap] of [

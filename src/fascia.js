@@ -304,13 +304,18 @@ function average(g, { x, y, w }) {
 	const sum = [0, 0, 0]
 	let count = 0
 	for (let i = 0; i < data.length; i += 4 * 3) {
-		for (let k = 0; k < 3; k++) sum[k] += linear(data[i + k] / 255)
+		for (let k = 0; k < 3; k++) sum[k] += LINEAR[data[i + k]]
 		count++
 	}
 	return { r: sum[0] / count, g: sum[1] / count, b: sum[2] / count }
 }
 
-const linear = (c) => (c < 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+// Canvas channels are bytes: keep the exact conversion for each value,
+// rather than raising every sampled channel of every board to a power.
+const LINEAR = Float64Array.from({ length: 256 }, (_, byte) => {
+	const c = byte / 255
+	return c < 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+})
 
 // The house stands on the lowest ground under its outline, like scene.js's.
 const bases = new WeakMap()
