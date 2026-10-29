@@ -11,11 +11,8 @@
 //   and the walk grid on top: the shapes and walls we built from the map,
 //   not how they're painted.
 export const LOOKS = {
-	// The game as it's meant to look.
 	default: { outline: 2, palette: false, grid: false, plain: false },
-	// The default, cheaply: big pixels, one-pixel ink, a limited palette.
 	pixel: { outline: 1, palette: true, grid: true, plain: false },
-	// For testing: geometry and colliders.
 	raw: { outline: 1, palette: false, grid: false, plain: true },
 }
 

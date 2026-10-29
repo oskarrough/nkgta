@@ -1,11 +1,3 @@
-// Music from places: a Späti radio, a bar door, an open window, a passing car,
-// a wedding convoy. Each plays one of the songs from the jukebox repo
-// (oskarrough/jukebox), plain text its synth plays live, quieter and duller the
-// further away it is. Only the nearest few play at all, and each one carries on
-// where it had got to while you were away.
-// A song can belong to a street or a kind of place (`at doener`, `at feld`);
-// sources there mostly play its songs. A big open field plays too, softly, from
-// all round you.
 import { shuffled } from './random.js'
 import { compile, parse } from 'jukebox/score'
 import { AHEAD, HEAR, KINDS, begin, end, feed, reach, shape as soundAt, synthFor, tune } from 'jukebox/player'
@@ -36,13 +28,11 @@ const REACH = 8 // tiles, how far from a source to look for its street
 const CELL = 8 // tiles, how coarsely the field is mapped
 const FIELD = 150 // hectares of open grass before it counts as a field
 
-// A number in [0, 1) that is always the same for the same n.
 const hash = (n) => {
 	const s = Math.sin(n * 127.1 + 311.7) * 43758.5453
 	return s - Math.floor(s)
 }
 
-// The name of the street nearest (x, y), within REACH tiles, or ''.
 export function streetNear(world, x, y) {
 	if (!world.streetAt) return ''
 	let best = ''
@@ -67,8 +57,6 @@ export function pickScore(homes, street, at, seed) {
 	return pool[Math.floor(hash(seed + 0.5) * pool.length)]
 }
 
-// Spätis, bars, döner shops, cafés and the odd open window, each with its song
-// and how long ago it started.
 export function placeSources(world, shops, homes = {}) {
 	const sources = []
 	for (const [i, shop] of shops.entries()) {
@@ -158,7 +146,6 @@ export function stationPool(homes) {
 	const own = SCORES.filter((n) => homes[n]?.at?.includes('autoradio'))
 	return own.length ? own : PLACE_SCORES
 }
-// R turns the dial: the rock station, everything the Kiez plays, then off.
 const STATIONS = [
 	{ name: 'Radio A100', pool: stationPool },
 	{ name: 'Kiezfunk', pool: (homes) => PLACE_SCORES.filter((n) => !stationPool(homes).includes(n)) },
@@ -176,8 +163,6 @@ export function shuffle(pool, rand, last) {
 	return order
 }
 
-// What a station plays after `station.score`: the rest of this round, or a
-// new shuffled round once it is through.
 export function nextOnAir(station, pool, rand) {
 	if (!station.queue?.length) station.queue = shuffle(pool, rand, station.score)
 	return station.queue.shift()
@@ -243,7 +228,6 @@ function loudestOf(want, shapes, own, before) {
 	return best
 }
 
-// What a source is called on the pocket device's screen.
 function placeOf(src) {
 	if (src.place) return src.place
 	return { window: 'Offenes Fenster', car: 'Autoradio', convoy: 'Hochzeitskorso', field: 'Auf dem Feld', bar: 'Bar' }[src.kind] ?? 'Radio'
@@ -263,7 +247,6 @@ export function nearest(sources, x, y) {
 export function createMusic(world, shops, rand = Math.random) {
 	const songs = new Map()
 	const fieldNear = openField(world)
-	// The field follows you along its edge, and picks a song again each time you come back.
 	const field = { kind: 'field', x: 0, y: 0, score: null, since: 0 }
 	let fieldSeed = 9000
 	const radios = new WeakMap()
@@ -312,7 +295,6 @@ export function createMusic(world, shops, rand = Math.random) {
 		return r
 	}
 
-	// The field sounds from where you are, as far off as its nearest edge.
 	function fieldAt(x, y) {
 		const d = fieldNear?.(x, y) ?? HEAR
 		if (d >= HEAR) {
@@ -352,7 +334,6 @@ export function createMusic(world, shops, rand = Math.random) {
 		return [station]
 	}
 
-	// What's on, for the radio display: the station and the song, once each.
 	function announce(now) {
 		const station = stations[dial]
 		const key = station ? `${station.name}:${station.score}` : 'off'
@@ -371,7 +352,6 @@ export function createMusic(world, shops, rand = Math.random) {
 		return [convoy]
 	}
 
-	// Each frame: who's in earshot, how loud and how muffled, and their next notes.
 	function update(audio, cars, listener, view, { inCar = false, inside = false, down = false } = {}) {
 		if (!audio || audio.muted) {
 			heard = fixed
@@ -391,14 +371,12 @@ export function createMusic(world, shops, rand = Math.random) {
 		synth ??= synthFor(context, bus.gain)
 		const now = context.currentTime
 		if (inCar && !wasInCar) {
-			// Let the car's name show first.
 			announceAt = now + 1.8
 			tunedIn = null
 		}
 		wasInCar = inCar
 		if (listener.car !== ridden) {
 			ridden = listener.car
-			// Each car has its own radio habit: the first time in one, it's on a random station, or off.
 			if (ridden && !dials.has(ridden))
 				dials.set(ridden, rand() * RADIO_OFF < 1 ? stations.length - 1 : Math.floor(rand() * (stations.length - 1)))
 			if (ridden) dial = dials.get(ridden)
@@ -451,11 +429,8 @@ export function createMusic(world, shops, rand = Math.random) {
 	return {
 		update,
 		nextStation,
-		// What the radio display shows while you're in a car, or null.
 		radio: () => onAir,
-		// The song you hear most and where it comes from, { name, title }, or null.
 		hearing: () => loudest && { name: placeOf(loudest), title: songs.get(loudest.score)?.title ?? loudest.score },
-		// Musik-Debug: every source, and the gain of the ones playing.
 		debug: () => ({ sources: heard ?? [], gains: new Map([...playing].map(([src, p]) => [src, p.level.gain.value])) }),
 		inspect: () =>
 			[...playing.values()].map((p) => ({

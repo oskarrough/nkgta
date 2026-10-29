@@ -1,4 +1,3 @@
-/* A chunky black stopwatch, a big countdown, a finish card and the race buttons. */
 #race {
 	--ink: #1a1e1b;
 	--cream: #e7e7e5;
@@ -92,7 +91,6 @@
 	position: static;
 	margin-left: auto;
 }
-/* The last gate dropped is the finish, for now: chequered. */
 #race .gates i.last {
 	background: repeating-conic-gradient(var(--ink) 0 25%, var(--cream) 0 50%) 0 0 / 0.5rem 0.5rem;
 	color: transparent;
@@ -268,7 +266,6 @@
 		sans-serif;
 }
 
-/* A column over the phone's E button, smaller with key hints on a keyboard. */
 #race .race-buttons {
 	position: fixed;
 	right: calc(1rem + env(safe-area-inset-right));
@@ -326,7 +323,6 @@ body.touch #race .next-step {
 	background: rgba(232, 194, 26, 0.18);
 }
 
-/* The race list from the menu, in the menu's panel. */
 #races,
 #daily {
 	inset: 0;
@@ -476,7 +472,6 @@ body.touch #races .how {
 	font: inherit;
 }
 
-/* Sharing: the finish card's link button, a rival's gap, the list's share and name. */
 #race .card .share {
 	display: block;
 	width: auto;

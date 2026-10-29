@@ -86,7 +86,6 @@ export function kerbLines(pts, t, w, cross) {
 	return out
 }
 
-// A line shifted sideways, in pieces between the junctions along it.
 function cut(pts, off, cross, pad) {
 	const line = offsetLine(pts, off)
 	const gaps = []
@@ -104,7 +103,6 @@ function cut(pts, off, cross, pad) {
 	return pieces
 }
 
-// The part of a line between distances a and b along it.
 function stretch(line, a, b) {
 	const out = [pointAt(line, a)]
 	for (const p of line) if (p.s > a && p.s < b) out.push(p)
@@ -112,7 +110,6 @@ function stretch(line, a, b) {
 	return out
 }
 
-// Whether a road is cobbled.
 export const isSett = (t) => SETTS.includes(t.surface)
 
 // Where cars mustn't park and bollards and lamps mustn't stand: driveways,
@@ -133,12 +130,9 @@ export function kerbGaps(ways, toTile, atKerb) {
 	return [...gaps.values()].flat()
 }
 
-// ---- In the game ----
-
 const hash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 const seedAt = (x, y) => Math.round(x * 10) * 7919 + Math.round(y * 10) * 104729
 
-// Points in cells, to ask what's near a spot.
 export function pointsGrid(points, cell = 4) {
 	const cells = new Map()
 	const key = (x, y) => Math.floor(x / cell) * 65536 + Math.floor(y / cell)
@@ -171,7 +165,6 @@ export function pointsGrid(points, cell = 4) {
 
 const pairs = (xy = []) => Array.from({ length: xy.length / 2 }, (_, i) => ({ x: xy[i * 2], y: xy[i * 2 + 1] }))
 
-// What parked cars keep clear of: driveways and crossings, traffic lights and bus stops.
 export function noParking(world) {
 	const gaps = pointsGrid(pairs(world.kerbGaps))
 	const lights = pointsGrid(pairs(world.signals))
@@ -204,7 +197,6 @@ export function parkingSpots(edge, blocked, mainRoad) {
 		const kind = code === PARK.unknown ? PARK.parallel : code
 		const fill = code !== PARK.unknown ? FILL.lane : edge.rank >= mainRoad ? FILL.main : FILL.side
 		const { step, turn, out } = SPOT[kind]
-		// Parallel, right against the kerb, but clear of the lane's traffic.
 		const off = out ? w / 2 + out : Math.max(w / 2 - 0.1, r.oneway ? 0.85 : w / 4 + 0.85)
 		const line = offsetLine(edge.centre, side * off)
 		const len = line.at(-1).s
@@ -229,7 +221,6 @@ function clearance(node) {
 	return Math.max(...node.out.map((e) => e.w), ...node.in.map((e) => e.w)) / 2 + 1.7
 }
 
-// Whether a car fits on a spot: no corner in a wall or the water.
 export function standsClear(world, x, y, angle, model) {
 	const cos = Math.cos(angle)
 	const sin = Math.sin(angle)
@@ -301,7 +292,6 @@ export function furnitureIn(world, box, mainRoad) {
 	return { lamps, bollards }
 }
 
-// The nearest point on a polyline, and how far it is.
 function nearestOn(pts, p) {
 	let best = { x: pts[0].x, y: pts[0].y, d: Infinity }
 	for (let i = 1; i < pts.length; i++) {

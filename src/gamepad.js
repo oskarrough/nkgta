@@ -1,8 +1,3 @@
-// Gamepad: the left stick drives the way the touch thumbstick does, the
-// triggers work the gas and brake, and the face buttons do what their keys
-// do. The pad is read afresh each frame, so one plugged in mid-game just
-// starts working; a button only acts on the way down, and one already held
-// when the pad arrives does nothing until it's let go.
 import { stickDrive } from './touch.js'
 
 // Standard mapping (https://w3c.github.io/gamepad/#remapping).
@@ -43,8 +38,6 @@ export function stickOf(pad) {
 	return { x: x * k, y: y * k }
 }
 
-// In a car: pulled triggers are the throttle and the stick steers; with
-// neither trigger touched the stick drives the way the thumbstick does.
 export function padDrive(car, pad) {
 	const stick = stickOf(pad)
 	const gas = amount(pad, GAS)
@@ -77,8 +70,6 @@ export function createGamepad(actions, blocked = () => false) {
 		return null
 	}
 
-	// Fresh state, and the buttons that went down since the last look. Returns
-	// the pad, or null while the menu is up and the game shouldn't hear it.
 	function read() {
 		const next = find()
 		if (next !== pad) {
@@ -121,7 +112,6 @@ export function createGamepad(actions, blocked = () => false) {
 	}
 
 	return {
-		// Where the stick points, each axis -1…1, as the thumbstick does.
 		axis: () => stickOf(read()),
 		drive: (car) => padDrive(car, read()),
 	}

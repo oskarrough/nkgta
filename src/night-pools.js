@@ -1,4 +1,3 @@
-// Warm light painted onto the terrain beneath lamps and outside shop doors.
 import * as THREE from 'three'
 import { furnitureIn } from './kerbs.js'
 

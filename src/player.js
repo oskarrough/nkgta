@@ -1,4 +1,3 @@
-// Walking, cycling, driving and bumping into things.
 import { T, SOLID } from './tiles.js'
 import { driveCar, speedOf, toWorld } from './car.js'
 import { HILLS } from './terrain.js'
@@ -36,7 +35,6 @@ export function toggleBike(p) {
 	}
 }
 
-// Out of the driver's door on the left, or the right if there's a wall.
 export function leaveCar(p, world) {
 	const c = p.car
 	for (const side of [-1, 1]) {
@@ -51,8 +49,6 @@ export function leaveCar(p, world) {
 }
 
 export function updatePlayer(p, input, world, dt) {
-	// In a car: up is gas, down is brake and reverse, left and right steer,
-	// space is the handbrake. Touch asks the same question through `drive`.
 	if (p.car) {
 		const c = p.car
 		driveCar(c, input.drive(c), world, dt)
@@ -69,12 +65,9 @@ export function updatePlayer(p, input, world, dt) {
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
 	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
-	// The ground sets the pace; see surface.js for how much each one takes.
 	const felt = feelOn(null, surfaceAt(world, p.x, p.y))
 	let cap = (p.onBike ? 3.6 : 1.6) * (p.onBike ? felt.bike : felt.foot)
 	if (p.onBike && here === T.CYCLEWAY) cap *= 1.2
-	// Uphill is slower going, on foot a little, on the bike a lot; downhill
-	// is quicker, and a bike rolls on by itself. See HILLS.
 	const back = steering && steering.y > 0 ? -1 : 1
 	const [sx, sy] = world.slopeAt?.(p.x, p.y) ?? [0, 0]
 	const grade = (sx * Math.cos(p.dir) + sy * Math.sin(p.dir)) * back
@@ -91,7 +84,6 @@ export function updatePlayer(p, input, world, dt) {
 		p.speed += dt * (p.onBike ? 4 : 12)
 		p.speed = Math.min(p.speed, Math.max(max, rolling ? Math.min(p.speed, cap) : 0))
 	} else {
-		// Off the pedals: the bike slows, unless the hill's steep enough to keep it going.
 		const pull = rolling ? -grade * HILLS.coast : 0
 		p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14)))
 		p.speed = Math.min(p.speed, rolling ? cap : max)
@@ -130,7 +122,6 @@ export function updatePlayer(p, input, world, dt) {
 	// and a bike grazing a wall would grind to a halt.
 	const made = Math.hypot(p.x - fromX, p.y - fromY)
 	if (dt > 0 && made < pace * 0.25) p.speed = Math.min(p.speed, made / dt)
-	// Setts rattle the bike, and the view with it; on foot barely at all.
 	p.rough = felt.rattle * (p.onBike ? 1 : 0.25) * Math.min(1, Math.abs(p.speed) / (p.onBike ? 2.5 : 4))
 }
 
@@ -155,7 +146,6 @@ function pushOut(p, world) {
 		for (let ty = Math.floor(p.y - RADIUS); ty <= Math.floor(p.y + RADIUS); ty++) {
 			for (let tx = Math.floor(p.x - RADIUS); tx <= Math.floor(p.x + RADIUS); tx++) {
 				if (!SOLID.has(world.tileAt(tx, ty))) continue
-				// The nearest point of the tile, and how far into it you are.
 				const dx = p.x - Math.max(tx, Math.min(tx + 1, p.x))
 				const dy = p.y - Math.max(ty, Math.min(ty + 1, p.y))
 				const d = Math.hypot(dx, dy)
@@ -164,7 +154,6 @@ function pushOut(p, world) {
 					p.x += (dx / d) * (RADIUS - d)
 					p.y += (dy / d) * (RADIUS - d)
 				} else {
-					// Centre inside the tile: out the nearest side.
 					const sides = [
 						[tx - RADIUS - p.x, 0],
 						[tx + 1 + RADIUS - p.x, 0],

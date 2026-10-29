@@ -1,4 +1,3 @@
-// Drag out a rectangle on a real map, then play that part of Neukölln.
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BBOX } from './default-area.js'
@@ -15,13 +14,11 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map)
 
 const toBounds = (b) => L.latLngBounds([b.south, b.west], [b.north, b.east])
-// Red on a white casing, so the edge shows on any part of the map.
 const RED = '#e0302a'
 const casing = L.rectangle(toBounds(start), { color: '#fff', weight: 7, fill: false, interactive: false }).addTo(map)
 const rect = L.rectangle(toBounds(start), { color: RED, weight: 3, fillColor: RED, fillOpacity: 0.12 }).addTo(map)
 map.fitBounds(rect.getBounds(), { padding: [60, 60] })
 
-// Corner handles to adjust the rectangle.
 const handle = () =>
 	L.marker([0, 0], {
 		draggable: true,
@@ -37,7 +34,6 @@ function placeHandles() {
 	nw.setLatLng(b.getNorthWest())
 	se.setLatLng(b.getSouthEast())
 	update()
-	// The URL follows the rectangle, so a pick can be shared as it stands.
 	history.replaceState(null, '', location.pathname + areaUrl(area()).slice(1))
 }
 for (const m of [nw, se])
@@ -73,7 +69,6 @@ function update() {
 }
 placeHandles()
 
-// Draw mode: press the button, then drag a new rectangle.
 const drawBtn = document.getElementById('draw')
 let drawFrom = null
 drawBtn.onclick = () => {

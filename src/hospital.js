@@ -1,5 +1,3 @@
-// Real hospitals from the map, and the pavement in front of one where you
-// wake up after getting wasted.
 import { T, SOLID } from './tiles.js'
 
 const REACH = 8 // tiles out from the campus edge to look for pavement
@@ -18,7 +16,6 @@ export function nearestHospital(pois, x, y) {
 	return best
 }
 
-// Pavement just outside a hospital outline, facing back in toward it.
 export function hospitalDoor(ring, tileAt) {
 	if (!ring?.length) return null
 	let cx = 0
@@ -76,8 +73,6 @@ function walkableNear(x, y, tileAt, fallback) {
 	return fallback
 }
 
-// Where to stand after a waste: the nearest hospital's door, or null if the
-// area has none.
 export function hospitalWake(pois, x, y, tileAt) {
 	const h = nearestHospital(pois, x, y)
 	if (!h) return null

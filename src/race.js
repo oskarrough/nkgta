@@ -1,9 +1,3 @@
-// Races between gates you drop yourself. A gate is a line between two posts
-// across wherever you stood, facing the way you were going; a race is gates
-// A, B, C… taken in order, by any route. This module is the rules and the
-// bookkeeping, no drawing: crossing a gate, the clock, splits against your
-// best, the leaderboard, and the ghost of your best run, recorded at 10 Hz.
-
 export const GHOST_HZ = 10
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const WIDEST = 4 // tiles from the middle to a post, at most
@@ -12,8 +6,6 @@ const KEEP = 10 // times on a race's leaderboard
 
 export const letter = (i) => LETTERS[i] ?? String(i + 1)
 
-// A gate where you stand, its posts pushed out to the walls on either side
-// (or WIDEST), so it fills a street and fits a Durchfahrt.
 export function makeGate(x, y, angle, solid = () => false) {
 	const nx = -Math.sin(angle)
 	const ny = Math.cos(angle)
@@ -25,7 +17,6 @@ export function makeGate(x, y, angle, solid = () => false) {
 	return { x: round(x), y: round(y), angle: round(angle, 3), left: reach(-1), right: reach(1) }
 }
 
-// The two posts, left then right as you drive through.
 export function postsOf(g) {
 	const nx = -Math.sin(g.angle)
 	const ny = Math.cos(g.angle)
@@ -50,7 +41,6 @@ export function crossing(g, ax, ay, bx, by) {
 	return t >= 0 && t <= 1 && u >= -0.1 && u <= 1.1 ? t : null
 }
 
-// A run of `race`, in `vehicle` ('foot', 'bike' or a car model's key).
 export function startRun(race, vehicle) {
 	return { race, vehicle, t: 0, next: 1, splits: [], ghost: { hz: GHOST_HZ, frames: [] }, done: false }
 }
@@ -69,19 +59,16 @@ export function stepRun(run, from, to, dt, pose) {
 	const time = t0 + dt * k
 	const i = run.next
 	run.splits.push(time)
-	// What you're up against: a shared race's rival, else your own best.
 	const best = (run.race.rival ?? run.race.best)?.splits[i - 1]
 	run.next++
 	run.done = run.next >= run.race.gates.length
 	return { gate: i, time, delta: best === undefined ? null : time - best, finish: run.done }
 }
 
-// A frame for every tick of the ghost's clock up to t.
 function record(ghost, t, { x, y, angle, vehicle }) {
 	while (ghost.frames.length <= t * ghost.hz) ghost.frames.push([round(x), round(y), round(angle, 3), vehicle])
 }
 
-// Where the ghost was at t, between its frames; it waits at the finish.
 export function ghostAt(ghost, t) {
 	const frames = ghost?.frames
 	if (!frames?.length) return null

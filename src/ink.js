@@ -1,7 +1,3 @@
-// The render path, for every look (see looks.js): the city is drawn off
-// screen at game resolution, plain grey and unshadowed if the look asks,
-// inked, then blown up by whole device pixels and snapped to the palette if
-// the look asks.
 import * as THREE from 'three'
 import { DEFAULT_LOOK, LOOKS } from './looks.js'
 import { DITHER, LUT_SIZE, PALETTE_SIZE, paletteLut, paletteTexture } from './palette.js'
@@ -81,7 +77,6 @@ bool personAt(vec2 uv) {
 	return texture2D(tNormal, uv).a < 0.5;
 }
 
-// A person at uv, in front of depth z.
 bool personBefore(vec2 uv, float z) {
 	return personAt(uv) && depthAt(uv) < z;
 }
@@ -131,7 +126,6 @@ export function inkOutside(material) {
 	return material
 }
 
-// Blow the frame up by whole pixels, and snap to the palette if it's on.
 const blitShader = `
 uniform sampler2D tPixels;
 uniform sampler2D tPalette;
@@ -150,7 +144,6 @@ float bayer4(vec2 a) {
 	return bayer2(0.5 * a) * 0.25 + bayer2(a);
 }
 
-// The nearest palette colour, as an index, via the lookup table.
 float palette(vec3 color, float dither) {
 	vec3 c = clamp(color + dither, 0.0, 0.9999);
 	vec2 cell = vec2(floor(c.b * ${LUT_SIZE.toFixed(1)}) * ${LUT_SIZE.toFixed(1)} + floor(c.r * ${LUT_SIZE.toFixed(1)}), floor(c.g * ${LUT_SIZE.toFixed(1)}));

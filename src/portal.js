@@ -58,7 +58,6 @@ const SHAPE = /* glsl */ `
 		float c = cos(a) / r.x, s = sin(a) / r.y;
 		return inversesqrt(c * c + s * s) * rag(a, t);
 	}
-	// Bands drift round the rim: colour A where positive, B where negative, C on the seams.
 	float band(float a) {
 		return sin(a * 3.0 + uTime * 0.5 + sin(a * 7.0 - uTime * 0.8) * 0.9);
 	}
@@ -131,7 +130,6 @@ export function createPortal(renderer, options = {}) {
 					float a = atan(vP.y, vP.x);
 					vec3 tint = tearColor(a);
 					if (uOpen <= 0.0) {
-						// The pop: a last star where the tear was.
 						float r2 = dot(vP, vP);
 						float f = exp(-r2 * 60.0 / (0.15 + uPop * 1.5)) * (1.0 - uPop) * (1.0 - uPop) * step(0.0001, uPop);
 						if (f < 0.004) discard;
@@ -151,7 +149,6 @@ export function createPortal(renderer, options = {}) {
 							col = mix(col, tint, min(edge, 0.85));
 							gl_FragColor = vec4(col, 1.0);
 						} else {
-							// Tongues: the glow reaches further in some directions than others.
 							float reach = mix(7.0, 30.0, 0.5 + 0.5 * sin(a * 13.0 + uTime * 2.3 + sin(a * 5.0) * 2.0));
 							float h = exp(-(d - 1.0) * reach) * (0.5 + uFlare * 0.8) * smoothstep(0.0, 0.2, uOpen);
 							h = min(h, 0.85);
@@ -173,7 +170,6 @@ export function createPortal(renderer, options = {}) {
 	const kinds = new Float32Array(count * 2)
 	for (let i = 0; i < count; i++) {
 		seeds.set([Math.random() * Math.PI * 2, Math.random(), Math.random(), 0.15 + Math.random() * 0.5], i * 4)
-		// A seam spark or a band spark, and its size.
 		kinds.set([Math.random() < 0.12 ? 1 : 0, 0.03 + Math.random() ** 3 * 0.1], i * 2)
 	}
 	const sparkGeometry = new THREE.BufferGeometry()
@@ -199,7 +195,6 @@ export function createPortal(renderer, options = {}) {
 					float twinkle = pow(0.5 + 0.5 * sin(uTime * (6.0 + aSeed.w * 30.0) + aSeed.z * 40.0), 8.0);
 					vec3 local;
 					if (uPop > 0.0) {
-						// The pop: everything left flies off the point where the tear shut.
 						float fly = uPop * (0.4 + 1.6 * aSeed.y) * (0.6 + aSeed.w);
 						local = vec3(vec2(cos(aSeed.x), sin(aSeed.x)) * fly, (aSeed.z - 0.5) * fly) * uR;
 						vAlpha = (1.0 - uPop) * (1.0 - uPop) * (0.5 + 0.9 * twinkle) * step(0.55, aSeed.y);
@@ -207,7 +202,6 @@ export function createPortal(renderer, options = {}) {
 						float e = edgeAt(a, uOpen);
 						float drift = 1.0 + life * life * (0.6 + uFlare * 0.6) * aSeed.y;
 						local = vec3(vec2(cos(a), sin(a)) * e * drift, (aSeed.y - 0.5) * 0.16 * (0.3 + life)) * uR;
-						// A spark before the rip: a few bright ones on the centre.
 						float spark = 1.0 - smoothstep(0.0, 0.1, uOpen);
 						vAlpha = sin(life * 3.14159) * (0.5 + 0.9 * twinkle) * smoothstep(0.0, 0.02, uOpen)
 							* mix(1.0, step(0.93, aSeed.y) * 2.5, spark) * (1.0 + uFlare * 0.6);
@@ -238,7 +232,6 @@ export function createPortal(renderer, options = {}) {
 	sparks.frustumCulled = false
 	object.add(hole, sparks)
 
-	// Light spill: the tear's colour pooled on the ground either side of it, flickering with the rim.
 	let spill = null
 	if (floor !== null) {
 		spill = new THREE.Mesh(
@@ -280,8 +273,6 @@ export function createPortal(renderer, options = {}) {
 	}
 	object.traverse((child) => child.layers.set(o.layer))
 
-	// --- Animation ----------------------------------------------------------------------------
-
 	let time = 0
 	let openness = 0
 	let phase = 'closed' // opening, open, collapsing, closed
@@ -312,11 +303,9 @@ export function createPortal(renderer, options = {}) {
 			const { from, to, start, duration, fresh } = tween
 			const k = duration > 0 ? Math.min(1, (time - start) / duration) : 1
 			if (to > from) {
-				// Opening holds a beat as a spark, then rips.
 				const e = fresh ? (k < 0.12 ? 0.04 * (k / 0.12) : 0.04 + 0.96 * easeOut((k - 0.12) / 0.88)) : easeOut(k)
 				openness = fresh ? e : lerp(from, to, e)
 			} else {
-				// Collapsing: a breath held, then it snaps shut; the edge shivers as it goes.
 				openness = lerp(from, to, k ** 2.4)
 			}
 			if (k >= 1) {
@@ -341,8 +330,6 @@ export function createPortal(renderer, options = {}) {
 		uniforms.uQuiver.value = phase === 'collapsing' ? 1 - openness * 0.5 : 0
 		uniforms.uPop.value = pop
 	}
-
-	// --- Geometry -----------------------------------------------------------------------------
 
 	const exitMatrix = new THREE.Matrix4()
 	let exitSet = false
@@ -430,8 +417,6 @@ export function createPortal(renderer, options = {}) {
 	function toFar(point) {
 		return point.clone().applyMatrix4(syncThrough())
 	}
-
-	// --- Far render ---------------------------------------------------------------------------
 
 	let target = null
 	const size = new THREE.Vector2()
@@ -562,7 +547,6 @@ export function createPortal(renderer, options = {}) {
 		view,
 		toFar,
 		dispose,
-		// A burst of rim light and sparks, as when it first rips.
 		flash: () => (flare = 1),
 		get openness() {
 			return openness
