@@ -10,6 +10,12 @@ export function shuffled(items, random = Math.random) {
 }
 
 // Sample streets equally, rather than letting the longest road fill the quiz.
+const spotsCache = new WeakMap()
+export const streetSpots = (world) => {
+	if (!spotsCache.has(world)) spotsCache.set(world, quizSpots(world))
+	return spotsCache.get(world)
+}
+
 export function quizSpots(world) {
 	const streets = new Map()
 	for (let y = 1; y < world.H - 1; y++) {

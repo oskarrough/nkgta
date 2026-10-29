@@ -1,8 +1,10 @@
-import { quizLine, quizRounds, quizSpots } from './quiz-rules.js'
+import { copy } from './copy.js'
+import { quizShareText, seeded } from './daily.js'
+import { quizLine, quizRounds, streetSpots } from './quiz-rules.js'
 import { COLORS } from './tiles.js'
 import './quiz.css'
 
-export function createQuiz({ world, player, camera, city3d, area, prepare, restore, say }) {
+export function createQuiz({ world, player, camera, city3d, area, prepare, restore, say, finished }) {
 	const root = document.createElement('section')
 	root.id = 'quiz'
 	root.hidden = true
@@ -15,7 +17,7 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 		started = 0,
 		selected = 0,
 		generation = 0
-	let candidates
+	let daily = null // today's date while playing the round everyone gets
 	let previousButtons = []
 	let lastSecond = -1
 	let sendFailed = false
@@ -142,7 +144,22 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 			row.textContent = `${a.answer === a.street ? '✓' : '×'} ${a.street}${a.answer === a.street ? '' : ` ← ${a.answer ?? 'übersprungen'}`}`
 			list.append(row)
 		}
-		root.append(list, button('Zurück ins Spiel', close))
+		root.append(list)
+		if (daily) {
+			const result = {
+				date: daily,
+				score: answers.filter((a) => a.answer === a.street).length,
+				marks: answers.map((a) => (a.answer === a.street ? '✓' : '×')).join(''),
+			}
+			finished(result)
+			root.append(
+				button('Teilen', async () => {
+					const link = `${location.origin}${location.pathname}?quiz=daily`
+					if (await copy(quizShareText(result, link))) say('Ergebnis kopiert')
+				}),
+			)
+		}
+		root.append(button('Zurück ins Spiel', close))
 		if (sendFailed) reportSendFailure()
 		selected = 0
 		select(0)
@@ -207,10 +224,12 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 	return {
 		active,
 		tick,
-		async start() {
+		// `date`: play the round everyone gets that day, not a random one.
+		async start(date = null) {
 			if (active() || !prepare()) return
-			candidates ??= quizSpots(world)
-			rounds = quizRounds(candidates)
+			daily = date
+			const streets = streetSpots(world)
+			rounds = quizRounds(streets, date ? seeded(`quiz|${area}|${date}`) : Math.random)
 			if (!rounds.length) {
 				say('Für das Quiz braucht die Gegend mindestens fünf Straßen.')
 				return

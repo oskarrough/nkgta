@@ -5,6 +5,7 @@
 // gate A where you stand, and the keys underneath are the whole how-to.
 // While it's open the game doesn't hear the keys; Esc or a tap outside closes it.
 import { MODELS } from './models.js'
+import { isDaily } from './daily.js'
 import { clock } from './race.js'
 
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
@@ -22,7 +23,8 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 	function route(r, i) {
 		const from = where(r.gates[0])
 		const to = where(r.gates.at(-1))
-		return from === to ? from : from === '?' && to === '?' ? `Rennen ${i + 1}` : `${from} → ${to}`
+		const line = from === to ? from : from === '?' && to === '?' ? `Rennen ${i + 1}` : `${from} → ${to}`
+		return isDaily(r) ? `Heute: ${line}` : line
 	}
 	const away = (g) => {
 		const m = Math.hypot(g.x - player.x, g.y - player.y) * (world.tileM ?? 3)

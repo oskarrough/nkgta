@@ -11,6 +11,9 @@ import { crossing, ghostAt, letter, loadRaces, makeGate, saveRaces, startRun, st
 import { createRaceGates } from './race-gates.js'
 import { createRaceHud } from './race-hud.js'
 import { createRaceList } from './race-list.js'
+import { copy } from './copy.js'
+import { dailyId, dailyRace, isDaily } from './daily.js'
+import { streetSpots } from './quiz-rules.js'
 import { cleanName, nickname, raceFromHash, shareLink } from './race-share.js'
 
 const COUNTDOWN = 3 // seconds
@@ -39,20 +42,6 @@ function setName(name) {
 		storage.setItem(NAME_KEY, nameNow)
 	} catch {
 		// The name lasts until the tab closes.
-	}
-}
-
-async function copy(text) {
-	try {
-		await navigator.clipboard.writeText(text)
-		return true
-	} catch {
-		const field = Object.assign(document.createElement('textarea'), { value: text })
-		document.body.append(field)
-		field.select()
-		const ok = document.execCommand('copy')
-		field.remove()
-		return ok
 	}
 }
 
@@ -180,6 +169,20 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		snapCamera()
 	}
 
+	// Today's race for everyone: made from the date, kept in the list under a
+	// fixed id so your times stack up and a shared link finds it.
+	function startDaily(date) {
+		let r = races.find((x) => x.id === dailyId(date))
+		if (!r) {
+			r = dailyRace(world, streetSpots(world), date, area)
+			if (!r) return void say('Für ein Tagesrennen fehlt hier die Straße.')
+			for (let i = races.length - 1; i >= 0; i--) if (isDaily(races[i]) && !races[i].best) races.splice(i, 1)
+			races.push(r)
+			save()
+		}
+		begin(r)
+	}
+
 	function restart() {
 		if (draft || !race) return
 		const car = start?.car
@@ -246,6 +249,8 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		placeGate,
 		finish,
 		restart,
+		startDaily,
+		dailyBest: (date) => races.find((x) => x.id === dailyId(date))?.best ?? null,
 		// The panel of saved races, from the menu.
 		openList: list.open,
 		listOpen: list.isOpen,

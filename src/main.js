@@ -23,6 +23,8 @@ import { createMusic } from './music.js'
 import { createPocket } from './pocket.js'
 import { createRacing } from './racing.js'
 import { createFeedback, shortAgent } from './feedback.js'
+import { createDailyPanel } from './daily-panel.js'
+import { dailyQuizResult, dateKey, saveDailyQuiz } from './daily.js'
 import { createQuiz } from './quiz.js'
 import { areaFromUrl } from './area-url.js'
 
@@ -130,7 +132,7 @@ const actions = {
 	},
 	nextStation: () => music.nextStation(!!player.car),
 	// Start on a gamepad opens and closes the menu, the way Esc does.
-	menuOpen: () => !menu.hidden || racing.listOpen(),
+	menuOpen: () => !menu.hidden || racing.listOpen() || dailyPanel.isOpen(),
 	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
 	placeGate: () => racing.placeGate(),
@@ -142,6 +144,13 @@ const actions = {
 		feedback.open()
 	},
 }
+const dailyPanel = createDailyPanel({
+	date: dateKey,
+	quizResult: () => dailyQuizResult(localStorage, dateKey()),
+	raceBest: () => racing.dailyBest(dateKey()),
+	startQuiz: (date) => quiz.start(date),
+	startRace: (date) => racing.startDaily(date),
+})
 const feedback = createFeedback({
 	thank: () => hud.say('Danke fürs Feedback!'),
 	context: () => ({
@@ -176,6 +185,7 @@ const quiz = createQuiz({
 		return true
 	},
 	restore: () => input.release(),
+	finished: (result) => saveDailyQuiz(localStorage, result),
 })
 // All input sources share the same guard; the quiz owns its answer controls.
 const quizInput = Object.fromEntries(
@@ -199,6 +209,13 @@ tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 // Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
+	daily: [
+		() => {
+			showMenu(false)
+			dailyPanel.open()
+		},
+		() => null,
+	],
 	quiz: [() => quiz.start(), () => null],
 	streets: [actions.toggleStreetNames, () => showStreetNames],
 	transit: [actions.toggleTransit, () => showTransit],
@@ -411,7 +428,7 @@ await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
 phase('first textures')
 loading.remove()
 requestAnimationFrame(frame)
-if (URL_PARAMS.has('quiz')) quiz.start()
+if (URL_PARAMS.has('quiz')) quiz.start(URL_PARAMS.get('quiz') === 'daily' ? dateKey() : null)
 
 // For poking at the game from the console and automated browser tests while developing.
 if (import.meta.env.DEV)

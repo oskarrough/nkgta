@@ -327,7 +327,8 @@ body.touch #race .next-step {
 }
 
 /* The race list from the menu, in the menu's panel. */
-#races {
+#races,
+#daily {
 	inset: 0;
 	margin: auto;
 	width: min(30rem, calc(100vw - 2rem));
@@ -337,7 +338,8 @@ body.touch #race .next-step {
 	color: #e7e7e5;
 	font-family: system-ui, sans-serif;
 }
-#races h2 {
+#races h2,
+#daily h2 {
 	display: flex;
 	align-items: center;
 	gap: 0.4rem;
@@ -347,50 +349,61 @@ body.touch #race .next-step {
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 }
-#races .icon {
+#races .icon,
+#daily .icon {
 	margin: 0;
 }
-#races ol {
+#races ol,
+#daily ol {
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
-#races li {
+#races li,
+#daily li {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 	padding: 0.35rem 0;
 	border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
-#races .route {
+#races .route,
+#daily .route {
 	flex: 1;
 	min-width: 0;
 }
 #races .route strong,
-#races .route small {
+#daily .route strong,
+#races .route small,
+#daily .route small {
 	display: block;
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
-#races .route strong {
+#races .route strong,
+#daily .route strong {
 	font-weight: 800;
 }
-#races .route small {
+#races .route small,
+#daily .route small {
 	opacity: 0.7;
 	font-weight: 700;
 }
-#races .best {
+#races .best,
+#daily .best {
 	display: flex;
 	align-items: center;
 	gap: 0.2rem;
 	font-family: ui-monospace, monospace;
 	font-variant-numeric: tabular-nums;
 }
-#races .best .none {
+#races .best .none,
+#daily .best .none {
 	opacity: 0.4;
 }
-#races button {
+#races button,
+#daily button {
 	padding: 0.35rem 0.7rem;
 	border: 2px solid rgba(255, 255, 255, 0.4);
 	border-radius: 0.8rem;
@@ -401,18 +414,22 @@ body.touch #race .next-step {
 		sans-serif;
 	cursor: pointer;
 }
-#races button.go {
+#races button.go,
+#daily button.go {
 	border-color: #e8c21a;
 	background: rgba(232, 194, 26, 0.3);
 }
-#races button.del {
+#races button.del,
+#daily button.del {
 	padding: 0.35rem 0.5rem;
 }
-#races button.del.armed {
+#races button.del.armed,
+#daily button.del.armed {
 	border-color: #ec4335;
 	background: #ec4335;
 }
-#races button.new {
+#races button.new,
+#daily button.new {
 	display: flex;
 	align-items: center;
 	gap: 0.4rem;
@@ -420,16 +437,19 @@ body.touch #race .next-step {
 	padding: 0.2rem 0.7rem 0.2rem 0.3rem;
 	border-color: #e8c21a;
 }
-#races kbd {
+#races kbd,
+#daily kbd {
 	position: static;
 	margin-left: 0.2rem;
 }
-#races .empty {
+#races .empty,
+#daily .empty {
 	margin: 0.3rem 0;
 	opacity: 0.8;
 	font-weight: 700;
 }
-#races .how {
+#races .how,
+#daily .how {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.3rem 1rem;
@@ -438,17 +458,20 @@ body.touch #race .next-step {
 	font-weight: 700;
 	opacity: 0.85;
 }
-#races .how kbd {
+#races .how kbd,
+#daily .how kbd {
 	margin: 0 0.25rem 0 0;
 }
 body.touch #races .how {
 	display: none;
 }
-#races .icon {
+#races .icon,
+#daily .icon {
 	width: 32px;
 	height: 32px;
 }
-#races button span {
+#races button span,
+#daily button span {
 	color: inherit;
 	font: inherit;
 }
@@ -481,7 +504,8 @@ body.touch #races .how {
 #race .card .vs.behind {
 	color: var(--behind);
 }
-#races .name {
+#races .name,
+#daily .name {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
@@ -489,7 +513,8 @@ body.touch #races .how {
 	font-size: 0.8rem;
 	font-weight: 700;
 }
-#races .name input {
+#races .name input,
+#daily .name input {
 	flex: 1;
 	min-width: 0;
 	padding: 0.3rem 0.5rem;
@@ -498,4 +523,10 @@ body.touch #races .how {
 	background: rgba(0, 0, 0, 0.35);
 	color: #e7e7e5;
 	font: inherit;
+}
+#daily h2 small {
+	margin-left: auto;
+	font-size: 0.8rem;
+	opacity: 0.6;
+	letter-spacing: 0;
 }
