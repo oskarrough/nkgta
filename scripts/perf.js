@@ -1,10 +1,11 @@
 // Frame timings on the real GPU, in one command, for anyone who changes how
 // the game draws.
 // Usage: bun run perf [url-params] [--url <base>] [--cam top|chase] [--seconds 10]
+// Add --profile <path-prefix> to save a CDP CPU profile per camera.
 // Starts its own Vite (or uses --url), drives headless Chromium over CDP, and
 // prints median and p95 frame ms for the overhead and the chase camera, at
 // 11:00 from the same spot. Extra url-params ("hour=20") are added to ?perf.
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'vite'
@@ -16,7 +17,9 @@ const flag = (name, fallback) => {
 }
 const base = flag('url')
 const only = flag('cam')
+const cpuProfile = flag('profile')
 const seconds = Number(flag('seconds', 10))
+const settle = Number(flag('settle', 3))
 const extra = args.join('&')
 const views = only ? [only] : ['top', 'chase']
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
@@ -82,6 +85,7 @@ try {
 	socket.onmessage = ({ data }) => {
 		const msg = JSON.parse(data)
 		waiting.get(msg.id)?.(msg)
+		waiting.delete(msg.id)
 	}
 	const send = (method, params) =>
 		new Promise((done) => {
@@ -106,7 +110,7 @@ try {
 	if (!/radeon/i.test(gpu)) console.log('Not the Radeon: these are software numbers, ignore them.')
 
 	const median = (xs, p = 0.5) => xs.toSorted((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * p))]
-	const ms = (n) => n.toFixed(1)
+	const ms = (n) => (n == null ? 'n/a' : n.toFixed(1))
 	const PASSES = ['shadow', 'color', 'ink', 'blit']
 	for (const cam of views) {
 		const query = ['perf', 'hour=11', `cam=${cam === 'chase' ? 'chase' : 'top'}`, extra].filter(Boolean).join('&')
@@ -117,18 +121,29 @@ try {
 			await sleep(200)
 			if (await run('globalThis.perf?.frames.length > 0').catch(() => false)) break
 		}
-		await sleep(3000)
+		await sleep(settle * 1000)
 		await run('perf.frames.length = 0')
+		if (cpuProfile) {
+			await send('Profiler.enable')
+			await send('Profiler.start')
+		}
 		await sleep(seconds * 1000)
+		if (cpuProfile) {
+			const { profile } = await send('Profiler.stop')
+			writeFileSync(`${cpuProfile}-${cam}.cpuprofile`, JSON.stringify(profile))
+		}
 		const frames = await run(
-			'perf.frames.map(f => ({ interval: f.interval, total: f.total, shadow: f.shadow, color: f.color, ink: f.ink, blit: f.blit }))',
+			'perf.frames.map(f => ({ interval: f.interval, total: f.total, shadow: f.shadow, color: f.color, ink: f.ink, blit: f.blit, cpu: f.cpu }))',
 		)
 		const gaps = frames.map((f) => f.interval)
 		const work = frames.map((f) => f.total)
-		const passes = PASSES.map((p) => `${p} ${ms(median(frames.map((f) => f[p] ?? 0)))}`).join(', ')
+		const passes = PASSES.map((p) => {
+			const samples = frames.map((f) => f[p]).filter(Number.isFinite)
+			return `${p} ${ms(median(samples))} (${samples.length})`
+		}).join(', ')
 		const label = cam === 'chase' ? 'chase   ' : 'overhead'
 		console.log(`${label}  frame ${ms(median(gaps))} / ${ms(median(gaps, 0.95))} ms (median / p95), ${frames.length} frames`)
-		console.log(`          work ${ms(median(work))} / ${ms(median(work, 0.95))} ms: ${passes}`)
+		console.log(`          work ${ms(median(work))} / ${ms(median(work, 0.95))} ms; GPU ms (exclusive, sample count): ${passes}`)
 	}
 } finally {
 	await cleanup()

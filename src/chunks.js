@@ -250,6 +250,11 @@ export function createChunks(world, renderer, build) {
 		c.building = null
 		c.shown = { ground: undefined, roofs: undefined }
 		group.add(c.parts.group)
+		// Chunk geometry never moves; only textures and visibility change.
+		// Bake world transforms once, then skip the whole static subtree on
+		// each render (matrixAutoUpdate alone still walks every descendant).
+		c.parts.group.updateWorldMatrix(true, true)
+		c.parts.group.updateMatrixWorld = () => {}
 		// Its shaders compile now, alongside the game, rather than stalling
 		// the frame it first shows up in.
 		if (group.parent) renderer.compileAsync(c.parts.group, probe, group.parent)
