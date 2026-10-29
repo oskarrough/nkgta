@@ -248,7 +248,10 @@ function claim(world, x, y, metres) {
 				if (r[i + 1] > y !== r[j + 1] > y && x < r[i] + ((y - r[i + 1]) / (r[j + 1] - r[i + 1])) * (r[j] - r[i])) hit = !hit
 			}
 		}
-		if (hit) b.h = Math.min(b.h, metres)
+		if (hit) {
+			b.h = Math.min(b.h, metres)
+			delete b.roof
+		}
 	}
 }
 

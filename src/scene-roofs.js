@@ -1,3 +1,4 @@
+import { splitRoofWalls } from './measured-roofs.js'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { roofOf } from './map-image.js'
@@ -55,10 +56,11 @@ export function house(b, n, world) {
 	let base = Infinity
 	for (const r of b.rings) for (let i = 0; i < r.length; i += 2) base = Math.min(base, world.heightAt(r[i], r[i + 1]))
 	if (!Number.isFinite(base)) base = 0
-	const parts = footprint(b.rings)
+	let parts = footprint(b.rings)
 	const pitched = parts.length === 1 && roofOf(b, n).ridge
 	const rings = [parts[0]?.outer, ...(parts[0]?.holes ?? [])].map((r) => r?.map((p) => [p.x, p.y]))
-	const roof = pitched ? roofShape(rings, b.h, tileM) : null
+	const roof = b.roof ?? (pitched ? roofShape(rings, b.h, tileM) : null)
+	if (roof?.kind === 'measured') parts = splitRoofWalls(parts, roof)
 	// The building's axis, along its longest wall, for lining up tar paper.
 	let axis = 0
 	let longest = 0

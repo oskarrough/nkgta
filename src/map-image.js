@@ -508,6 +508,7 @@ function shade(hex, t) {
 
 // Which roof a building has: tiles or slate by a stable hash, sheds plain.
 export function roofOf(b, n) {
+	if (b.roof?.kind === 'measured') return ROOFS[Math.floor(roofHash(n) * 4)]
 	return b.h <= 5 ? SHED_ROOF : ROOFS[Math.floor(roofHash(n) * ROOFS.length)]
 }
 

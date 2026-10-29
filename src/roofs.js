@@ -1,3 +1,5 @@
+import { measuredHeight, planeOf } from './measured-roofs.js'
+
 // Pitched roofs. A building that is close enough to a rectangle gets a hip
 // roof over its oriented bounding box: four slopes up from the eaves, and a
 // flat top where the building is too deep for the slopes to meet. The slopes
@@ -45,6 +47,15 @@ export function roofShape(rings, h, tileM) {
 // The flat part on top of a pitched roof, as rings in the outline's frame, or
 // null where the slopes meet in a ridge.
 export function flatTops(roof) {
+	if (roof.kind === 'measured') {
+		const tops = roof.faces
+			.filter((rings) => {
+				const plane = planeOf(rings[0])
+				return plane && Math.hypot(plane[0], plane[1]) < 0.1
+			})
+			.flat()
+		return tops.length ? tops : null
+	}
 	if (roof.kind === 'mansard') return roof.insets
 	const top = roofFaces(roof)[4]
 	return top ? [top] : null
@@ -64,6 +75,13 @@ export function roofTriangles(roof, triangulate) {
 			const [a, b, c] = tri.map((i) => [...all[i], z])
 			push(a, b, c)
 		}
+	}
+	if (roof.kind === 'measured') {
+		for (const rings of roof.faces) {
+			const all = rings.flat()
+			for (const tri of triangulate(rings[0], rings.slice(1))) push(...tri.map((i) => all[i]))
+		}
+		return out
 	}
 	if (roof.kind === 'hip') {
 		for (const face of roofFaces(roof)) {
@@ -231,6 +249,7 @@ function hipRoof(pts, h, tileM) {
 }
 
 export function roofHeight(roof, x, y) {
+	if (roof.kind === 'measured') return measuredHeight(roof, x, y)
 	if (roof.kind === 'mansard') return Math.min(distanceToRings(roof.rings, x, y), roof.run) * roof.slope
 	const dx = x - roof.cx
 	const dy = y - roof.cy

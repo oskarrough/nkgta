@@ -3,6 +3,7 @@ import { getArea, putArea } from './area-cache.js'
 import { areaFromUrl } from './area-url.js'
 import { TILE_M } from './default-area.js'
 import { phase } from './perf.js'
+import { applyMeasuredRoofs } from './measured-roofs.js'
 
 // Bump when build-map.js or map-codec.js changes, so cached areas get rebuilt.
 const BUILD_VERSION = 16
@@ -11,6 +12,9 @@ export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
 	if (!bbox) {
 		onStatus('Lade Karte…')
+		const roofs = fetch('/roofs.json')
+			.then((res) => (res.ok ? res.json() : null))
+			.catch(() => null)
 		const terrain = fetch('/terrain.json')
 			.then((res) => (res.ok ? res.json() : null))
 			.catch(() => null)
@@ -20,6 +24,7 @@ export async function loadMap(onStatus) {
 		phase('parse')
 		const map = decodeMap(json)
 		phase('decode')
+		applyMeasuredRoofs(map, await roofs)
 		map.terrain = await terrain
 		return map
 	}

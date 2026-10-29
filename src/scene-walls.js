@@ -1,3 +1,4 @@
+import { roofSteps } from './measured-roofs.js'
 import * as THREE from 'three'
 import { roofHash } from './map-image.js'
 import { STOREY } from './build-map.js'
@@ -107,7 +108,7 @@ export function wallGeometry(houses, world, firewalls) {
 	const foot = [] // per vertex: the ground the building stands on
 	const plaster = FACADES.map((f) => new THREE.Color(f))
 	const c = new THREE.Color()
-	houses.forEach(({ n, h, base, parts, top }) => {
+	houses.forEach(({ n, h, base, parts, top, roof }) => {
 		// Downhill a hair below the ground, so no light shows under the wall.
 		const z0 = base - WALL_FOOT
 		const j = roofHash(n + 500)
@@ -146,9 +147,25 @@ export function wallGeometry(houses, world, firewalls) {
 						pos.push(p.x, p.y, z)
 						nor.push(nx, ny, 0)
 						col.push(c.r, c.g, c.b)
-						wall.push((d - lead) / bay, fit, h, balconies)
+						wall.push((d - lead) / bay, fit, roof?.kind === 'measured' ? Math.min(ta, te) - base : h, balconies)
 						foot.push(base)
 					}
+				}
+			}
+		}
+		if (roof?.kind === 'measured') {
+			for (const { a, b, za, zb, nx, ny } of roofSteps(roof)) {
+				const lowA = [a[0], a[1], za],
+					lowB = [b[0], b[1], zb]
+				const quad = [lowA, lowB, b, lowA, b, a]
+				// Quads must face the lower roof on either ring winding.
+				if ((b[1] - a[1]) * nx - (b[0] - a[0]) * ny < 0) quad.reverse()
+				for (const p of quad) {
+					pos.push(p[0], p[1], base + h + p[2])
+					nor.push(nx, ny, 0)
+					col.push(c.r, c.g, c.b)
+					wall.push(0, -1, h, seed + 1)
+					foot.push(base)
 				}
 			}
 		}

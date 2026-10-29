@@ -16,6 +16,7 @@ Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from O
 bun install
 bun run fetch-osm   # data/osm.json from Overpass, for the default area in src/default-area.js
 bun run build-map   # public/map.json, the static default map
+bun run build-roofs # public/roofs.json, measured Berlin roofs; caches LoD2 tiles in data/lod2/
 bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
 ```
@@ -50,6 +51,8 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names) and the text. `src/pocket.js`: the pocket device, its screen running one app (sound, for now) so another can join.
 - `src/race.js`: races between gates, the rules and bookkeeping: crossing a gate, splits, the leaderboard and the ghost. `src/racing.js` plays them in the game, `src/race-gates.js` stands the gates and the ghost in the city, `src/race-hud.js` is the stopwatch, countdown and finish card, `src/race-share.js` turns a race and its ghost into a link and back. `src/daily.js` and `src/daily-panel.js`: today's race and quiz round from the date, and the Heute panel.
 
+The default map also loads `public/roofs.json`, built from [Berlin’s LoD2 building model](https://gdi.berlin.de/data/a_lod2/atom/). Run `bun run build-roofs` after rebuilding the map; downloads are cached in `data/lod2/`, so subsequent builds work offline. Roof surfaces are clipped to the game’s footprints, including courtyards and passages. Buildings with less than 95% survey coverage keep their generated roofs. Picked areas work without this file. LoD2 gives generalised roof geometry and measured heights, not roof materials or individual roof terraces.
+
 ## Icons
 
 Every icon is its own PNG in `public/icons/`, 32×32 with a transparent background, shown at 32 CSS pixels with `image-rendering: pixelated`. Paint over a file (same name, same size) and the game picks it up; no code to touch.
@@ -62,4 +65,4 @@ Every icon is its own PNG in `public/icons/`, 32×32 with a transparent backgrou
 - `race-gate.png`, `race-finish.png`, `race-restart.png`: drop a gate (G), save the race (F), back to the start (Q)
 - `foot.png`: on foot, beside a race time; `act-bike.png` and `act-car.png` stand for the bike and the cars there
 
-Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1, Geoportal Berlin, dl-de/zero-2-0.
+Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1; building roofs: LoD2, Geoportal Berlin, dl-de/zero-2-0.

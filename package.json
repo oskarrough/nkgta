@@ -9,6 +9,7 @@
 		"preview": "vite preview",
 		"fetch-osm": "bun scripts/fetch-osm.js",
 		"build-map": "bun scripts/build-map.js",
+		"build-roofs": "bun scripts/build-roofs.js",
 		"build-terrain": "bun scripts/build-terrain.js",
 		"perf": "bun scripts/perf.js",
 		"check": "oxlint --quiet && oxfmt --check",
