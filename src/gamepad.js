@@ -10,6 +10,9 @@ const A = 0
 const B = 1
 const X = 2
 const Y = 3
+const LB = 4
+const RB = 5
+const BACK = 8
 const START = 9
 const UP = 12
 const DOWN = 13
@@ -97,6 +100,9 @@ export function createGamepad(actions, blocked = () => false) {
 		if (fired(RIGHT)) actions.shiftChoice(1)
 		if (fired(X)) actions.toggleCamera()
 		if (fired(Y)) actions.nextStation()
+		if (fired(LB)) actions.placeGate()
+		if (fired(RB)) actions.finishRace()
+		if (fired(BACK)) actions.restartRace()
 		if (fired(UP)) actions.zoom(1.25)
 		if (fired(DOWN)) actions.zoom(0.8)
 		return pad

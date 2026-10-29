@@ -70,8 +70,8 @@ export function createHud(world) {
 		say: (text) => (toast = { text, t: 3 }),
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door.
-		update({ player, cam, bag, showTransit, wasted, inside, door, action }, dt) {
-			minimap(player, !!cam.third, inside)
+		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate }, dt) {
+			minimap(player, !!cam.third, inside, gate)
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
 			// A door that's open already just names the shop.

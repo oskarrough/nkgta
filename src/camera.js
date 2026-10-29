@@ -64,6 +64,12 @@ export function createCamera(world) {
 			speedDistance = aheadX = aheadY = away = 0
 			return thirdPerson
 		},
+		// Straight behind the target again, e.g. after being put back at a start line.
+		snap(target) {
+			yaw = target.dir
+			boom = null
+			speedDistance = aheadX = aheadY = away = 0
+		},
 		setLooking(value) {
 			if (looking && !value) returnDelay = 1.2
 			looking = value

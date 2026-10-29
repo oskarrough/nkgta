@@ -21,6 +21,8 @@ import { createActors } from './actors.js'
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createRadioHud } from './radio-hud.js'
+import { createRacing } from './racing.js'
+import { areaFromUrl } from './area-url.js'
 
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
 
@@ -61,11 +63,23 @@ const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt
 const veil = document.getElementById('veil')
 const wasted = createWasted({
 	player,
-	onDown: () => pfand.spill(player.x, player.y),
+	onDown: () => {
+		pfand.spill(player.x, player.y)
+		racing.abort()
+	},
 	respawn: () => Object.assign(player, createPlayer(hospitalWake(world.pois, player.x, player.y, world.tileAt) ?? world.startPoint(START))),
 	fade: (a) => {
 		veil.style.opacity = String(a)
 	},
+})
+const racing = createRacing({
+	world,
+	player,
+	scene: city3d.scene,
+	gradient: city3d.gradient,
+	area: areaFromUrl() && Object.values(areaFromUrl()).join(','),
+	say: hud.say,
+	snapCamera: () => camera.snap(player),
 })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
@@ -150,6 +164,9 @@ const actions = {
 	menuOpen: () => !menu.hidden,
 	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
+	placeGate: () => racing.placeGate(),
+	finishRace: () => racing.finish(),
+	restartRace: () => racing.restart(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 }
 const input = createInput(actions)
@@ -212,7 +229,23 @@ menuButton.addEventListener('click', () => {
 })
 // Esc closes the volume pill first, otherwise opens or closes the menu. While
 // the menu is open the game doesn't hear walking or E.
-const GAME_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'e', 'Enter'])
+const GAME_KEYS = new Set([
+	'ArrowUp',
+	'ArrowDown',
+	'ArrowLeft',
+	'ArrowRight',
+	'w',
+	'a',
+	's',
+	'd',
+	' ',
+	'e',
+	'Enter',
+	'g',
+	'f',
+	'q',
+	'Backspace',
+])
 addEventListener(
 	'keydown',
 	(e) => {
@@ -292,6 +325,7 @@ function frame(now) {
 	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	camera.suspend(visit.busy())
+	const from = { x: player.x, y: player.y }
 	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
 	visit.update(dt, heading())
 	wasted.update(dt)
@@ -332,8 +366,12 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car)
+	racing.update(dt, from, { inside: visit.busy(), down: wasted.active() })
 	radioHud.update(music.radio(), dt)
-	hud.update({ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action }, dt)
+	hud.update(
+		{ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action, gate: racing.target() },
+		dt,
+	)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
 	if (FPS) fpsMeter(now)
 	last = now
@@ -350,4 +388,18 @@ requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.
 if (import.meta.env.DEV)
-	window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound, clock, weather: city3d.weather }
+	window.nkgta = window.__nkgta = {
+		world,
+		player,
+		shops,
+		visit,
+		pfand,
+		camera,
+		traffic,
+		music,
+		sound,
+		clock,
+		weather: city3d.weather,
+		racing,
+		city3d,
+	}

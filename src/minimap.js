@@ -42,7 +42,8 @@ export function createMinimap(world) {
 	}
 	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: world.buildings })
 	let next = 0
-	return function update(player, chase, inside) {
+	// `gate` is the race's next gate, { x, y, label }, or null.
+	return function update(player, chase, inside, gate) {
 		const hidden = !!inside || !image
 		if (canvas.hidden !== hidden) canvas.hidden = hidden
 		const now = performance.now()
@@ -86,6 +87,23 @@ export function createMinimap(world) {
 			ctx.lineWidth = 2
 			ctx.stroke()
 			ctx.fill()
+		}
+		// The next race gate: its letter on a yellow badge, pinned to the rim
+		// when it's out of range.
+		if (gate) {
+			const point = radarPoint(gate, player, rotation)
+			ctx.beginPath()
+			ctx.arc(point.x, point.y, 6, 0, Math.PI * 2)
+			ctx.fillStyle = '#e8c21a'
+			ctx.lineWidth = 2
+			ctx.strokeStyle = INK
+			ctx.fill()
+			ctx.stroke()
+			ctx.font = 'bold 8px monospace'
+			ctx.textAlign = 'center'
+			ctx.textBaseline = 'middle'
+			ctx.fillStyle = INK
+			ctx.fillText(gate.label, point.x, point.y + 0.5)
 		}
 		// North moves round the rim when the map turns.
 		ctx.font = 'bold 8px monospace'
