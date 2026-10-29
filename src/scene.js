@@ -10,6 +10,7 @@ import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import { createBridges } from './bridges.js'
 import { createTrees, createTrunks } from './trees.js'
 import { createFurniture } from './street-furniture.js'
+import { createNightPools } from './night-pools.js'
 import { SETT_ALPHA } from './map-image.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
@@ -272,6 +273,8 @@ export function createScene(canvas, world, shops = []) {
 			group.add(mesh)
 		}
 		yield
+		const pools = createNightPools(world, chunk, shops, sky.night)
+		if (pools) group.add(pools)
 		const furniture = createFurniture(world, gradient, chunk, sky.night)
 		for (const mesh of furniture.meshes) group.add(mesh)
 		const uv = plane.geometry.attributes.uv
