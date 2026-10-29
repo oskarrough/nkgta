@@ -52,6 +52,10 @@ Agents often work in parallel, each in its own bb worktree, with a GitHub issue 
 - Stay inside your task. src/scene.js is shared by most look changes: touch as few of its lines as you can and put new things in their own module, so parallel work merges cleanly.
 - Finish with: the pushed commit, one line per change the player notices, perf before/after if it draws anything, a before/after screenshot at an absolute path if it shows on screen, and what Oskar should check by eye.
 
+## Keep learning
+
+Every session should leave the next one faster. When something costs you time that a sentence could have saved (a wrong assumption, a missing step, a trap in the tooling), add that sentence here or to the relevant skill in the same change. When a better way of working emerges, write it down here. Lead agents also note how each model did (time, tokens, quality, how much steering it needed) in Oskar's model tier list, so the next pick is better.
+
 ## Issues
 
 Ideas, bugs and the roadmap live in GitHub issues, using the labels `now`, `next` and `later`. Not in Linear and not in the bb inbox.
