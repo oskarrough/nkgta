@@ -3,6 +3,7 @@ import { T, SOLID } from './tiles.js'
 import { driveCar, speedOf, toWorld } from './car.js'
 import { HILLS } from './terrain.js'
 import { pushFromTrunks } from './trees.js'
+import { feelOn, surfaceAt } from './surface.js'
 
 export const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
@@ -18,6 +19,8 @@ export function createPlayer(start) {
 		onBike: false,
 		car: null,
 		bike: { x: start.x + 1.2, y: start.y },
+		// Ground shake for the camera and the bike, set from the surface each frame.
+		rough: 0,
 	}
 }
 
@@ -57,6 +60,7 @@ export function updatePlayer(p, input, world, dt) {
 		p.y = c.y
 		p.dir = c.angle
 		p.speed = speedOf(c)
+		p.rough = feelOn(c.model, surfaceAt(world, c.x, c.y)).rattle * Math.min(1, Math.abs(p.speed) / 5)
 		return
 	}
 	const steering = input.steer?.()
@@ -65,8 +69,9 @@ export function updatePlayer(p, input, world, dt) {
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
 	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
-	let cap = p.onBike ? 3.6 : 1.6
-	if (p.onBike && here === T.GRASS) cap *= 0.55
+	// The ground sets the pace; see surface.js for how much each one takes.
+	const felt = feelOn(null, surfaceAt(world, p.x, p.y))
+	let cap = (p.onBike ? 3.6 : 1.6) * (p.onBike ? felt.bike : felt.foot)
 	if (p.onBike && here === T.CYCLEWAY) cap *= 1.2
 	// Uphill is slower going, on foot a little, on the bike a lot; downhill
 	// is quicker, and a bike rolls on by itself. See HILLS.
@@ -125,6 +130,8 @@ export function updatePlayer(p, input, world, dt) {
 	// and a bike grazing a wall would grind to a halt.
 	const made = Math.hypot(p.x - fromX, p.y - fromY)
 	if (dt > 0 && made < pace * 0.25) p.speed = Math.min(p.speed, made / dt)
+	// Setts rattle the bike, and the view with it; on foot barely at all.
+	p.rough = felt.rattle * (p.onBike ? 1 : 0.25) * Math.min(1, Math.abs(p.speed) / (p.onBike ? 2.5 : 4))
 }
 
 // You're round: a wall pushes you straight out of it, and what's left of

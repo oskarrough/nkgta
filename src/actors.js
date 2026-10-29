@@ -303,7 +303,9 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			const shown = (!player.car || !!player.down) && eyeDistance > 0.65
 			const parent = room ?? root
 			if (you.group.parent !== parent) parent.add(you.group)
-			const z = ground + (player.onBike && !player.down ? 0.15 : 0)
+			// Setts jolt the rider and the bike, on top of the stride.
+			const bob = player.onBike ? (player.rough ?? 0) * 0.05 * Math.sin(stride) : 0
+			const z = ground + (player.onBike && !player.down ? 0.15 + bob : 0)
 			const grow = cam.third ? 1 : OVERHEAD
 			pose(
 				you,
@@ -325,8 +327,8 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 
 			bike.visible = !room && (!player.down || !player.onBike)
 			const on = player.onBike ? player : player.bike
-			bike.position.set(on.x, -on.y, heightAt(on.x, on.y))
-			bike.rotation.z = player.onBike ? -player.dir : 0
+			bike.position.set(on.x, -on.y, heightAt(on.x, on.y) + (player.onBike ? bob : 0))
+			bike.rotation.z = player.onBike ? -player.dir + bob * 1.8 : 0
 
 			if (peds.length > crowds.size) {
 				root.remove(crowds.group)

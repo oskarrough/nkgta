@@ -3,15 +3,15 @@
 // little and sliding sideways a lot, both in proportion to its speed; that
 // alone makes a car steer, drift and spin. Lengths are tiles, forces are per
 // unit of mass.
-import { SOLID, T } from './tiles.js'
+import { SOLID } from './tiles.js'
 import { MODELS } from './models.js'
 import { HILLS } from './terrain.js'
+import { feelOn, surfaceAt } from './surface.js'
 
 export const { length: LENGTH, width: WIDTH } = MODELS.car // an ordinary car, for spacing traffic
 const REVERSE = 0.5
 const HANDBRAKE_GRIP = 0.35 // rear sideways grip left with the handbrake on
 const HANDBRAKE_ROLLING = 6
-const OFF_ROAD = 3 // rolling resistance on grass and earth
 const STEP = 1 / 120
 const GRAVITY = 9.81 // m/s²
 
@@ -119,9 +119,9 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 
 	// Less lock the faster you go, or the front tyres scrub off all your speed.
 	const lock = m.steer / (1 + Math.max(0, forward - 2) * m.steerFade)
-	c.steer += (turn * lock - c.steer) * Math.min(1, dt * 8)
-	const ground = world.tileAt(c.x, c.y)
-	const rough = ground === T.GROUND || ground === T.GRASS ? OFF_ROAD : 1
+	// Rough ground makes the wheels take their set late; a van lags well behind.
+	const centre = feelOn(m, surfaceAt(world, c.x, c.y))
+	c.steer += (turn * lock - c.steer) * Math.min(1, dt * 8 * centre.steer)
 	for (const t of c.tyres) {
 		const [px, py] = toWorld(c, t.lx, t.ly)
 		const [vx, vy] = pointVelocity(c, px, py)
@@ -132,8 +132,10 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 		const lateral = vx * -ry + vy * rx
 		const hand = handbrake && !t.front
 		c.slip = Math.max(c.slip, Math.abs(lateral), c.braking || hand ? Math.abs(rolling) * 0.4 : 0)
-		const kr = m.rolling * rough * (hand ? HANDBRAKE_ROLLING : 1)
-		const kl = m.lateral * (hand ? HANDBRAKE_GRIP : 1)
+		// Per tyre, so a wheel on the kerb feels the kerb.
+		const feel = feelOn(m, surfaceAt(world, px, py))
+		const kr = m.rolling * feel.roll * (hand ? HANDBRAKE_ROLLING : 1)
+		const kl = m.lateral * feel.grip * (hand ? HANDBRAKE_GRIP : 1)
 		// Hysteresis, so marks don't flicker on and off at the threshold.
 		t.skid = !t.front && Math.abs(lateral) > (t.skid ? 0.5 : 0.9)
 		const tx = -kr * rolling * rx + kl * lateral * ry

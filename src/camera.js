@@ -27,6 +27,9 @@ export const ZOOM = {
 }
 
 const pull = (speed) => 1 - Math.exp(-Math.max(0, speed - ZOOM.calm) / (ZOOM.fast / 2))
+// Rough ground rattles the view. Small enough that it reads as the street, not a bug.
+const SHAKE = { overhead: 1.4, chase: 0.03, rate: 96 }
+const sway = (t, seed) => Math.sin(t * SHAKE.rate + seed) * 0.6 + Math.sin(t * SHAKE.rate * 2.7 + seed * 2.3) * 0.4
 // Eases `from` towards `to`, quicker on the way out than back in.
 const glide = (from, to, dt) => from + (to - from) * (1 - Math.exp(-dt / Math.max(0.01, to > from ? ZOOM.easeOut : ZOOM.easeIn)))
 
@@ -46,6 +49,7 @@ export function createCamera(world) {
 	let aheadY = 0
 	let boom = null
 	let held = 0 // seconds the boom stays pulled in before easing out again
+	let shakeT = 0
 
 	let ground = null
 	const active = () => thirdPerson && !suspended
@@ -94,6 +98,8 @@ export function createCamera(world) {
 		state: () => ({ away, boom: speedDistance }),
 
 		update(target, canvas, dt, pixelGrid, closer = 1) {
+			shakeT += dt
+			const rattle = Math.min(1.4, target.rough ?? 0)
 			if (active()) {
 				const vehicle = target.car || target.onBike
 				const moving = vehicle && Math.abs(target.speed) > 0.12
@@ -143,12 +149,13 @@ export function createCamera(world) {
 				const x = target.x + dx * fraction
 				const y = target.y + dy * fraction
 				const z = Math.max(ground + height + Math.sin(pitch) * boom, heightAt(x, y) + 0.25)
+				const amp = rattle * SHAKE.chase
 				return {
 					scale: 24 * devicePixelRatio,
 					third: {
-						x,
-						y,
-						z,
+						x: x + sway(shakeT, 0) * amp,
+						y: y + sway(shakeT, 1.7) * amp,
+						z: z + sway(shakeT, 3.1) * amp * 0.6,
 						target: { x: target.x + aheadX, y: target.y + aheadY, z: ground + height },
 					},
 					bounds: { x0: target.x - 64, y0: target.y - 64, x1: target.x + 64, y1: target.y + 64 },
@@ -176,8 +183,9 @@ export function createCamera(world) {
 			// makes slow pans alternate between standing still and jumping, and
 			// lets the player wobble around the centre while zoom is changing.
 			const snap = pixelGrid ? gameUpscale(scale) : 0
-			const x = target.x * scale - canvas.width / 2
-			const y = target.y * scale - canvas.height / 2
+			const amp = rattle * SHAKE.overhead * devicePixelRatio
+			const x = target.x * scale - canvas.width / 2 + sway(shakeT, 0) * amp
+			const y = target.y * scale - canvas.height / 2 + sway(shakeT, 1.7) * amp
 			return {
 				scale,
 				x: snap ? Math.round(x / snap) * snap : x,
