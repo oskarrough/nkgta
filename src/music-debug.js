@@ -1,8 +1,3 @@
-// Musik-Debug: where music comes from. Every source gets a speaker and a ring
-// on the ground as far as it carries (HEAR, or the convoy's own reach); the
-// level falls off as (1 - d / reach)², so there's no full-volume inner ring.
-// The ones you hear glow and pulse with their gain. Overhead view only, like
-// the rest of the flat layer.
 import { KINDS, reach } from 'jukebox/player'
 
 const icon = new Image()
@@ -29,7 +24,6 @@ export function drawMusicDebug(ctx, { sources, gains, enclosure = 0 }, toScreen,
 		const s = size * (1 + 0.35 * on * pulse)
 		if (icon.complete) ctx.drawImage(icon, sx - s / 2, sy - s / 2, s, s)
 	}
-	// What's playing, loudest first, and how shut in you are (the reverb send).
 	const playing = [...gains].sort((a, b) => b[1] - a[1]).map(([src, gain]) => `${src.kind} · ${src.score} · ${gain.toFixed(2)}`)
 	const lines = [`Raum ${enclosure.toFixed(2)}`, ...(playing.length ? playing : ['Musik: still'])]
 	ctx.font = `800 ${13 * dpr}px system-ui, sans-serif`

@@ -60,7 +60,6 @@ export function cornerCutter(roads, others, tileM) {
 				const inward = { x: v.x + (mid.x / ml) * 0.3, y: v.y + (mid.y / ml) * 0.3 }
 				const outward = { x: v.x - (mid.x / ml) * 0.8, y: v.y - (mid.y / ml) * 0.8 }
 				if (!self(inward) || self(outward) || taken(outward)) return out.push(v)
-				// Both fronts face a street, and nobody else stands in front of them.
 				const front = (u, s) => ({ x: v.x + u.x * 1.2 - s * u.y * 0.6, y: v.y + u.y * 1.2 + s * u.x * 0.6 })
 				const sideP = self(front(up, 1)) ? front(up, -1) : front(up, 1)
 				const sideN = self(front(un, 1)) ? front(un, -1) : front(un, 1)

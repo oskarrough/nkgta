@@ -52,7 +52,6 @@ function sideLamp() {
 	const body = merge([
 		upright(new THREE.CylinderGeometry(r * 1.8, r * 2.3, 0.35, 8), 0.17),
 		upright(new THREE.CylinderGeometry(r * 0.8, r, h, 6), h / 2),
-		// The swan's neck: up, over and down to the lantern.
 		tube(
 			[
 				[0, h - 0.05],
@@ -77,7 +76,6 @@ function bollard() {
 	])
 }
 
-// Shapes and materials, made once and shared by every chunk.
 let kit
 function kitFor(gradient, night) {
 	if (kit) return kit

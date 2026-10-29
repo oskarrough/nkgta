@@ -16,7 +16,6 @@ const HIGH = 2.4 // wall height
 const FLOOR = { a: '#C2BDB0', b: '#A9A7A0', mat: '#4D4C4B' }
 const PLASTER = '#D2C4A0'
 const VOID = '#2D333D'
-// Indoor light: flat and bright, from the front, so the board is fully lit.
 const AMBIENT = { color: '#d8d4cc', intensity: 1.1 }
 const LAMP = { color: '#fff4e2', intensity: 2.2, direction: [0.25, 0.45, -1] }
 const BOARDS = { spaeti: '#C8302A', doener: '#B5603F', imbiss: '#E8C21A', cafe: '#6E3A2A', bar: '#2D333D', bikeshop: '#3D5E82' }
@@ -51,7 +50,6 @@ export function createInterior(gradient) {
 		return mesh
 	}
 
-	// Lino in big checks, with a dark mat at the door.
 	const lino = document.createElement('canvas')
 	lino.width = W * 16
 	lino.height = D * 16
@@ -69,7 +67,6 @@ export function createInterior(gradient) {
 	linoTex.magFilter = THREE.NearestFilter
 	at(new THREE.Mesh(new THREE.PlaneGeometry(W, D).translate(W / 2, -D / 2, 0), toon('#fff', linoTex)), false)
 
-	// Walls, then the furniture, each kind one merged mesh.
 	const box = (x0, y0, x1, y1, h) => new THREE.BoxGeometry(x1 - x0, y1 - y0, h).translate((x0 + x1) / 2, -(y0 + y1) / 2, h / 2)
 	at(
 		new THREE.Mesh(
@@ -83,7 +80,6 @@ export function createInterior(gradient) {
 		),
 	)
 	for (const [x0, y0, x1, y1, h, color] of FURNITURE) at(new THREE.Mesh(box(x0, y0, x1, y1, h), toon(color)))
-	// Bottles in the fridges and goods on the shelves: little boxes in shop colours.
 	const goods = []
 	const colors = ['#C8302A', '#3FA34D', '#E8C21A', '#3D5E82', '#E7E7E5', '#B5603F']
 	const shelf = (x0, x1, y0, y1, z, step) => {
@@ -98,9 +94,7 @@ export function createInterior(gradient) {
 		item.setColorAt(i, new THREE.Color(color))
 	})
 	at(item)
-	// The till.
 	at(new THREE.Mesh(box(7.4, 2.45, 8.1, 2.95, 0.62), toon('#363B44')))
-	// A clerk behind the counter in Dönerläden.
 	const clerk = new THREE.Group()
 	const clerkPart = (geometry, color, x, y, z) => {
 		const mesh = new THREE.Mesh(geometry, toon(color))
@@ -113,11 +107,8 @@ export function createInterior(gradient) {
 	clerkPart(new THREE.SphereGeometry(0.27, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#292321', 6, -2.2, 1.43)
 	clerk.visible = false
 	scene.add(clerk)
-	// Lit glass down the fridge fronts.
 	at(new THREE.Mesh(box(WALL + 0.8, 2.1, WALL + 0.86, 6.3, 1.1), new THREE.MeshBasicMaterial({ color: '#B4C1D0' })), false)
 
-	// The board: name on the front, ink round the back and edges, hung from
-	// the back wall and tilted out over the counter.
 	const poster = document.createElement('canvas')
 	poster.width = 2048
 	poster.height = 456
@@ -126,7 +117,6 @@ export function createInterior(gradient) {
 	posterTex.anisotropy = 8
 	const ink = new THREE.MeshBasicMaterial({ color: INK })
 	const board = new THREE.Mesh(new THREE.BoxGeometry(9, 2, 0.08), [ink, ink, ink, ink, toon('#fff', posterTex), ink])
-	// From the top of the back wall down and out to just behind the counter.
 	board.position.set(W / 2, -1.3, 2.1)
 	board.rotation.x = Math.atan2(1.2, 1.6)
 	at(board)
@@ -151,7 +141,6 @@ export function createInterior(gradient) {
 		const { width: w, height: h } = poster
 		g.fillStyle = BOARDS[shop.kind] ?? '#3D5E82'
 		g.fillRect(0, 0, w, h)
-		// A cream rule round the edge, and the kind of shop in a band below.
 		g.strokeStyle = CREAM
 		g.lineWidth = 14
 		g.strokeRect(28, 28, w - 56, h - 56)
@@ -166,7 +155,6 @@ export function createInterior(gradient) {
 	}
 
 	const inRect = (x, y, [x0, y0, x1, y1], pad = 0) => x > x0 - pad && x < x1 + pad && y > y0 - pad && y < y1 + pad
-	// The room as the player's world: floor, or solid.
 	const world = {
 		tileAt: (x, y) => (x < WALL || y < WALL || x > W - WALL || y > DOOR_Y || SOLIDS.some((r) => inRect(x, y, r)) ? T.BUILDING : T.GROUND),
 	}
@@ -175,7 +163,6 @@ export function createInterior(gradient) {
 		scene,
 		world,
 		setShop,
-		// In front of the counter, where you hand things over.
 		atCounter: (x, y) => x > COUNTER[0] && x < COUNTER[2] && y > COUNTER[3] && y < COUNTER[3] + 1.1,
 	}
 }

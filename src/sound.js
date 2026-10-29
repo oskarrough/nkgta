@@ -1,6 +1,3 @@
-// Quiet street audio. Every source reaches the same master, including delayed cues,
-// and the same small room: the more walls around you, the more of it each source
-// sends there.
 import { enclosure } from './space.js'
 
 let context
@@ -72,7 +69,6 @@ function start() {
 		noise = context.createBuffer(1, context.sampleRate * 2, context.sampleRate)
 		const data = noise.getChannelData(0)
 		for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
-		// Decode small cues after the gesture, before the first door or bottle.
 		for (const name of ['door-open', 'door-close', 'glass', 'till']) load(name)
 	}
 	if (context.state === 'suspended') context.resume().catch(() => {})
@@ -96,7 +92,6 @@ function impulse(ctx, seconds) {
 	return buffer
 }
 
-// Into the speakers, and into the room by how shut in you are.
 function out(node) {
 	node.connect(master)
 	node.connect(room)
@@ -264,7 +259,6 @@ function load(name) {
 	return buffers.get(name)
 }
 
-// Two cars' horns a third apart, always sounding, gated by their gain.
 function horns() {
 	const filter = context.createBiquadFilter()
 	filter.type = 'lowpass'
@@ -350,7 +344,6 @@ function street(cars, player, view, dt) {
 			duck(0.3)
 			note('horn', 0.07)
 		}
-		// Swerving or stamping on the brake for you: a long, angry one.
 		if (!muted && car.ai.honk) {
 			v.hornUntil = now + 0.5
 			duck(0.3)
@@ -401,8 +394,6 @@ addEventListener('visibilitychange', () => {
 })
 let lastClink = -Infinity
 
-// Look at the walls round the listener a few times a second and send more to
-// the room the more they close in.
 function listen(world, x, y, inside) {
 	if (!context || context.currentTime - lookAt < LOOK_EVERY) return
 	lookAt = context.currentTime
@@ -414,7 +405,6 @@ export const sound = {
 	start,
 	listen,
 	enclosure: () => shut,
-	// The context, master and room for music from the street, once sound has started.
 	audio: () => context && { context, master, room, muted, duck: ducking },
 	engine,
 	street,
@@ -440,7 +430,6 @@ export const sound = {
 		duck(0.4)
 		cue('till', 0.13)
 	},
-	// A click on the radio's wheel.
 	tick() {
 		burst(2800, 0.04, 0.035)
 	},
@@ -455,7 +444,6 @@ export const sound = {
 		return muted
 	},
 	volume: () => volume,
-	// Dragging to zero mutes; dragging up again unmutes.
 	setVolume(value) {
 		volume = Math.min(1, Math.max(0, value))
 		muted = volume === 0

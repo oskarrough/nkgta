@@ -18,7 +18,6 @@ const ATLAS_W = 2048
 export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0) {
 	const list = [...pick]
 	if (!list.length) return new THREE.Group()
-	// Lay the names out in rows, then paint them.
 	const measure = document.createElement('canvas').getContext('2d')
 	const cells = []
 	let x = 0
@@ -49,7 +48,6 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 		if (flip) [up, right] = [up.map((v) => -v), right.map((v) => -v)]
 		paintCell(g, cell, shop.name, color, flip)
 
-		// Along the wall from the door, stopping halfway to a neighbour's door.
 		const want = Math.max(WIDTH[0], Math.min(WIDTH[1], (cell.w / CELL) * DEPTH)) / 2
 		let lo = -want
 		let hi = want
@@ -101,13 +99,11 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 	return mesh
 }
 
-// Plain cloth, a scalloped valance along the front edge, the name in the middle.
 function paintCell(g, { x, y, w }, name, color, flip) {
 	g.save()
 	g.translate(x, y)
 	g.fillStyle = color
 	g.fillRect(0, 0, w, CELL)
-	// Valance: a darker band with a scalloped hem, on whichever side is the front.
 	const band = CELL * 0.16
 	const front = flip ? 0 : CELL - band
 	g.fillStyle = 'rgba(0, 0, 0, 0.28)'

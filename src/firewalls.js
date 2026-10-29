@@ -25,7 +25,6 @@ export function createFirewalls(world) {
 		return baseOf.get(n)
 	}
 	const inside = (n, x, y) => insideRings(x, y, buildings[n].rings)
-	// The other buildings at a point, if any.
 	const against = (n, x, y) => index(x, y).filter((o) => o.n !== n && inside(o.n, x, y))
 	const road = (x, y) => world.tileAt(x, y) === 1 // T.ROAD
 
@@ -55,7 +54,6 @@ export function createFirewalls(world) {
 				w.len = Math.hypot(w.bx - w.ax, w.by - w.ay)
 				w.ex = (w.bx - w.ax) / w.len
 				w.ey = (w.by - w.ay) / w.len
-				// Outward is the side that isn't the building.
 				const mx = (w.ax + w.bx) / 2
 				const my = (w.ay + w.by) / 2
 				const side = inside(n, mx - w.ey * 0.1, my + w.ex * 0.1) ? -1 : 1
@@ -109,7 +107,6 @@ export function createFirewalls(world) {
 				const dx = m.x - (w.ax + w.ex * t)
 				const dy = m.y - (w.ay + w.ey * t)
 				const d = Math.hypot(dx, dy)
-				// On the wall's own side, give or take a tile, firewalls first.
 				if (d > MURAL_REACH || dx * w.nx + dy * w.ny < -1) continue
 				const score = d - (w.fire ? 4 : 0) + (w.mural ? 10 : 0)
 				if (!best || score < best.score) best = { w, score }

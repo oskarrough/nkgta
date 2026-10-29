@@ -1,7 +1,3 @@
-// Day and night: a clock that runs by itself, and how the city looks at each
-// hour, one small bundle of numbers per time of day (after Slop New York's
-// presets), blended between the nearest two. The sun's way across the sky
-// comes from the clock; the moon stands still.
 import * as THREE from 'three'
 
 export const HOUR_SECONDS = 60 // seconds of play per hour of the day
@@ -165,7 +161,6 @@ export function createClock(hour = START_HOUR) {
 	}
 }
 
-// The debug menu's time of day: a slider that follows the clock and sets it.
 export function tuneClock(form, clock) {
 	form.style.cssText =
 		'display:grid;grid-template-columns:auto 9em 3em;gap:2px 6px;align-items:center;margin-top:0.6rem;color:#fff;font:11px monospace'

@@ -1,6 +1,3 @@
-// The flat layer over the 3D city, once per frame: Pfand, places, stops,
-// traffic lights and street names. People and the bike are in 3D, see
-// actors.js.
 import { SOLID } from './tiles.js'
 import { badgeSprites, labelSprites, transitSprites, LABEL_PX } from './sprites.js'
 import { DEPTH as AWNING_DEPTH } from './signs.js'
@@ -34,7 +31,6 @@ export function createRenderer(canvas, world, shops = []) {
 	const icons = badgeSprites()
 	const signs = transitSprites()
 	const labels = labelSprites(world.labels.map((l) => l.name))
-	// Where each place's badge stands, and whether it hides behind an awning.
 	const doors = new Map(shops.map((s) => [s.place, s]))
 	const badges = world.pois.map((p) => {
 		const s = doors.get(p)
@@ -49,8 +45,6 @@ export function createRenderer(canvas, world, shops = []) {
 	addEventListener('resize', resize)
 	resize()
 
-	// `inside` a shop, only the player: the map's places, stops, names, walls
-	// and the parked bike are all out on the street.
 	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music, people = [], cars = [] }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
@@ -76,7 +70,6 @@ export function createRenderer(canvas, world, shops = []) {
 			const [sx, sy] = toScreen(b.x, b.y)
 			const s = b.awning ? size * (BADGE.shrink + (1 - BADGE.shrink) * fade) : size
 			if (!onScreen(sx, sy, s)) continue
-			// First come, first drawn: a badge on top of another is left out.
 			if (placed.some(([px, py]) => Math.hypot(px - sx, py - sy) < s * apart)) continue
 			placed.push([sx, sy])
 			ctx.globalAlpha = alpha
@@ -135,7 +128,6 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.fillRect(sx - scale * 0.12, sy - scale * 0.3, scale * 0.24, scale * 0.6)
 		}
 
-		// Traffic lights: a dark box with the one lamp that's lit.
 		const lamp = Math.max(4 * devicePixelRatio, scale * 0.3)
 		for (const l of lights) {
 			const [sx, sy] = toScreen(l.x, l.y)
@@ -162,7 +154,6 @@ export function createRenderer(canvas, world, shops = []) {
 			ctx.setTransform(1, 0, 0, 1, 0, 0)
 		}
 
-		// K: a circle on foot, the car's box in one, over the player.
 		if (showWalls) {
 			ctx.strokeStyle = '#fff'
 			ctx.lineWidth = 2

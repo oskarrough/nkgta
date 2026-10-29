@@ -1,8 +1,3 @@
-// Touch controls: a thumbstick that appears under the thumb on the left half,
-// and E and handbrake (in a car) buttons on the right. The stick is an absolute
-// direction, like pointing at the map; the car's own physics stays untouched,
-// the stick is translated into its throttle, turn and handbrake here. A
-// gamepad's left stick drives the same way, through the same translation.
 import { forwardSpeed } from './car.js'
 
 const RANGE = 56 // pixels from the centre for full deflection
@@ -12,8 +7,6 @@ const PINCH = 1.25 // px of two-finger distance before the zoom follows
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-// A stick pointed at a direction on the map, as throttle, turn and
-// handbrake. Shared by the thumbstick and a gamepad.
 export function stickDrive(car, axis, handbrake) {
 	const mag = Math.min(1, Math.hypot(axis.x, axis.y))
 	if (!mag) return { throttle: 0, turn: 0, handbrake }
@@ -75,7 +68,6 @@ export function createTouch(actions) {
 		return { x: stick.x, y: stick.y }
 	}
 
-	// Two fingers zoom; dragging them around does nothing.
 	function pinchMove() {
 		const [a, b] = [...pointers.values()]
 		if (!a || !b) return
@@ -172,14 +164,12 @@ export function createTouch(actions) {
 		// Where the thumb points, each axis -1…1.
 		axis: stickAxis,
 		drive: (car) => stickDrive(car, stickAxis(), brakeHeld),
-		// The E button shows a picture of what it does, the same as the HUD's.
 		setUse(action) {
 			if (use.dataset.action === (action ?? '')) return
 			use.dataset.action = action ?? ''
 			use.innerHTML = action ? `<img class="icon" src="/icons/act-${action}.png" alt="">` : ''
 			use.classList.toggle('dim', !action)
 		},
-		// The handbrake button only shows in a car.
 		setDriving(driving) {
 			brake.hidden = !driving
 			if (!driving) {

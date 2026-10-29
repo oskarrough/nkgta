@@ -1,7 +1,3 @@
-// Parapets along the edges of every bridge deck, as real walls in the 3D
-// scene, so bridges stand out from the water with an inked edge and a
-// shadow. A deck is wherever a road or path crosses water; the painted
-// deck under them comes from map-image.js.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { T } from './tiles.js'
@@ -33,7 +29,6 @@ function bandsOf(s) {
 	return out
 }
 
-// Is (x, y) on the water: inside a water area, or within a canal's stroke.
 function wetTest(waters) {
 	const rings = waters.filter((s) => s.rings)
 	const lines = waters.filter((s) => s.line)
@@ -58,7 +53,6 @@ function wetTest(waters) {
 	}
 }
 
-// A shape's bounding box, worked out once.
 const boxes = new WeakMap()
 function boxOf(s) {
 	let box = boxes.get(s)
@@ -77,7 +71,6 @@ function boxOf(s) {
 	boxes.set(s, box)
 	return box
 }
-// The water shapes and deck lines of a map, picked out once.
 const sorted = new WeakMap()
 function sort(shapes) {
 	let out = sorted.get(shapes)
@@ -97,7 +90,6 @@ export function createBridges(world, area, gradient) {
 	const waters = all.waters.filter((s) => overlaps(boxOf(s), box, 10))
 	if (!waters.length) return null
 	const wbox = waters.map(boxOf)
-	// Every stretch of deck: a segment of a line over water, and its half width.
 	const spans = []
 	for (const s of all.decks) {
 		if (!overlaps(boxOf(s), box, 8) || !wbox.some((w) => overlaps(w, boxOf(s)))) continue
@@ -107,7 +99,6 @@ export function createBridges(world, area, gradient) {
 			const [ax, ay, bx, by] = [l[i], l[i + 1], l[i + 2], l[i + 3]]
 			const len = Math.hypot(bx - ax, by - ay)
 			const seg = [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)]
-			// Only the waters this segment could cross are tested.
 			const near = waters.filter((_, k) => overlaps(wbox[k], seg))
 			if (len < 1e-3 || !near.length) continue
 			const wet = wetTest(near)
@@ -150,7 +141,6 @@ export function createBridges(world, area, gradient) {
 			const py = my + sp.ex * off * side
 			if (onDeck(px, py, sp)) continue
 			const geo = new THREE.BoxGeometry(len, PARAPET.width, PARAPET.height)
-			// Tilted with the road, should it rise across the water.
 			geo.rotateY(-Math.atan((world.heightAt(sp.bx, sp.by) - world.heightAt(sp.ax, sp.ay)) / len))
 			geo.rotateZ(-Math.atan2(sp.ey, sp.ex))
 			geo.translate(px, -py, PARAPET.height / 2 + world.heightAt(px, py))

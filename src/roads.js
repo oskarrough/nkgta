@@ -1,6 +1,3 @@
-// The road network as lanes: each road split at junctions into one lane per
-// direction of travel, with points along it to steer for.
-
 // Lanes run right of the centre line, or on it for one-way streets. Each
 // lane knows its other half, for U-turns.
 export function roadGraph(world) {
@@ -27,7 +24,6 @@ export function roadGraph(world) {
 			start = i
 			const pts = ids.map((n) => ({ x: node(n).x, y: node(n).y }))
 			const lane = (points, from, to) => {
-				// Kerb to kerb, which on a split street is less than its class.
 				const w = r.kw ?? r.w
 				const edge = {
 					from: node(from),
@@ -84,7 +80,6 @@ export function pointAt(line, s) {
 	return { x: line[0].x, y: line[0].y, dir: 0 }
 }
 
-// Distance along the line to the point nearest (x, y).
 export function project(line, x, y) {
 	let best = Infinity
 	let bestS = 0

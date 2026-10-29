@@ -1,4 +1,3 @@
-// A short exchange at the counter. The order stays in your hand after you leave.
 import { euro } from './pfand.js'
 import { sound } from './sound.js'
 

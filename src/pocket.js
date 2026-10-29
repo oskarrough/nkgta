@@ -1,10 +1,3 @@
-// Your pocket device, always on you: a battered little handheld with a screen,
-// a knob and a mute switch on its edge. The screen shows what you hear: the
-// car's station in a car, otherwise the song nearest you and where it comes
-// from. Turning the knob sets the volume; tapping it in a car turns the dial,
-// its left side back, the rest forward. Drag it anywhere (on touch, hold it
-// first); it snaps to the nearest edge or corner and stays there. It sits
-// small, and grows for a few seconds whenever something changes.
 import './pocket.css'
 import { sound } from './sound.js'
 
@@ -16,9 +9,6 @@ const EDGE = 8 // px from the screen's edge
 const CORNER = 0.2 // this close to a second edge, it goes in the corner
 const STORE = 'nk-pocket'
 
-// The screen runs one app. For now that's sound; another (a courier job, the
-// race list) is an object like this one: mount fills the screen, draw shows
-// the moment and returns a key that changes whenever the device should grow.
 const soundApp = {
 	mount(screen) {
 		screen.innerHTML = '<b></b><span></span><i class="volume"></i>'
@@ -71,7 +61,6 @@ export function createPocket({ turnStation, toggleMute }) {
 	function room() {
 		return { w: Math.max(1, innerWidth - el.offsetWidth - 2 * EDGE), h: Math.max(1, innerHeight - el.offsetHeight - 2 * EDGE) }
 	}
-	// To the nearest edge, and into the corner if it's near a second one.
 	function snap(x, y) {
 		const edges = [x, 1 - x, y, 1 - y]
 		const nearest = edges.indexOf(Math.min(...edges))
@@ -89,7 +78,6 @@ export function createPocket({ turnStation, toggleMute }) {
 		sound.setVolume(value)
 	}
 
-	// One gesture: a tap, a turn of the knob, or a drag of the whole thing.
 	let gesture = null
 	el.addEventListener('pointerdown', (e) => {
 		if (e.button > 0) return
@@ -181,7 +169,6 @@ export function createPocket({ turnStation, toggleMute }) {
 		if (e.detail === 0) toggleMute()
 		muteSwitch.blur()
 	})
-	// Scrolling over it turns the volume and leaves the zoom alone.
 	el.addEventListener(
 		'wheel',
 		(e) => {
@@ -200,7 +187,6 @@ export function createPocket({ turnStation, toggleMute }) {
 			const volume = sound.volume()
 			const next = app.draw(parts, { radio, hearing, muted, volume })
 			if (next !== key) {
-				// Not at the very start, only on a change.
 				if (key !== null) open = OPEN
 				key = next
 			}

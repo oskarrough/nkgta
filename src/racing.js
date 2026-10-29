@@ -1,10 +1,3 @@
-// Racing in the game: G drops the next gate where you are, F saves the race
-// (or calls off a run), Q puts you back at the start in the same vehicle for
-// another go. Riding into any race's first gate starts it too: you're set
-// down just behind the line, held for 3-2-1, then the clock runs until the
-// last gate. The city carries on round you the whole time. A race can be
-// shared as a link with your best ghost; opening one adds the race to the
-// list, with the sender's ghost to beat next to yours, and starts it.
 import { MODELS } from './models.js'
 import { SOLID } from './tiles.js'
 import { crossing, ghostAt, letter, loadRaces, makeGate, saveRaces, startRun, stepRun, submit } from './race.js'
@@ -65,7 +58,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		share,
 		name: { get: myName, set: setName },
 		create() {
-			// A new race from the list, even from the middle of a run.
 			if (phase === 'countdown' || phase === 'running') phase = 'idle'
 			placeGate()
 		},
@@ -79,7 +71,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			}
 		},
 	})
-	// Copies a link to the race with your best ghost, as far as it fits.
 	async function share(r) {
 		const { url, ghost } = shareLink(r, myName(), location.origin + location.pathname + location.search)
 		const copied = await copy(url)
@@ -93,8 +84,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		)
 	}
 
-	// A race from a link: added to the list (or, if you have it, given a new
-	// rival) and started.
 	function receive(shared) {
 		let r = races.find((x) => x.id === shared.id)
 		if (!r) races.push((r = { id: shared.id, gates: shared.gates, times: [], best: null }))
@@ -126,7 +115,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		hud.placed()
 	}
 
-	// Saves the race being made, or calls off the run.
 	function finish() {
 		if (draft) {
 			if (draft.length >= 2) {
@@ -135,7 +123,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 				save()
 				say(`Rennen gespeichert: ${draft.length} Tore`)
 				hud.saved()
-				// Straight onto the start line, to ride what you just made.
 				begin(race)
 			}
 			draft = null
@@ -199,7 +186,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		begin(race, start?.vehicle)
 	}
 
-	// Pinned to the start line, engine or legs going but not moving.
 	function hold() {
 		const c = player.car
 		if (c) {
@@ -222,8 +208,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		}
 	}
 
-	// What's standing in the city: the gates being dropped, the race being
-	// run, or every race's first gate, waiting to be ridden into.
 	function shownGates() {
 		if (draft) return draft.map((gate, i) => ({ gate, label: letter(i), state: i === draft.length - 1 ? 'next' : 'later' }))
 		if (race && phase !== 'idle') {
@@ -235,7 +219,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		return races.map((r) => ({ gate: r.gates[0], label: letter(0), state: 'start' }))
 	}
 
-	// A link opened here, or pasted into a tab that's already playing.
 	function openLink() {
 		if (!location.hash.startsWith('#race=')) return
 		const shared = raceFromHash(location.hash)
@@ -251,7 +234,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		restart,
 		startDaily,
 		dailyBest: (date) => races.find((x) => x.id === dailyId(date))?.best ?? null,
-		// The panel of saved races, from the menu.
 		openList: list.open,
 		listOpen: list.isOpen,
 		// Called going down, so a run doesn't carry on from under a car.
@@ -294,7 +276,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			hud.update(view(), dt)
 		},
 
-		// The next gate, for the radar.
 		target() {
 			if (draft || !race || (phase !== 'running' && phase !== 'countdown')) return null
 			const gate = race.gates[run.next]

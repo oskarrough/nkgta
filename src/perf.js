@@ -8,7 +8,6 @@ const perf = { phases: [], frames: [], frame: null }
 if (PERF) globalThis.perf = perf
 
 let last = performance.now()
-// Ends a load phase: the time since the previous one ended.
 export function phase(name) {
 	const now = performance.now()
 	if (PERF) perf.phases.push([name, Math.round(now - last)])
@@ -90,7 +89,6 @@ export function timePasses(renderer, names) {
 	renderer.render = timed(renderer.render, () => names[call++] ?? 'extra')
 }
 
-// Adds to a number kept for this frame, like time spent on something.
 export function note(name, value) {
 	if (PERF && perf.frame) perf.frame[name] = (perf.frame[name] ?? 0) + value
 }

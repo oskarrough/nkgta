@@ -1,6 +1,3 @@
-// Shopfronts: every named shop, bank, pharmacy, café and bar on the street
-// gets a stretch of wall above its windows for its sign, not only the ones
-// you can walk into. Found when the map is built; src/fascia.js letters them.
 import { alongFacade, facades } from './shops.js'
 
 // Amenities with a sign over the door. Doctors, schools and churches have
@@ -95,7 +92,6 @@ export function findFronts(world, list) {
 	})
 }
 
-// Where o's sign sits along f's wall, if they share a facade.
 function span(f, o) {
 	const t = alongFacade(f, o)
 	if (t === null) return null
@@ -104,7 +100,6 @@ function span(f, o) {
 
 const near = (a, b) => Math.abs(a.x - b.x) < WANT * 4 && Math.abs(a.y - b.y) < WANT * 4
 
-// Unpacked again, for the scene.
 export function frontsOf(world) {
 	const packed = world.fronts ?? []
 	const fronts = []

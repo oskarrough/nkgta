@@ -1,4 +1,3 @@
-// Zoom the player controls, plus GTA 1's zoom-out as you speed up.
 import { PX } from './map-image.js'
 import { gameUpscale } from './looks.js'
 import { T } from './tiles.js'
@@ -27,7 +26,6 @@ export const ZOOM = {
 	boomPerLength: 0.3,
 }
 
-// How far out speed takes the view, 0 to 1.
 const pull = (speed) => 1 - Math.exp(-Math.max(0, speed - ZOOM.calm) / (ZOOM.fast / 2))
 // Eases `from` towards `to`, quicker on the way out than back in.
 const glide = (from, to, dt) => from + (to - from) * (1 - Math.exp(-dt / Math.max(0.01, to > from ? ZOOM.easeOut : ZOOM.easeIn)))
@@ -64,7 +62,6 @@ export function createCamera(world) {
 			speedDistance = aheadX = aheadY = away = 0
 			return thirdPerson
 		},
-		// Straight behind the target again, e.g. after being put back at a start line.
 		snap(target) {
 			yaw = target.dir
 			boom = null
@@ -141,13 +138,10 @@ export function createCamera(world) {
 				else if (held > 0) held -= dt
 				else boom += (clear - boom) * (1 - Math.exp(-3 * dt))
 				fraction = boom / reach
-				// Rises and dips with the ground under the player, a little behind,
-				// so the view glides over the slope instead of jolting on it.
 				const here = heightAt(target.x, target.y)
 				ground = ground === null ? here : ground + (here - ground) * (1 - Math.exp(-8 * dt))
 				const x = target.x + dx * fraction
 				const y = target.y + dy * fraction
-				// Never under the hill behind you, walking down it.
 				const z = Math.max(ground + height + Math.sin(pitch) * boom, heightAt(x, y) + 0.25)
 				return {
 					scale: 24 * devicePixelRatio,

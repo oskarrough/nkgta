@@ -4,9 +4,6 @@ import { FAMILIES, FAMILY } from './places.js'
 
 const INK = '#1A1E1B'
 
-// A round badge per kind of place, in the family of the H and U signs: its
-// family's colour, a dark ink rim, and one bold glyph, drawn on a 64 px grid
-// so it still reads stamped at 20 px.
 export function badgeSprites() {
 	const sprites = {}
 	for (const [kind, family] of Object.entries(FAMILY)) {
@@ -64,8 +61,6 @@ function bottle(g) {
 	box(g, 28, 12, 36, 17, 1)
 }
 
-// The Späti badge's bottle on its own, white with an ink outline like the HUD
-// text, as an image URL for the bag counter.
 export function bottleIcon() {
 	const c = document.createElement('canvas')
 	c.width = c.height = 64
@@ -95,9 +90,7 @@ export function bottleIcon() {
 
 // Each glyph gets the badge colour too, for cutting lines into itself.
 const GLYPHS = {
-	// A Pfand bottle.
 	spaeti: bottle,
-	// The spit: a cone of meat in layers on its pole.
 	doener(g, cut) {
 		box(g, 30.5, 10, 33.5, 54, 1)
 		poly(g, [20, 16], [44, 16], [39, 45], [25, 45])
@@ -105,7 +98,6 @@ const GLYPHS = {
 		line(g, 2.5, [21, 26], [43, 26])
 		line(g, 2.5, [22, 35], [42, 35])
 	},
-	// Fries in their carton.
 	imbiss(g, cut) {
 		for (const [x, top] of [
 			[24, 18],
@@ -118,7 +110,6 @@ const GLYPHS = {
 		g.strokeStyle = cut
 		line(g, 2.5, [20, 31], [44, 31])
 	},
-	// A cup on its saucer, steaming.
 	cafe(g) {
 		poly(g, [19, 27], [41, 27], [38, 45], [22, 45])
 		ring(g, 41, 34, 5.5, 4)
@@ -126,7 +117,6 @@ const GLYPHS = {
 		line(g, 3, [26, 22], [28, 18], [26, 14])
 		line(g, 3, [33, 22], [35, 18], [33, 14])
 	},
-	// A beer mug with a head on it.
 	bar(g, cut) {
 		box(g, 19, 22, 38, 51, 3)
 		ring(g, 40, 36, 6.5, 5)
@@ -137,7 +127,6 @@ const GLYPHS = {
 		line(g, 2.5, [25, 30], [25, 45])
 		line(g, 2.5, [32, 30], [32, 45])
 	},
-	// Fork and knife.
 	restaurant(g) {
 		for (const x of [19, 24, 29]) line(g, 3, [x, 12], [x, 24])
 		box(g, 17.5, 22, 30.5, 28, 3)
@@ -145,7 +134,6 @@ const GLYPHS = {
 		poly(g, [38, 11], [45, 18], [45, 34], [38, 34])
 		box(g, 38, 32, 43, 53, 2)
 	},
-	// A bicycle.
 	bikeshop(g) {
 		ring(g, 19, 40, 9, 4)
 		ring(g, 45, 40, 9, 4)
@@ -154,14 +142,12 @@ const GLYPHS = {
 		line(g, 3.5, [22, 22], [29, 22])
 		line(g, 3.5, [36, 21], [41, 21])
 	},
-	// A shopping trolley.
 	supermarket(g) {
 		line(g, 4, [11, 18], [17, 18], [24, 41], [45, 41])
 		poly(g, [18, 23], [50, 23], [45, 37], [22, 37])
 		disc(g, 27, 48, 4)
 		disc(g, 42, 48, 4)
 	},
-	// A croissant: a fat crescent cut into its rolls.
 	bakery(g, cut) {
 		g.beginPath()
 		g.arc(32, 44, 15, Math.PI * 1.08, Math.PI * 1.92)
@@ -174,23 +160,19 @@ const GLYPHS = {
 			line(g, 2.5, [32 + c * 9, 44 + s * 9], [32 + c * 21, 44 + s * 21])
 		}
 	},
-	// The pharmacy cross.
 	pharmacy(g) {
 		box(g, 26, 14, 38, 50, 2)
 		box(g, 14, 26, 50, 38, 2)
 	},
-	// A hospital H.
 	hospital(g) {
 		box(g, 16, 14, 25, 50, 1)
 		box(g, 39, 14, 48, 50, 1)
 		box(g, 16, 28, 48, 36, 1)
 	},
-	// An open book.
 	school(g) {
 		poly(g, [13, 19], [30, 23], [30, 49], [13, 45])
 		poly(g, [34, 23], [51, 19], [51, 45], [34, 49])
 	},
-	// A teddy.
 	kita(g, cut) {
 		disc(g, 20, 20, 6.5)
 		disc(g, 44, 20, 6.5)
@@ -200,7 +182,6 @@ const GLYPHS = {
 		disc(g, 26, 30, 2.5)
 		disc(g, 38, 30, 2.5)
 	},
-	// A swing.
 	playground(g) {
 		line(g, 4, [14, 51], [23, 14], [41, 14], [50, 51])
 		line(g, 2.5, [28, 14], [28, 38])

@@ -1,4 +1,3 @@
-// Tile types, shared by the map builder and the game.
 export const T = {
 	GROUND: 0, // courtyards, Hinterhöfe, anything unmapped
 	ROAD: 1,
@@ -12,7 +11,6 @@ export const T = {
 	PRIVATE: 9, // paths and passages you're not really meant to use
 }
 
-// Muted comic palette: charcoal roads, warm grey stone, slate water.
 export const COLORS = {
 	[T.GROUND]: '#8d8577',
 	[T.ROAD]: '#46484c',
@@ -26,7 +24,6 @@ export const COLORS = {
 	[T.PRIVATE]: '#9d9484',
 }
 
-// Ink lines and the pale kerb between tarmac and pavement.
 export const INK = 'rgba(26, 30, 30, 0.55)'
 export const KERB = '#c9c1b2'
 export const MARK = '#f4f1e7'

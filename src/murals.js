@@ -16,8 +16,6 @@ const SIZE = { margin: 0.25, plinth: 0.3, ad: 4.5, tags: 0.6, off: 0.015 }
 // patched, streaked by rain, here and there down to the brick.
 const FIRE = { grey: '#b3aca1', brick: '#9a5a46', mortar: '#c4baa9', patch: 0.16, bricks: 0.85 }
 
-// What they're painted in: a few strong colours a wall, inked in black, and
-// chrome for throw-ups. Skin tones and hair for faces.
 const BOLD = ['#E4312B', '#F5C518', '#1F6FB2', '#2FA34A', '#F27D2A', '#E85A9B', '#6CC5E0', '#7A3FA0']
 const BLACK = '#161616'
 const WHITE = '#F4F1E8'
@@ -36,7 +34,6 @@ const AD_WORDS = [
 	['LEDER', 'KOFFER · TASCHEN'],
 ]
 const KINDS = ['face', 'creature', 'garden', 'shapes']
-// Throw-ups are short names in fat letters; tags are names in a quick hand.
 const THROWS = ['NK', '44', 'KMS', 'ZEK', 'OKS', 'KAOS', 'DUX', 'REMS', 'BOMA']
 const TAGS = ['nk44', '12043', '12047', 'kiez', 'rollberg', 'sonne', 'zek', 'oks!', 'dux', 'rems']
 const PIECES = ['NK', '44', 'KIEZ', 'SONNE', 'KMS']
@@ -96,7 +93,6 @@ export function createMurals(world, firewalls, gradient) {
 			const t0 = (w.len - wide) * (0.2 + 0.6 * hash(w.n + 17))
 			out.push([adCell(Math.floor(hash(w.n + 23) * AD.cols * AD.rows)), t0, t0 + wide, top - 0.3 - high, top - 0.3])
 		}
-		// Tags where a hand can reach: walls bare down to the ground.
 		if (w.gap && hash(w.n * 3 + 1) < SHARE.tags && !out.length) {
 			const wide = Math.min(w.len - 0.3, SIZE.tags * 8)
 			const t0 = (w.len - wide) / 2
@@ -106,7 +102,6 @@ export function createMurals(world, firewalls, gradient) {
 	}
 
 	return {
-		// The paintings on these houses' firewalls as one mesh, or null.
 		decals(houses) {
 			const pos = []
 			const nor = []
@@ -148,8 +143,6 @@ export function createMurals(world, firewalls, gradient) {
 	}
 }
 
-// Everything painted into the atlas: the mapped murals, the generic ones,
-// the ads and the tag bands.
 export function paintAtlas(g, mapped) {
 	const cells = MURAL.cols * MURAL.rows
 	for (let i = 0; i < cells; i++) {
@@ -157,7 +150,6 @@ export function paintAtlas(g, mapped) {
 		const m = own ? { seed: i * 977, of: KINDS[i % 4] } : mapped[i]
 		if (!m) continue
 		const { x, y } = muralCell(i)
-		// Untold, a mural shows whatever its seed says.
 		paintMural(g, x, y, MURAL.size, m.of || KINDS[m.seed % KINDS.length], rng(m.seed))
 	}
 	for (let i = 0; i < AD.cols * AD.rows; i++) paintAd(g, adCell(i), i, rng(i * 31 + 5))
@@ -189,7 +181,6 @@ export function firewallShader(bayTiles, glsl) {
 				diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(FIRE.grey)}, 0.6);
 				float patch_ = fwNoise(fw / 0.7) - 0.5;
 				diffuseColor.rgb *= 1.0 + ${f(FIRE.patch)} * 2.0 * floor(patch_ * 3.0 + 0.5) / 3.0 * big;
-				// Rain streaks down from the top.
 				diffuseColor.rgb *= 1.0 - 0.08 * smoothstep(0.55, 0.8, fwNoise(vec2(fw.x / 0.12, 0.5))) * fine;
 				// Where the render has come off: bare brick, its courses fading
 				// to the brick's average under a pixel.
@@ -224,8 +215,6 @@ function crop({ x, y, w, h }, aspect) {
 	return [(cx - cw / 2) / ATLAS.w, 1 - (cy + ch / 2) / ATLAS.h, (cx + cw / 2) / ATLAS.w, 1 - (cy - ch / 2) / ATLAS.h]
 }
 
-// A mural in a square of side s: big confident shapes in three strong
-// colours, each inked round in black, on a sunburst, stripes or dots.
 function paintMural(g, x, y, s, of, rand) {
 	const pick = (list) => list[Math.floor(rand() * list.length)]
 	const [bg, a, b, c] = [...BOLD].sort(() => rand() - 0.5)
@@ -237,7 +226,6 @@ function paintMural(g, x, y, s, of, rand) {
 	g.clip()
 	g.lineJoin = 'round'
 	g.lineCap = 'round'
-	// A path filled in colour f, then its outline inked; line 0 leaves it bare.
 	const shape = (path, f, line = 0.022) => {
 		g.beginPath()
 		path()
@@ -269,7 +257,6 @@ function paintMural(g, x, y, s, of, rand) {
 		g.strokeStyle = col
 		g.stroke()
 	}
-	// A four-pointed sparkle.
 	const sparkle = (cx, cy, r) =>
 		poly(
 			[0, 1, 2, 3, 4, 5, 6, 7].map((k) => {
@@ -320,13 +307,11 @@ function paintMural(g, x, y, s, of, rand) {
 		if (long) ellipse(0.5, 0.56, 0.3, 0.3, 0, hair)
 		ellipse(0.5, 0.36, 0.26, 0.22, 0, hair)
 		ellipse(0.5, 0.47, 0.2, 0.25, 0, skin)
-		// A cap on some, a fringe on the rest.
 		if (rand() < 0.35) {
 			shape(() => g.arc(0.5, 0.33, 0.21, Math.PI, TAU), b)
 			ellipse(0.38, 0.33, 0.17, 0.035, -0.1, b)
 		} else shape(() => g.ellipse(0.5, 0.29, 0.2, 0.1, 0, Math.PI * 0.95, TAU * 1.02), hair)
 		if (rand() < 0.4) {
-			// Shades, the sky in them.
 			for (const ex of [0.42, 0.58]) ellipse(ex, 0.44, 0.07, 0.05, 0, BLACK)
 			line([
 				[0.49, 0.43],
@@ -421,7 +406,6 @@ function paintMural(g, x, y, s, of, rand) {
 		sparkle(0.15, 0.15, 0.07)
 		sparkle(0.85, 0.82, 0.05)
 	} else if (of === 'garden') {
-		// A jungle of big leaves round one giant flower.
 		circle(0.78, 0.2, 0.12, '#F5C518')
 		const greens = ['#2FA34A', '#1E6B35', '#7CC242']
 		for (let k = 0; k < 7; k++) {
@@ -454,7 +438,6 @@ function paintMural(g, x, y, s, of, rand) {
 		circle(fx, fy, 0.09, b)
 		for (let k = 0; k < 5; k++) circle(fx - 0.03 + rand() * 0.06, fy - 0.03 + rand() * 0.06, 0.01, BLACK, 0)
 	} else {
-		// A piece: a word in fat letters, a sparkle on it.
 		g.save()
 		g.scale(1 / s, 1 / s)
 		throwUp(g, pick(PIECES), s * 0.5, s * 0.52, s * 0.46, a, b, rand, s * 0.9)
@@ -465,9 +448,6 @@ function paintMural(g, x, y, s, of, rand) {
 	g.restore()
 }
 
-// A name in fat bubbly letters that run into each other: a drop shadow in
-// shade, a black outline and the fill, with a shine. Centred on cx, cy, at
-// most max wide. Returns how wide it came out.
 function throwUp(g, word, cx, cy, size, fill, shade, rand, max = Infinity) {
 	g.save()
 	g.font = `900 ${size}px sans-serif`
@@ -532,8 +512,6 @@ function throwUp(g, word, cx, cy, size, fill, shade, rand, max = Infinity) {
 	return wide * k
 }
 
-// An old painted ad, faded into the wall: a dark field, a pale border and
-// the trade in big letters.
 function paintAd(g, { x, y, w, h }, i, rand) {
 	const [big, small] = AD_WORDS[i % AD_WORDS.length]
 	g.save()
@@ -551,7 +529,6 @@ function paintAd(g, { x, y, w, h }, i, rand) {
 	g.fillText(big, w / 2, h * 0.42, w - 60)
 	g.font = `bold ${Math.round(h * 0.13)}px sans-serif`
 	g.fillText(small, w / 2, h * 0.74, w - 80)
-	// Weathered: the paint's gone in patches.
 	g.globalCompositeOperation = 'destination-out'
 	g.globalAlpha = 0.35
 	for (let k = 0; k < 14; k++) {
@@ -562,8 +539,6 @@ function paintAd(g, { x, y, w, h }, i, rand) {
 	g.restore()
 }
 
-// A band of what's sprayed where a hand can reach: chrome or coloured
-// throw-ups and names in a quick slanted hand, dripping, crowding each other.
 function paintTags(g, { x, y, w, h }, rand) {
 	g.save()
 	g.translate(x, y)
@@ -588,8 +563,6 @@ function paintTags(g, { x, y, w, h }, rand) {
 	g.restore()
 }
 
-// A name in a quick hand: tall narrow letters leaning forward, a swoosh
-// under them and the paint running. Returns how wide it came out.
 function handTag(g, word, x, y, size, rand) {
 	const col = rand() < 0.7 ? BLACK : rand() < 0.5 ? '#3A57C4' : '#C8302A'
 	g.save()

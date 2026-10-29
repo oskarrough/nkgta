@@ -1,5 +1,3 @@
-// Pfand bottles lying around on pavements and in parks, cashed in at the
-// counter inside a Späti.
 import { sound } from './sound.js'
 import { T } from './tiles.js'
 
@@ -39,7 +37,6 @@ export function createPfand(world) {
 		}
 	}
 
-	// Over the counter at `shop`, if there's anything in the bag.
 	function cashIn(shop, say) {
 		if (!bag.bottles) return
 		sound.till()
@@ -49,7 +46,6 @@ export function createPfand(world) {
 		bag.pending = 0
 	}
 
-	// Knocked over: the bag splits and the bottles roll about.
 	function spill(x, y) {
 		sound.spill(bag.bottles)
 		for (let i = 0; i < bag.bottles; i++) {

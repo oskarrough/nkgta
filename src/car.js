@@ -15,7 +15,6 @@ const OFF_ROAD = 3 // rolling resistance on grass and earth
 const STEP = 1 / 120
 const GRAVITY = 9.81 // m/s²
 
-// Everything about a model's shape the physics needs, worked out once.
 const shapes = new Map()
 function shapeOf(m) {
 	if (shapes.has(m)) return shapes.get(m)
@@ -28,7 +27,6 @@ function shapeOf(m) {
 	const n = Math.ceil(m.length / 0.5)
 	for (let i = 0; i <= n; i++) hull.push([-hl + (i * m.length) / n, hw], [-hl + (i * m.length) / n, -hw])
 	hull.push([hl, 0], [-hl, 0])
-	// For bumping into other cars and people: a row of overlapping circles.
 	const r = hw
 	const k = Math.max(2, Math.ceil((m.length - 2 * r) / (r * 1.2)) + 1)
 	const discs = Array.from({ length: k }, (_, i) => -hl + r + (i * (m.length - 2 * r)) / (k - 1))
@@ -95,7 +93,6 @@ export function driveCar(c, controls, world, dt) {
 	const steps = Math.ceil(dt / STEP)
 	for (let i = 0; i < steps; i++) step(c, controls, world, dt / steps)
 
-	// Rear tyres sliding sideways leave marks.
 	for (const t of c.tyres) {
 		const [x, y] = toWorld(c, t.lx, t.ly)
 		if (t.skid && t.mark) c.marks.push([t.mark[0], t.mark[1], x, y])
@@ -108,15 +105,12 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	const sin = Math.sin(c.angle)
 	const forward = c.vx * cos + c.vy * sin
 	const m = c.model
-	// Brakes until the car stops, then reverses gently.
 	c.braking = (throttle < 0 && forward > 0.1) || hold
 	const engine = throttle * (c.braking ? m.brake : throttle < 0 ? m.engine * REVERSE : m.engine)
-	// Air resistance, against the direction of travel.
 	const speed = Math.hypot(c.vx, c.vy)
 	let fx = cos * engine - m.drag * speed * c.vx
 	let fy = sin * engine - m.drag * speed * c.vy
 	let torque = 0
-	// Gravity pulls down the slope, except on a parked car nobody's driving.
 	if (world.slopeAt && (throttle || speed > 0.2)) {
 		const [sx, sy] = world.slopeAt(c.x, c.y)
 		fx -= ((GRAVITY * HILLS.car) / world.tileM) * sx
@@ -173,7 +167,6 @@ function hitWalls(c, world) {
 			const ty = Math.floor(py)
 			const fx = px - tx
 			const fy = py - ty
-			// Out through the nearest side that isn't another wall.
 			const exits = [
 				[-1, 0, fx],
 				[1, 0, 1 - fx],
@@ -202,7 +195,6 @@ function impulse(c, px, py, nx, ny, bounce, friction) {
 	const arm = (px - c.x) * ny - (py - c.y) * nx
 	const j = (-(1 + bounce) * vn) / (1 + (arm * arm) / c.shape.inertia)
 	push(c, nx * j, ny * j, px, py)
-	// Scraping along the wall slows you down.
 	const tx = -ny
 	const ty = nx
 	const vt = vx * tx + vy * ty
@@ -213,8 +205,6 @@ function impulse(c, px, py, nx, ny, bounce, friction) {
 
 const discs = (c) => c.shape.discs.map((d) => toWorld(c, d, 0))
 
-// Cars bumping into each other. A bus shoves a Kleinwagen aside; the other
-// way round, not so much.
 export function collideCars(cars) {
 	for (let i = 0; i < cars.length; i++) {
 		const a = cars[i]

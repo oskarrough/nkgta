@@ -111,7 +111,6 @@ export function createClouds(world, gradient) {
 			const phase = hash(cloud.seed + 4) * Math.PI * 2
 			for (let b = 0; b < blobs; b++) {
 				const s = cloud.seed * 31 + b * 17
-				// One big blob in the middle, smaller ones round and above it.
 				const br = cloud.r * (b === 0 ? 0.75 : mix(0.4, 0.6, hash(s + 1)))
 				const spread = b === 0 ? 0 : cloud.r * mix(0.45, 0.7, hash(s + 2))
 				const a = phase + (b / blobs) * Math.PI * 2

@@ -3,7 +3,6 @@
 const INKAST = 'https://inkast.0sk.ar/n3fnd6j6'
 const MAX_TEXT = 2000
 
-// "Chrome 126 · Linux", enough to tell which browser a bug came from.
 export function shortAgent(ua, touch = false) {
 	const browser = /(Firefox|Edg|OPR|Chrome|Version)\/(\d+)/.exec(ua)
 	const name = !browser ? 'browser' : ({ Edg: 'Edge', OPR: 'Opera', Version: 'Safari' }[browser[1]] ?? browser[1])
@@ -13,7 +12,6 @@ export function shortAgent(ua, touch = false) {
 
 const clock = (hour) => `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor((hour % 1) * 60)).padStart(2, '0')}`
 
-// The player's words, a blank line, then where and how they were playing.
 export function feedbackText(text, c) {
 	const lines = [
 		`url: ${c.url}`,
@@ -29,7 +27,6 @@ export function feedbackText(text, c) {
 	return `${text.trim().slice(0, MAX_TEXT)}\n\n${lines.join('\n')}`
 }
 
-// `context()` says where the player is right now; `thank` toasts after a send.
 export function createFeedback({ context, thank }) {
 	const box = document.getElementById('feedback')
 	const field = box.querySelector('textarea')
@@ -46,12 +43,10 @@ export function createFeedback({ context, thank }) {
 		const body = feedbackText(text, context())
 		field.value = ''
 		close()
-		// Offline or blocked: the note is lost, quietly.
 		fetch(INKAST, { method: 'POST', body })
 			.then((res) => res.ok && thank())
 			.catch(() => {})
 	})
-	// Ctrl or Cmd+Enter sends from the keyboard; plain Enter is a new line.
 	field.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.requestSubmit()
 	})

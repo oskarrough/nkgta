@@ -1,5 +1,3 @@
-// The debug menu's sliders for the camera's zoom knobs, live, and a button
-// that copies them to paste back into ZOOM in camera.js.
 const RANGES = {
 	foot: [4, 30, 0.5],
 	bike: [4, 30, 0.5],

@@ -51,8 +51,6 @@ export function createPedestrians(world, junctions) {
 	}
 	let crosswalks = [] // busy last frame
 
-	// Stretches of pavement alongside lane e, clear of the junctions at
-	// either end, and the crossing over its arm where it runs into one.
 	function tracksOf(e) {
 		if (paths.has(e)) return paths.get(e)
 		const ends = [junctionAt.get(e.from), junctionAt.get(e.to)].filter(Boolean)
@@ -74,7 +72,6 @@ export function createPedestrians(world, junctions) {
 		}
 		const j = entryJunction.get(e)
 		if (j && e.stop !== undefined) {
-			// Just past the stop line, from this kerb straight across to the other.
 			const p = pointAt(e.lane, Math.min(e.len - 0.1, e.stop + LENGTH / 2 + 0.45))
 			const nx = -Math.sin(p.dir)
 			const ny = Math.cos(p.dir)
@@ -103,7 +100,6 @@ export function createPedestrians(world, junctions) {
 	}
 
 	function update(dt, near, cars, hidden, ring, budget, scare = null) {
-		// Off out of sight and far away.
 		for (let i = people.length - 1; i >= 0; i--) {
 			const p = people[i]
 			if (Math.hypot(p.x - ring.x, p.y - ring.y) > ring.max + 5 && hidden(p.x, p.y)) people.splice(i, 1)
@@ -112,7 +108,6 @@ export function createPedestrians(world, junctions) {
 		const pavement = tracks.reduce((s, t) => s + (t.edge ? 0 : t.b - t.a), 0)
 		for (let i = 0; i < budget && people.length < Math.min(MAX, pavement / PER_PERSON); i++) spawn(tracks, hidden, ring)
 
-		// On at the end of a track: across the road, or along the next stretch.
 		const next = (p) => {
 			const end = pointAt(p.track.line, p.way > 0 ? p.track.b : p.track.a)
 			const options = []
@@ -167,8 +162,6 @@ export function createPedestrians(world, junctions) {
 	return { people, update }
 }
 
-// One step for everyone: walk on, queue, wait at the kerb, cross. `mayCross`
-// says whether a crossing's open, `next` finds a track to go on along.
 export function walk(people, dt, mayCross, next = () => null, scare = null) {
 	for (let i = 0; i < people.length; i++) {
 		const p = people[i]
@@ -186,7 +179,6 @@ export function walk(people, dt, mayCross, next = () => null, scare = null) {
 		}
 		p.waited = p.kerb ? (p.waited ?? 0) + dt : 0
 		if (p.kerb && p.pause <= 0 && mayCross(t, p.waited)) p.kerb = false
-		// Stop for a bit now and then, stepped aside: on the phone, at a window.
 		if (!t.edge && p.pause <= 0 && Math.random() < dt * 0.02) p.pause = 2 + Math.random() * 5
 		p.pause = Math.max(0, p.pause - dt)
 
@@ -221,8 +213,6 @@ export function walk(people, dt, mayCross, next = () => null, scare = null) {
 	}
 }
 
-// Where someone stands: on their side of the pavement, a step aside to stop,
-// anywhere along the kerb to cross.
 function place(p) {
 	const at = pointAt(p.track.line, p.s)
 	const side = p.track.edge ? p.spot : p.way * (p.pause > 0 ? 0.35 : KEEP_RIGHT)
@@ -285,7 +275,6 @@ export function dodge(from, heading, speed, room, threats, ok = () => true) {
 	const risk = worst(going)
 	if (risk > ALARM) return null
 
-	// The vehicle that matters, for which way is out of its path.
 	const c = near.reduce((a, b) => (contact(from, going, b) < contact(from, going, a) ? b : a))
 	const lateral = [-Math.sin(c.angle), Math.cos(c.angle)]
 	const side = (n, dist, v) => {
@@ -311,8 +300,6 @@ export function dodge(from, heading, speed, room, threats, ok = () => true) {
 		if (o.score > best.score + (o.kind === 'dive' ? 0.1 : 0.03)) best = o
 	}
 	if (best.score < Infinity) {
-		// Nothing's clean: throw themselves clear of the vehicle's line, as
-		// fast as it takes. The nearer to it, the harder the throw.
 		const v = (from.y - c.y) * Math.cos(c.angle) - (from.x - c.x) * Math.sin(c.angle)
 		for (const k of [1, -1]) {
 			const n = [lateral[0] * k, lateral[1] * k]
@@ -367,8 +354,6 @@ export function glance(p, dt, scare, room) {
 	p.flee = { stop: choice.kind === 'stop', t: 0.8 }
 }
 
-// Moves someone aside by (dx, dy), if there's room: on the pavement it's an
-// offset from their track, which they walk back off afterwards.
 function shift(p, dx, dy, ok) {
 	if (!ok(p.x + dx, p.y + dy)) return
 	if (p.track) p.off = { x: (p.off?.x ?? 0) + dx, y: (p.off?.y ?? 0) + dy }
@@ -376,8 +361,6 @@ function shift(p, dx, dy, ok) {
 	p.y += dy
 }
 
-// A step or dive under way: the lunge, lying there a beat, getting up, and a
-// shout on the way.
 export function dodgeStep(p, dt, scare) {
 	const d = p.dodge
 	const before = d.age
@@ -395,7 +378,6 @@ export function dodgeStep(p, dt, scare) {
 	}
 }
 
-// Back to the track, slowly, after being thrown off it.
 function relax(p, dt) {
 	const d = Math.hypot(p.off.x, p.off.y)
 	if (d < 0.02) p.off = null

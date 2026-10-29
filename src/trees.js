@@ -127,8 +127,6 @@ function crownOf(t, tileM, world) {
 	return { half, cz: (top + bottom) / 2 + world.heightAt(t.x, t.y) }
 }
 
-// One tapered stem per tree, from a little below the ground up to the middle
-// of its crown, thicker under bigger crowns.
 export function createTrunks(world, gradient, pick = (world.trees ?? []).keys()) {
 	const trees = world.trees ?? []
 	const list = [...pick]

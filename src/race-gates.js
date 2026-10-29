@@ -1,9 +1,3 @@
-// Race gates and the ghost, in the city. A gate is two posts with bunting
-// strung between them, a chalk line across the ground and its letter on a
-// round badge above, big enough to read from the overhead camera and seen
-// through the houses in the chase camera. The next gate's badge is yellow
-// and pulses. The ghost is your best run as a see-through stand-in of the
-// vehicle you rode it in; a shared race adds the sender's, in orange.
 import * as THREE from 'three'
 import { MODELS } from './models.js'
 import { postsOf } from './race.js'
@@ -121,7 +115,6 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		return { group, sprite, size, state }
 	}
 
-	// Little triangles hanging off the rope, in turn through the colours.
 	function bunting(ax, ay, bx, by, top) {
 		const span = Math.hypot(bx - ax, by - ay)
 		const n = Math.max(2, Math.floor(span / FLAG.every))
@@ -154,8 +147,6 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		items = []
 	}
 
-	// A ghost: one see-through box shape per kind of vehicle, swapped as needed.
-	// Yours is pale blue; a shared race's rival is orange, with their name above.
 	function createGhost(color, named) {
 		const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: GHOST.opacity, depthWrite: false })
 		const group = new THREE.Group()

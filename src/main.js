@@ -48,7 +48,6 @@ const canvas = document.getElementById('overlay')
 const shops = shopsOf(world)
 phase('shops')
 const city3d = createScene(document.getElementById('city'), world, shops)
-// The time of day, running by itself from late afternoon.
 const clock = createClock()
 const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
@@ -98,7 +97,6 @@ try {
 	// Debug views just start off when storage is blocked.
 }
 
-// L, the menu and the pocket device's switch all mute; the device shows it.
 function toggleMute() {
 	sound.toggleMute()
 }
@@ -131,7 +129,6 @@ const actions = {
 		showWalls = city3d.showsWalls()
 	},
 	nextStation: () => music.nextStation(!!player.car),
-	// Start on a gamepad opens and closes the menu, the way Esc does.
 	menuOpen: () => !menu.hidden || racing.listOpen() || dailyPanel.isOpen(),
 	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
@@ -199,15 +196,12 @@ const quizInput = Object.fromEntries(
 )
 const input = createInput(quizInput)
 
-// The menu: what the keys do, as buttons, with each toggle's state.
 const menu = document.getElementById('menu')
 const menuButton = document.getElementById('menu-button')
-// `: the debug menu, the same kind of panel, open from the start with ?tune.
 const debug = document.getElementById('debug')
 tuneClock(document.getElementById('clock'), clock)
 tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
-// Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
 	daily: [
 		() => {
@@ -269,8 +263,6 @@ menuButton.addEventListener('click', () => {
 	showMenu(menu.hidden)
 	menuButton.blur()
 })
-// Esc opens or closes the menu. While
-// the menu is open the game doesn't hear walking or E.
 const GAME_KEYS = new Set([
 	'ArrowUp',
 	'ArrowDown',
@@ -303,8 +295,6 @@ addEventListener('pointerdown', (e) => {
 	if (!menu.hidden && !e.target.closest('#menu, #menu-button')) showMenu(false)
 })
 
-// E: in or out of a shop, out of the car, off the bike, or onto whichever is
-// closer, bike or car.
 function use() {
 	if (wasted.active() || visit.use()) return
 	if (player.car) {
@@ -353,8 +343,6 @@ function fpsMeter(now) {
 	meterFrames = [now]
 }
 
-// Which way you're trying to walk, on the map: with the keys from above,
-// up is forward and down is back, whichever way you face.
 function heading() {
 	const steering = input.steer()
 	if (!steering) return input.axis()

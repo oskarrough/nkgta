@@ -1,10 +1,3 @@
-// The race on screen: a stopwatch top-left with the gates as little badges
-// (taken ones dark, the next one yellow) and a split chip that flashes green
-// ahead of your best and red behind; 3-2-1 over the street; and at the finish
-// a card under the watch with your time and the leaderboard, a picture of the
-// vehicle beside each time. Buttons for the gate flag, finishing and
-// restarting show when they do something, always on a phone; on a keyboard
-// each has its key in the corner. The chimes are made here too.
 import './race-hud.css'
 import { MODELS } from './models.js'
 import { clock, gap, letter } from './race.js'
@@ -103,8 +96,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 				if (mode === 'draft') badges.push('<i class="add">+</i>')
 				gatesEl.innerHTML = badges.join('')
 			})
-			// While dropping gates, what to do next: another gate, or with two
-			// or more, make the last one the finish and go.
 			const step = mode !== 'draft' ? '' : view.gates < 2 ? 'gate' : 'finish'
 			set('step', step, (s) => {
 				nextStep.dataset.step = s
@@ -119,7 +110,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			set('restart', view.canRestart, (on) => buttons.restart.classList.toggle('can', on))
 			set('gate', mode !== 'countdown' && mode !== 'running', (on) => buttons.gate.classList.toggle('can', on))
 			set('finish', view.canFinish, (on) => buttons.finish.classList.toggle('can', on))
-			// 3, 2, 1 with a beep each, then LOS! on a higher one.
 			if (mode === 'countdown') {
 				const n = Math.ceil(view.count)
 				if (n !== beat) {
@@ -140,7 +130,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			if ((mode !== 'done' || (cardFor -= dt) < 0) && !card.hidden) card.hidden = true
 		},
 
-		// A gate taken: the split against the best run there, if there is one.
 		split({ gate, time: t, delta, finish: last }) {
 			split.textContent = delta === null ? clock(t) : gap(delta)
 			split.className = `split on ${delta === null ? '' : delta < 0 ? 'ahead' : 'behind'}`
@@ -148,7 +137,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			if (!last) chime([880, 1320])
 		},
 
-		// Over the line: the time, and where it landed among the race's times.
 		result({ time: t, best, place, times, previous, rival }) {
 			const rows = times
 				.slice(0, SHOWN)
@@ -167,13 +155,11 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			chime(best ? [880, 1109, 1319, 1760] : [880, 1109, 1319])
 		},
 
-		// A new gate dropped, or the race saved: a little plink.
 		placed: () => chime([1046]),
 		saved: () => chime([784, 1046, 1568]),
 	}
 }
 
-// Rising notes, struck like a bell.
 function chime(notes) {
 	notes.forEach((hz, i) => beep(hz, 0.5, i * 0.09))
 }

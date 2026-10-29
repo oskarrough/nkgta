@@ -81,8 +81,6 @@ export function lookOf(seed) {
 	}
 }
 
-// Body parts, each a box (or a few) around its joint: where the joint sits
-// on the body, which way it swings with the stride, and its colour.
 const block = (l, w, h, x = 0, y = 0, z = 0) => new THREE.BoxGeometry(l, w, h).translate(x, y, z)
 const LEG = { l: 0.1, w: 0.09, h: 0.24 }
 const ARM = { l: 0.08, w: 0.07, h: 0.24 }
@@ -92,15 +90,12 @@ const SHOULDER = 0.165
 // covers only its back, so the face shows which way someone faces.
 const PARTS = [
 	{ name: 'torso', geo: block(0.17, 0.26, 0.25), at: [0, 0, 0.35], color: (k) => k.top },
-	// The nose makes the direction readable while orbiting.
 	{
 		name: 'head',
 		geo: mergeGeometries([block(0.12, 0.125, 0.14), block(0.035, 0.045, 0.035, 0.075)]),
 		at: [0.02, 0, 0.55],
 		color: (k) => k.skin,
 	},
-	// Over the top and down the back of the head; from above the face shows as
-	// a strip of skin at the front.
 	{
 		name: 'short',
 		geo: mergeGeometries([block(0.08, 0.135, 0.035, -0.025, 0, 0.075), block(0.035, 0.135, 0.1, -0.055, 0, 0.025)]),
@@ -115,7 +110,6 @@ const PARTS = [
 		color: (k) => k.hair,
 		has: (k) => k.hairStyle === 'long',
 	},
-	// A cap, its peak to the front.
 	{
 		name: 'hat',
 		geo: mergeGeometries([block(0.135, 0.14, 0.05, -0.005, 0, 0.085), block(0.06, 0.11, 0.015, 0.085, 0, 0.065)]),
@@ -148,7 +142,6 @@ const PARTS = [
 			color: (k) => k.skin,
 		},
 	]),
-	// A Späti bag in the right hand, swinging with it.
 	{
 		name: 'bag',
 		geo: block(0.1, 0.04, 0.12, 0, 0, -0.34),
@@ -182,7 +175,6 @@ function standOut(mesh) {
 	}
 }
 
-// A group of people, one instance of every part each, with room for `size`.
 function crowd(material, size) {
 	const group = new THREE.Group()
 	const meshes = PARTS.map((part) => {
@@ -240,8 +232,6 @@ function done(c, n) {
 export function createActors(scene, gradientMap, heightAt = () => 0) {
 	const root = new THREE.Group()
 	scene.add(root)
-	// Pfand and traffic lights, only in the chase camera; from above they're
-	// on the flat layer.
 	const street = new THREE.Group()
 	root.add(street)
 	const box = new THREE.BoxGeometry(1, 1, 1)
@@ -258,19 +248,15 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 
 	const people = inkOutside(new THREE.MeshToonMaterial({ gradientMap }))
 	const pets = createPetActors(root, people, standOut, heightAt)
-	// The player gets a crowd of one, to take inside a shop.
 	const you = crowd(people, 1)
 	let crowds = crowd(people, 128)
 	root.add(crowds.group)
 	const looks = new WeakMap()
 	const lookFor = (p) => looks.get(p) ?? looks.set(p, lookOf(p.seed ?? Math.random())).get(p)
-	// Where you went down.
 	const puddle = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: '#5e1a17' }))
 	standOut(puddle)
 	root.add(puddle)
 
-	// Red mudguards over the wheels and a red crate on the rack, so from
-	// above it's still a red bar to find.
 	const bike = new THREE.Group()
 	root.add(bike)
 	const frame = inkOutside(new THREE.MeshToonMaterial({ color: '#d23c3c', gradientMap }))
@@ -308,7 +294,6 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	let stride = 0
 
 	return {
-		// `room` is the scene of the shop you're in, if you are.
 		update(player, peds, bottleList, lights, cam, dt, room = null) {
 			stride += player.speed * dt * 7
 			// At a wall the camera can come inside the character's head.

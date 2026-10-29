@@ -188,7 +188,6 @@ function boards(world, batch, gradient, night, bayM, open) {
 				uv.push(...(uvs?.[i] ?? plain))
 			}
 		}
-		// The front: the name in the middle, the plain board either side of it.
 		const half = f.half
 		const text = Math.min(half, cell.w / PX / 2)
 		const front = (s0, s1, u0, u1) =>
@@ -206,7 +205,6 @@ function boards(world, batch, gradient, night, bayM, open) {
 			front(-half, -text, u(2), u(2))
 			front(text, half, u(cell.w - 2), u(cell.w - 2))
 		}
-		// Its top, bottom and ends, in the board's colour.
 		quad([at(-half, OUT[0], z1), at(-half, OUT[1], z1), at(half, OUT[1], z1), at(half, OUT[0], z1)])
 		quad([at(-half, OUT[0], z0), at(half, OUT[0], z0), at(half, OUT[1], z0), at(-half, OUT[1], z0)])
 		quad([at(-half, OUT[0], z0), at(-half, OUT[1], z0), at(-half, OUT[1], z1), at(-half, OUT[0], z1)])
@@ -264,7 +262,6 @@ function boards(world, batch, gradient, night, bayM, open) {
 	return mesh
 }
 
-// The board: its colour, the stripe, the name centred, squeezed to fit.
 function paint(g, { x, y, w }, look) {
 	g.save()
 	g.translate(x, y)

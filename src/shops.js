@@ -1,5 +1,3 @@
-// Shops you can walk into: every shop-like place that sits on a facade, with
-// its door on the nearest stretch of wall that opens onto somewhere walkable.
 import { SOLID, T } from './tiles.js'
 import { placeName } from './places.js'
 import { isCutCorner } from './corners.js'
@@ -22,7 +20,6 @@ export function findShops(world) {
 	const shops = []
 	for (const p of world.pois) {
 		if (!KINDS.has(p.kind)) continue
-		// One door per corner: the next shop there stays on its front.
 		let best = facadeOf(p.x, p.y, p.kind)
 		if (best?.seg?.taken) best = best.front
 		if (!best) continue
@@ -80,7 +77,6 @@ export function shopsOf(world) {
 // where to stand, and its building `n`, `s` along a wall `len` long.
 export function facades(world) {
 	const free = (x, y) => !SOLID.has(world.tileAt(x, y))
-	// Each building's walls as segments, with a bounding box to skip the far ones.
 	const walls = world.buildings.map((b) => {
 		const segs = []
 		let x0 = Infinity
@@ -101,7 +97,6 @@ export function facades(world) {
 				x1 = Math.max(x1, r[i])
 				y1 = Math.max(y1, r[i + 1])
 			}
-			// Cut corners, where the corner shop has its door.
 			const ring = segs.slice(first)
 			const dir = ([ax, ay, bx, by]) => [bx - ax, by - ay]
 			ring.forEach((seg, k) => {
@@ -123,7 +118,6 @@ export function facades(world) {
 			}
 		}
 	})
-	// The walls within reach of (x, y), in the order they were mapped.
 	function wallsNear(x, y) {
 		const near = new Set()
 		for (let cy = Math.floor((y - REACH) / CELL); cy <= Math.floor((y + REACH) / CELL); cy++) {
@@ -147,7 +141,6 @@ export function facades(world) {
 				if (len < MARGIN * 2 + 0.4 && !seg.corner) continue
 				const ex = (bx - ax) / len
 				const ey = (by - ay) / len
-				// On a cut corner the door is in the middle of the slant.
 				const s = seg.corner ? len / 2 : Math.max(MARGIN, Math.min(len - MARGIN, (px - ax) * ex + (py - ay) * ey))
 				const x = ax + ex * s
 				const y = ay + ey * s
@@ -162,7 +155,6 @@ export function facades(world) {
 					// The tiles round off the outline, so stand on the first free spot.
 					const out = STAND.find((o) => free(x + nx * o, y + ny * o) && free(x + nx * (o + 0.6), y + ny * (o + 0.6)))
 					if (out === undefined) continue
-					// Pavement beats a courtyard.
 					const street = world.tileAt(x + nx * (out + 0.6), y + ny * (out + 0.6)) === T.SIDEWALK
 					const score = d + out + (street ? 0 : 2) - (seg.corner && CORNER.has(kind) ? CORNER_PULL : 0)
 					const spot = { d: score, x, y, nx, ny, ex, ey, out, room: Math.min(s, len - s), n: w.n, s, len, street, seg: seg.corner && seg }
@@ -196,7 +188,6 @@ function straight([ax, ay, bx, by], x, y) {
 	return lu > 0 && lv > 0 && (ux * vx + uy * vy) / (lu * lv) > 0.99
 }
 
-// The shop whose door you're standing at, if any.
 export function shopAt(shops, x, y) {
 	let best = null
 	let bestD = Infinity

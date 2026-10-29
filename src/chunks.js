@@ -37,13 +37,11 @@ const solid = (hex) => {
 	tex.needsUpdate = true
 	return tex
 }
-// Shown until a chunk's first texture is painted.
 export const BLANK = { ground: solid(COLORS[T.GROUND]), roofs: solid('#858d92') }
 
 const levelFor = (scale) => LEVELS.findLast((l) => l >= scale * UNDERSAMPLE) ?? LEVELS[0]
 const bytesOf = (w, h) => (w * h * 4 * 4) / 3
 
-// Tiles between a chunk and the view, 0 if it's on screen.
 const distance = (c, v) => Math.max(0, c.x - v.x1, v.x0 - c.x - c.w, c.y - v.y1, v.y0 - c.y - c.h)
 
 function grid(world) {
@@ -238,7 +236,6 @@ export function createChunks(world, renderer, build) {
 		}
 	}
 
-	// Builds a chunk a step at a time until `until`, or to the end.
 	function buildChunk(c, until = Infinity) {
 		const t = performance.now()
 		c.building ??= build(c)
@@ -271,8 +268,6 @@ export function createChunks(world, renderer, build) {
 		const level = levelFor(scale)
 		const order = chunks.map((c) => [distance(c, view), c]).sort((a, b) => a[0] - b[0])
 
-		// What's on screen is built now; the rest a little each frame,
-		// nearest first.
 		for (const [d, c] of order) {
 			if (c.parts) continue
 			if (d === 0) buildChunk(c)
@@ -281,8 +276,6 @@ export function createChunks(world, renderer, build) {
 		}
 		note('build', performance.now() - t)
 
-		// What to paint, nearest first: the level the zoom needs round the
-		// view, within the budget, and the coarse level everywhere.
 		for (const entry of queue) entry.state = 'new'
 		queue.length = 0
 		let room = BUDGET
@@ -292,7 +285,6 @@ export function createChunks(world, renderer, build) {
 			// A chunk's coarse texture before its finer ones, so the first
 			// view shows soon and sharpens after.
 			for (const kind of kinds) want(c, kind, FAR, true, d - 0.5)
-			// The finest level the budget still has room for.
 			c.target = FAR
 			if (d > MARGIN) continue
 			for (const l of LEVELS.slice(LEVELS.indexOf(level), -1)) {
@@ -317,7 +309,6 @@ export function createChunks(world, renderer, build) {
 			c.scale = scale
 		}
 
-		// Over budget: let go of what hasn't been shown for longest.
 		if (bytes > BUDGET) {
 			const old = [...entries.values()].filter((e) => e.texture && !e.pinned && e.used < frame).sort((a, b) => a.used - b.used)
 			for (const entry of old) {
@@ -342,7 +333,6 @@ export function createChunks(world, renderer, build) {
 				if (c.parts) c.parts.group.visible = frustum.intersectsBox(c.bounds) || !!shadow?.intersectsBox(c.bounds)
 			}
 		},
-		// Resolves once the chunks in view show a texture, coarse or finer.
 		ready(view, scale) {
 			return new Promise((resolve) => {
 				const start = performance.now()

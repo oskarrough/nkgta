@@ -176,7 +176,6 @@ function inset(ring, d) {
 	return out
 }
 
-// Does any edge of the inset rings cross another?
 function crossing(rings) {
 	const edges = []
 	rings.forEach((r, k) => r.forEach((p, i) => edges.push([k, i, r.length, p, r[(i + 1) % r.length]])))
@@ -231,7 +230,6 @@ function hipRoof(pts, h, tileM) {
 	return { kind: 'hip', outline: pts, cx: cu * c - cv * s, cy: cu * s + cv * c, c, s, L, W, run, slope: PITCH }
 }
 
-// Height of the roof above the eaves at (x, y).
 export function roofHeight(roof, x, y) {
 	if (roof.kind === 'mansard') return Math.min(distanceToRings(roof.rings, x, y), roof.run) * roof.slope
 	const dx = x - roof.cx

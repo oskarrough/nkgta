@@ -1,4 +1,3 @@
-// A loaded map plus the questions the game asks of it.
 import { T } from './tiles.js'
 import { createTerrain } from './terrain.js'
 
@@ -25,7 +24,6 @@ export function createWorld(map) {
 		return { x, y }
 	}
 
-	// Somewhere sensible to start: near `preferred` if it's on this map, else the middle.
 	function startPoint(preferred) {
 		const at = contains(preferred) ? fromLatLon(preferred) : { x: W / 2, y: H / 2 }
 		return nearestOf(T.SIDEWALK, at)

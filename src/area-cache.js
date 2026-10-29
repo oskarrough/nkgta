@@ -51,7 +51,6 @@ export async function putArea(key, text) {
 	})
 }
 
-// gzip to base64 text and back.
 async function gzip(text) {
 	const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))
 	return toBase64(new Uint8Array(await new Response(stream).arrayBuffer()))

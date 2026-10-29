@@ -82,7 +82,6 @@ export function createTraffic(world, say = () => {}) {
 		})
 	}
 
-	// A spot on a random lane inside the ring, out of sight.
 	function spawn(near, ring, view) {
 		for (let tries = 0; tries < 20; tries++) {
 			const edge = pick(near, (e) => e.len)
@@ -126,9 +125,6 @@ export function createTraffic(world, say = () => {}) {
 		}
 	}
 
-	// A wedding convoy: a string of cars nose to tail up one lane, out of sight,
-	// the bride's white car in front. Each takes the turn the first one to reach
-	// a lane took, so they stay together.
 	function spawnConvoy(near, ring, view) {
 		const span = (CONVOY.colors.length - 1) * CONVOY.gap + 1
 		const long = near.filter((e) => e.len > span)
@@ -168,19 +164,16 @@ export function createTraffic(world, say = () => {}) {
 		const sin = Math.sin(c.angle)
 		const local = (x, y) => [(x - c.x) * cos + (y - c.y) * sin, -(x - c.x) * sin + (y - c.y) * cos]
 
-		// Steer for a point a little way up the lane.
 		const m = c.model
 		const target = along(ai, LOOKAHEAD + Math.max(0, fwd) * 0.5 + (m.length - LENGTH) * 0.6)
 		const [tx, ty] = local(target.x, target.y)
 		const aim = Math.atan2(ty, tx)
 
-		// The speed this driver likes here, less for bends ahead.
 		const bend = along(ai, 3 + fwd)
 		const turnAhead = Math.abs(Math.atan2(Math.sin(bend.dir - c.angle), Math.cos(bend.dir - c.angle)))
 		let v0 = ai.edge.speed * m.pace * Math.max(0.35, 1 - turnAhead / 1.6)
 		if (Math.abs(aim) > 1) v0 = Math.min(v0, 1.2)
 
-		// Then brake for whatever's ahead, the hardest of them wins.
 		const d = m.driver
 		let worst = 0
 		// Red lights and right of way, at this lane's stop line or the next one's:
@@ -199,7 +192,6 @@ export function createTraffic(world, say = () => {}) {
 		const line = ai.edge.stop - ai.s - longer
 		if (ai.next?.twin?.crosswalk?.busy && line > -0.3) worst = Math.min(worst, stopAt(d, fwd, line))
 
-		// The car ahead in this lane or the next, however far up the road.
 		for (const o of cars) {
 			if (!o.ai || o === c) continue
 			const ahead = o.ai.edge === ai.edge ? o.ai.s - ai.s : o.ai.edge === ai.next ? ai.edge.len - ai.s + o.ai.s : 0
@@ -207,7 +199,6 @@ export function createTraffic(world, say = () => {}) {
 			worst = Math.min(worst, follow(d, fwd, ahead - (m.length + o.model.length) / 2, forwardSpeed(o)))
 		}
 
-		// And anything right in front: crossing, oncoming, parked badly, on foot.
 		ai.ignore = Math.max(0, ai.ignore - dt)
 		let blocked = false
 		let standoff = false // blocked by someone crossing, coming the other way, or not driving at all
@@ -227,7 +218,6 @@ export function createTraffic(world, say = () => {}) {
 				const towards = (o.vx ?? 0) * cos + (o.vy ?? 0) * sin // its speed along our way
 				worst = Math.min(worst, follow(d, fwd, clear - 0.3, towards))
 				blocked = true
-				// People crossing get all the time they need.
 				if (!o.track && (Math.cos(turned) < 0.7 || (o.model && !o.ai && o !== player.car))) standoff = true
 			}
 		}
@@ -239,7 +229,6 @@ export function createTraffic(world, say = () => {}) {
 		ai.blocked = standoff && fwd < 0.2 ? ai.blocked + dt : 0
 		if (ai.blocked > 3 + Math.random()) ai.ignore = 1.5
 
-		// Wedged against something: back up a little.
 		ai.stuck = !blocked && acc > d.a / 2 && Math.abs(fwd) < 0.2 ? ai.stuck + dt : 0
 		if (ai.stuck > 1.5) ai.reversing = 1.2
 		if (ai.reversing > 0) {
@@ -247,7 +236,6 @@ export function createTraffic(world, say = () => {}) {
 			return { throttle: -1, turn: -Math.sign(aim) }
 		}
 
-		// About to be hit: stamp on the brake or floor it, and swerve.
 		react(c, dt)
 		if (ai.panic > 0) {
 			const swerve = Math.atan2(ty + ai.evade, tx)
@@ -257,7 +245,6 @@ export function createTraffic(world, say = () => {}) {
 			return { throttle: pedal(m, acc, fwd), turn }
 		}
 
-		// Standing and meaning to stay: foot on the brake.
 		const hold = fwd < 0.3 && acc < d.a * 0.1
 		return {
 			throttle: hold ? Math.max(-1, Math.min(1, -fwd * 1.5)) : pedal(m, acc, fwd),
@@ -331,7 +318,6 @@ export function createTraffic(world, say = () => {}) {
 		return next
 	}
 
-	// Walk the route ahead of the car, onto the next lane if need be.
 	function along(ai, ahead) {
 		const s = ai.s + ahead
 		if (s <= ai.edge.len || !ai.next) return pointAt(ai.edge.lane, Math.min(s, ai.edge.len))
@@ -348,7 +334,6 @@ export function createTraffic(world, say = () => {}) {
 		const near = edges.filter((e) => Math.hypot(e.mid.x - ring.x, e.mid.y - ring.y) < ring.max)
 		const laneLength = near.reduce((s, e) => s + e.len, 0)
 
-		// Out of sight and far away: gone, unless it's a car you've driven.
 		const reach = Math.min(ring.max, PARK_REACH)
 		for (let i = cars.length - 1; i >= 0; i--) {
 			const c = cars[i]
@@ -358,11 +343,9 @@ export function createTraffic(world, say = () => {}) {
 		}
 		const moving = cars.filter((c) => c.ai).length
 		if (near.length) {
-			// All at once on the first frame, then a couple per frame.
 			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(80, laneLength / PER_CAR); i++) spawn(near, ring, view)
 		}
 		park(ring, view, reach)
-		// One wedding convoy at a time, the next one to two and a half minutes after.
 		if (near.length && !cars.some((c) => c.convoy) && (convoyIn -= dt) < 0)
 			convoyIn = spawnConvoy(near, ring, view) ? 60 + Math.random() * 90 : 5
 		started = true
@@ -381,7 +364,6 @@ export function createTraffic(world, say = () => {}) {
 			}
 		}
 		collideCars(cars)
-		// How hard the player got hit, if they're on foot or on the bike.
 		let hit = 0
 		if (!player.car) for (const c of cars) hit = Math.max(hit, shoveOut(c, player, 0.3))
 
@@ -434,7 +416,6 @@ export function createTraffic(world, say = () => {}) {
 		return hit
 	}
 
-	// A car close enough to get into, and slow enough to jump.
 	function enterable(x, y) {
 		let best = null
 		let bestD = 0.8
@@ -445,7 +426,6 @@ export function createTraffic(world, say = () => {}) {
 		return best
 	}
 
-	// Into the driver's seat. Whoever was driving gets out and legs it.
 	function steal(c, say) {
 		if (c.ai) {
 			const [x, y] = toWorld(c, 0, -c.model.width / 2 - 0.35)
@@ -457,7 +437,6 @@ export function createTraffic(world, say = () => {}) {
 		c.kept = true
 	}
 
-	// Sends the next wedding convoy round now, for trying it out.
 	const convoy = () => (convoyIn = 0)
 
 	return { cars, peds, update, enterable, steal, convoy, lights: junctions.lights }

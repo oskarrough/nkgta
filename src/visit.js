@@ -1,8 +1,3 @@
-// Going into a shop. Walk into the door, or press E at it, and the air tears
-// open on the facade, showing the room inside, live and in parallax. Once it's
-// open enough it swells until it fills the view while the room swings upright,
-// and you're inside. The tear stays open behind you at the shop door; walk
-// back into it, or press E, and you're on the street where you left it.
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
@@ -94,7 +89,6 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		player.speed = 0
 	}
 
-	// Through to the other side, at the end of the warp.
 	function cross() {
 		portal.object.scale.setScalar(1)
 		if (!inside) {
@@ -118,16 +112,12 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		inside: () => inside,
 		busy: () => inside || !!warp || portal.phase !== 'closed',
 		warping: () => !!warp,
-		// Once the tear has swallowed most of the view, the street's markers go.
 		indoors: () => inside || (!!warp && warp.t > 0.4),
 		shop: () => (inside ? shop : null),
 		choose: doener.choose,
 		shiftChoice: (n) => doener.shift(n),
-		// The shop's room while you're in it, for the player to stand in.
 		room: () => (inside ? interior.scene : null),
-		// The world the player moves in.
 		world: (city) => (inside ? interior.world : city),
-		// Where traffic should centre on: you, or your stand-in at the shop door.
 		street: () => (inside ? standIn : player),
 		closer: () => (inside ? CLOSER : 1),
 		// What the camera follows: you, but inside drawn towards the middle of
@@ -144,7 +134,6 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			return focus
 		},
 
-		// E: in or out. True if it was for us.
 		use() {
 			if (warp) return true
 			if (inside) {
@@ -165,7 +154,6 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 				doener.update(false)
 				warp.t += dt / WARP
 				const k = Math.min(1, warp.t)
-				// Drawn to the tear's foot, and the tear swells past the screen edges.
 				const anchor = near().anchor
 				const pull = smooth(Math.min(1, k * 1.4))
 				player.x = warp.from.x + (anchor.x - warp.from.x) * pull
@@ -183,14 +171,12 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 				doener.update(shop.kind === 'doener' && interior.atCounter(player.x, player.y))
 				const out = pushing({ x: DOOR.nx, y: DOOR.ny })
 				if (!out) armed = true
-				// Anywhere from just in front of the door to flat against it.
 				const dx = player.x - DOOR.x
 				const dy = player.y - DOOR.y
 				if (armed && out && Math.abs(dx) < 0.9 && dy > -0.6) startWarp()
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) pfand.cashIn(shop.name, say)
 				return
 			}
-			// Walking into a door opens it.
 			const at = !player.car && !player.onBike && shopAt(shops, player.x, player.y)
 			const walking = at && pushing({ x: at.nx, y: at.ny }) && armed
 			if (!at || !pushing({ x: at.nx, y: at.ny })) armed = true
@@ -204,7 +190,6 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			if (portal.openness > 0.4 && (going || (walking && at === shop))) startWarp()
 		},
 
-		// Draw the frame: the street or the room, and the tear over it.
 		render(cam, cars, dt) {
 			frame.cam = cam
 			frame.cars = cars
@@ -221,7 +206,6 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			renderer.autoClear = true
 		},
 
-		// What E would do here, for the HUD.
 		hint() {
 			if (warp) return ''
 			if (inside) {

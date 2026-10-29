@@ -1,4 +1,3 @@
-// Load the default map, or the area picked on /pick.html (?area=south,west,north,east).
 import { decodeMap } from './map-codec.js'
 import { getArea, putArea } from './area-cache.js'
 import { areaFromUrl } from './area-url.js'
@@ -12,7 +11,6 @@ export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
 	if (!bbox) {
 		onStatus('Lade Karte…')
-		// The lie of the land comes alongside; without it the ground stays flat.
 		const terrain = fetch('/terrain.json')
 			.then((res) => (res.ok ? res.json() : null))
 			.catch(() => null)

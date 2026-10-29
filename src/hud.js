@@ -1,4 +1,3 @@
-// The text overlays: street name, money, bag, nearby place or message.
 import { badgeColor, nearestPlace, placeName } from './places.js'
 import { bottleIcon } from './sprites.js'
 import { nearBike } from './player.js'
@@ -7,7 +6,6 @@ import { T } from './tiles.js'
 import { createMinimap } from './minimap.js'
 import './minimap.css'
 
-// What E does right now, for the HUD and the touch button.
 export function useHint(player, car) {
 	if (player.car) return 'aussteigen'
 	if (player.onBike) return 'absteigen'
@@ -16,7 +14,6 @@ export function useHint(player, car) {
 	return null
 }
 
-// The picture for what E does: from a shop door's hint or from useHint.
 const ACTIONS = { aussteigen: 'exit', absteigen: 'exit', 'aufs Fahrrad': 'bike', 'Auto klauen': 'car', einsteigen: 'car' }
 export function useAction(door, hint) {
 	if (door) return door.startsWith('E: raus') ? 'exit' : door.startsWith('E: ') ? 'shop' : null
@@ -28,7 +25,6 @@ const stopName = (s) => {
 	return s.lines.length ? `${name} · ${s.lines.join(', ')}` : name
 }
 
-// The dot before the place line: the badge colour, or the stop sign's.
 const STOP_DOT = { ubahn: '#115d91', bus: '#f5d000' }
 const PRIVATE_DOT = '#9d9484'
 
@@ -42,7 +38,6 @@ export function createHud(world) {
 		document.getElementById(id).textContent = text
 	}
 
-	// The place line's dot is a CSS ::before coloured through --dot.
 	function dot(color) {
 		if (shown.dot === color) return
 		shown.dot = color
@@ -51,7 +46,6 @@ export function createHud(world) {
 		if (color) el.style.setProperty('--dot', color)
 	}
 
-	// E plus a picture of what it does, instead of words.
 	const useEl = document.getElementById('use')
 	const useAct = document.getElementById('use-act')
 	function showUse(action) {
@@ -69,12 +63,10 @@ export function createHud(world) {
 	return {
 		say: (text) => (toast = { text, t: 3 }),
 
-		// `inside` is the shop you're in; `door` is what E does at a shop door.
 		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate }, dt) {
 			minimap(player, !!cam.third, inside, gate)
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
-			// A door that's open already just names the shop.
 			const shopName = door && !door.startsWith('E: ') ? door.split(' · ').pop() : null
 			set('money', euro(bag.cents))
 			set('bag', bag.bottles ? String(bag.bottles) : '')

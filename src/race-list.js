@@ -1,9 +1,3 @@
-// Every race saved in this area, as a panel from the menu: where it runs,
-// from the first gate's street to the last's, how many gates, the best time
-// with its vehicle, and how far away the start is. Los takes you to its start
-// line for 3-2-1; the cross deletes it after a second tap. Neues Rennen drops
-// gate A where you stand, and the keys underneath are the whole how-to.
-// While it's open the game doesn't hear the keys; Esc or a tap outside closes it.
 import { MODELS } from './models.js'
 import { isDaily } from './daily.js'
 import { clock } from './race.js'
