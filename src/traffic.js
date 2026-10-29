@@ -324,7 +324,7 @@ export function createTraffic(world, say = () => {}) {
 		return pointAt(ai.next.lane, Math.min(s - ai.edge.len, ai.next.len))
 	}
 
-	function update(dt, player, view) {
+	function update(dt, player, view, hour = 11, day = 0) {
 		const first = !started
 		const ring = {
 			x: player.x,
@@ -410,7 +410,7 @@ export function createTraffic(world, say = () => {}) {
 			else Object.assign(p, { x: nx, y: ny })
 			keepClear(p, threats, scare.ok)
 		}
-		walkers.update(dt, near, cars, (x, y) => first || !inView(view, x, y, 2), ring, first ? 999 : 6, scare)
+		walkers.update(dt, near, cars, (x, y) => first || !inView(view, x, y, 2), ring, first ? 999 : 6, scare, hour, day)
 		peds.length = 0
 		peds.push(...runners, ...walkers.people)
 		return hit

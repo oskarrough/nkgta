@@ -38,6 +38,14 @@ const walkable = (t) => t === T.SIDEWALK || t === T.GROUND
 
 let streetWorld = null
 
+export function crowdAt(hour, day, street = '') {
+	const h = ((hour % 24) + 24) % 24
+	const base = h < 5 ? 0.2 : h < 7 ? 0.4 : h < 10 ? 0.75 : h < 19 ? 1 : h < 23 ? 0.75 : 0.4
+	const sunday = day === 6 ? 0.65 : 1
+	const evening = street === 'Weserstraße' && h >= 18 && h < 24 ? 1.8 : 1
+	return base * sunday * evening
+}
+
 export function createPedestrians(world, junctions) {
 	streetWorld = world
 	const people = []
@@ -65,7 +73,7 @@ export function createPedestrians(world, junctions) {
 				const ok = s <= len && clear(pointAt(line, s))
 				if (ok && a === null) a = s
 				if (!ok && a !== null) {
-					if (s - 0.25 - a > 3) out.push({ line, a, b: s - 0.25 })
+					if (s - 0.25 - a > 3) out.push({ line, a, b: s - 0.25, street: world.streetAt?.(e.mid.x, e.mid.y) ?? '' })
 					a = null
 				}
 			}
@@ -99,14 +107,19 @@ export function createPedestrians(world, junctions) {
 		return !cars.some((c) => c.ai && Math.abs(c.x - mid.x) < GAP && Math.abs(c.y - mid.y) < GAP)
 	}
 
-	function update(dt, near, cars, hidden, ring, budget, scare = null) {
+	function update(dt, near, cars, hidden, ring, budget, scare = null, hour = 11, day = 0) {
 		for (let i = people.length - 1; i >= 0; i--) {
 			const p = people[i]
 			if (Math.hypot(p.x - ring.x, p.y - ring.y) > ring.max + 5 && hidden(p.x, p.y)) people.splice(i, 1)
 		}
 		const tracks = near.flatMap(tracksOf)
-		const pavement = tracks.reduce((s, t) => s + (t.edge ? 0 : t.b - t.a), 0)
-		for (let i = 0; i < budget && people.length < Math.min(MAX, pavement / PER_PERSON); i++) spawn(tracks, hidden, ring)
+		const weight = (t) => (t.b - t.a) * (t.edge ? 2 : 1) * crowdAt(hour, day, t.street)
+		const pavement = tracks.reduce((s, t) => s + (t.edge ? 0 : weight(t)), 0)
+		const target = Math.min(MAX, pavement / PER_PERSON)
+		for (let i = people.length - 1; i >= 0 && people.length > target; i--) {
+			if (hidden(people[i].x, people[i].y)) people.splice(i, 1)
+		}
+		for (let i = 0; i < budget && people.length < target; i++) spawn(tracks, hidden, ring, weight)
 
 		const next = (p) => {
 			const end = pointAt(p.track.line, p.way > 0 ? p.track.b : p.track.a)
@@ -131,11 +144,11 @@ export function createPedestrians(world, junctions) {
 		for (const c of crosswalks) c.busy++
 	}
 
-	function spawn(tracks, hidden, ring) {
+	function spawn(tracks, hidden, ring, weight) {
 		if (!tracks.length) return
 		for (let tries = 0; tries < 10; tries++) {
-			let r = Math.random() * tracks.reduce((s, t) => s + (t.b - t.a) * (t.edge ? 2 : 1), 0)
-			const track = tracks.find((t) => (r -= (t.b - t.a) * (t.edge ? 2 : 1)) <= 0) ?? tracks.at(-1)
+			let r = Math.random() * tracks.reduce((s, t) => s + weight(t), 0)
+			const track = tracks.find((t) => (r -= weight(t)) <= 0) ?? tracks.at(-1)
 			const way = Math.random() < 0.5 ? 1 : -1
 			const s = track.edge ? (way > 0 ? track.a : track.b) : track.a + Math.random() * (track.b - track.a)
 			const at = pointAt(track.line, s)

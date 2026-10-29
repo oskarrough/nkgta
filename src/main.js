@@ -367,7 +367,7 @@ function frame(now) {
 	// Inside a shop, the street carries on round its door.
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
-	const hit = traffic.update(dt, street, streetView)
+	const hit = traffic.update(dt, street, streetView, clock.hour, clock.day)
 	if (!quiz.active() && !inside && !visit.warping()) wasted.hit(hit)
 	if (!quiz.active() && !inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)

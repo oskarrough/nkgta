@@ -148,15 +148,21 @@ export function daylight(hour) {
 }
 
 export function createClock(hour = START_HOUR) {
+	let day = 0 // Monday
 	return {
 		get hour() {
 			return hour
+		},
+		get day() {
+			return day
 		},
 		set(h) {
 			hour = ((h % 24) + 24) % 24
 		},
 		tick(dt) {
-			hour = (hour + dt / HOUR_SECONDS) % 24
+			const elapsed = hour + dt / HOUR_SECONDS
+			day = (day + Math.floor(elapsed / 24)) % 7
+			hour = elapsed % 24
 		},
 	}
 }

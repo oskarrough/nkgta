@@ -38,3 +38,11 @@ test('the clock runs an hour every HOUR_SECONDS and wraps at midnight', () => {
 	clock.set(-1)
 	expect(clock.hour).toBe(23)
 })
+
+test('the clock advances the weekday at midnight', () => {
+	const clock = createClock(23)
+	clock.tick(HOUR_SECONDS * 25)
+	expect(clock.day).toBe(2)
+	clock.tick(HOUR_SECONDS * 24 * 5)
+	expect(clock.day).toBe(0)
+})
