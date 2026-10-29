@@ -3,7 +3,7 @@ import { createPlayer, updatePlayer } from '../src/player.js'
 import { T } from '../src/tiles.js'
 
 const world = { tileAt: () => T.ROAD }
-const input = (x, y) => ({ steer: () => ({ x, y }), axis: () => ({ x, y }), turbo: () => false })
+const input = (x, y) => ({ steer: () => ({ x, y }), axis: () => ({ x, y }) })
 
 for (const onBike of [false, true]) {
 	test(`overhead ${onBike ? 'cycling' : 'walking'} follows facing and backs up without turning`, () => {
@@ -27,7 +27,7 @@ for (const onBike of [false, true]) {
 
 test('directional movement still follows its world axis', () => {
 	const p = createPlayer({ x: 10, y: 10 })
-	updatePlayer(p, { axis: () => ({ x: 0, y: -1 }), turbo: () => false }, world, 0.1)
+	updatePlayer(p, { axis: () => ({ x: 0, y: -1 }) }, world, 0.1)
 	expect(p.y).toBeLessThan(10)
 	expect(p.dir).toBeCloseTo(-Math.PI / 2)
 })
@@ -39,7 +39,7 @@ const staircase = {
 const ride = (world, x, y, frames = 180) => {
 	const p = createPlayer({ x: 5.5, y: 5.5 })
 	p.onBike = true
-	for (let i = 0; i < frames; i++) updatePlayer(p, { axis: () => ({ x, y }), turbo: () => false }, world, 1 / 60)
+	for (let i = 0; i < frames; i++) updatePlayer(p, { axis: () => ({ x, y }) }, world, 1 / 60)
 	return p
 }
 

@@ -101,8 +101,6 @@ export function createGamepad(actions, blocked = () => false) {
 	return {
 		// Where the stick points, each axis -1…1, as the thumbstick does.
 		axis: () => stickOf(read()),
-		// On foot and on the bike: turbo while B is held.
-		turbo: () => pressed(read(), B),
 		drive: (car) => padDrive(car, read()),
 	}
 }

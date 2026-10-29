@@ -35,7 +35,7 @@ test('triggers are gas and brake, the stick steers', () => {
 	expect(padDrive(car(), pad([0, 0], [], { [GAS]: 0.5, [BRAKE]: 0.25 })).throttle).toBeCloseTo(0.25)
 })
 
-test('B is the handbrake in a car and turbo on foot', () => {
+test('B is the handbrake in a car', () => {
 	expect(padDrive(car(), pad([0, 0], [B], { [GAS]: 1 })).handbrake).toBe(true)
 })
 

@@ -60,7 +60,6 @@ export function updatePlayer(p, input, world, dt) {
 	}
 	const steering = input.steer?.()
 	const axis = steering || input.axis()
-	const turbo = input.turbo()
 	const here = world.tileAt(p.x, p.y)
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
@@ -75,8 +74,6 @@ export function updatePlayer(p, input, world, dt) {
 	const grade = (sx * Math.cos(p.dir) + sy * Math.sin(p.dir)) * back
 	const feel = p.onBike ? (grade > 0 ? HILLS.bikeUp : HILLS.bikeDown) : HILLS.walk
 	cap *= Math.max(HILLS.slowest, Math.min(HILLS.fastest, 1 - grade * feel))
-	const boost = turbo ? 10 : 1
-	cap *= boost
 	const max = cap * push
 
 	if (steering) p.dir += steering.x * dt * (p.onBike ? 2.5 : 3.5)
@@ -85,12 +82,12 @@ export function updatePlayer(p, input, world, dt) {
 		let diff = steering ? 0 : Math.atan2(axis.y, axis.x) - p.dir
 		diff = Math.atan2(Math.sin(diff), Math.cos(diff))
 		p.dir += diff * Math.min(1, dt * (p.onBike ? 6 : 14))
-		p.speed += dt * (p.onBike ? 4 : 12) * boost
+		p.speed += dt * (p.onBike ? 4 : 12)
 		p.speed = Math.min(p.speed, Math.max(max, rolling ? Math.min(p.speed, cap) : 0))
 	} else {
 		// Off the pedals: the bike slows, unless the hill's steep enough to keep it going.
 		const pull = rolling ? -grade * HILLS.coast : 0
-		p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14) * boost))
+		p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14)))
 		p.speed = Math.min(p.speed, rolling ? cap : max)
 	}
 

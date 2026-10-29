@@ -9,8 +9,7 @@ const HOLD = 0.6 // seconds
 
 // The knobs for how close the camera sits, tuned live with ?tune. Zoom is
 // screen pixels per tile over PX; boom lengths are tiles. Speed is tiles per
-// second: walking 1.6, the bike 3.6, a car flat out 14, a sports car 24,
-// turbo on the bike 36. Above `calm`, the view pulls back towards its
+// second: walking 1.6, the bike 3.6, a car flat out 14, a sports car 24. Above `calm`, the view pulls back towards its
 // furthest, `out` (top-down, a fraction of the zoom) or `boomOut` (chase,
 // tiles), getting most of the way there by `fast`. It eases out over
 // `easeOut` seconds and back in over the slower `easeIn`.

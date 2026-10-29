@@ -192,7 +192,7 @@ menuButton.addEventListener('click', () => {
 	menuButton.blur()
 })
 // Esc closes the volume pill first, otherwise opens or closes the menu. While
-// the menu is open the game doesn't hear walking, turbo or E.
+// the menu is open the game doesn't hear walking or E.
 const GAME_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'e', 'Enter'])
 addEventListener(
 	'keydown',

@@ -1,5 +1,5 @@
 // Touch controls: a thumbstick that appears under the thumb on the left half,
-// and E and turbo/handbrake buttons on the right. The stick is an absolute
+// and E and handbrake (in a car) buttons on the right. The stick is an absolute
 // direction, like pointing at the map; the car's own physics stays untouched,
 // the stick is translated into its throttle, turn and handbrake here. A
 // gamepad's left stick drives the same way, through the same translation.
@@ -36,12 +36,12 @@ export function createTouch(actions) {
 	const base = document.getElementById('stick')
 	const knob = document.getElementById('stick-knob')
 	const use = document.getElementById('touch-use')
-	const boost = document.getElementById('touch-boost')
+	const brake = document.getElementById('touch-brake')
 
 	const pointers = new Map()
 	let stick = null // { id, x0, y0, x, y }
 	let pinch = 0 // last distance between two fingers
-	let boostHeld = false
+	let brakeHeld = false
 	let enabled = matchMedia('(pointer: coarse)').matches
 
 	function show(on) {
@@ -127,8 +127,8 @@ export function createTouch(actions) {
 		if (stick && stick.id === e.pointerId) endStick()
 		if (pointers.size < 2) pinch = 0
 		if (!pointers.size) {
-			boostHeld = false
-			boost.classList.remove('on')
+			brakeHeld = false
+			brake.classList.remove('on')
 		}
 	}
 
@@ -137,7 +137,7 @@ export function createTouch(actions) {
 	addEventListener('pointerup', up)
 	addEventListener('pointercancel', up)
 
-	// The buttons are held, not clicked: E fires at once, boost stays down
+	// The buttons are held, not clicked: E fires at once, the handbrake stays down
 	// until the thumb lifts.
 	use.addEventListener('pointerdown', (e) => {
 		e.preventDefault()
@@ -151,17 +151,17 @@ export function createTouch(actions) {
 	}
 	use.addEventListener('pointerup', lift)
 	use.addEventListener('pointercancel', lift)
-	boost.addEventListener('pointerdown', (e) => {
+	brake.addEventListener('pointerdown', (e) => {
 		e.preventDefault()
 		e.stopPropagation()
-		boostHeld = true
-		boost.classList.add('on')
+		brakeHeld = true
+		brake.classList.add('on')
 	})
 	for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
-		boost.addEventListener(type, (e) => {
+		brake.addEventListener(type, (e) => {
 			e.stopPropagation()
-			boostHeld = false
-			boost.classList.remove('on')
+			brakeHeld = false
+			brake.classList.remove('on')
 		})
 	}
 	root.addEventListener('contextmenu', (e) => e.preventDefault())
@@ -171,9 +171,7 @@ export function createTouch(actions) {
 	return {
 		// Where the thumb points, each axis -1…1.
 		axis: stickAxis,
-		// On foot and on the bike: turbo while the boost button is held.
-		turbo: () => boostHeld,
-		drive: (car) => stickDrive(car, stickAxis(), boostHeld),
+		drive: (car) => stickDrive(car, stickAxis(), brakeHeld),
 		// The E button shows a picture of what it does, the same as the HUD's.
 		setUse(action) {
 			if (use.dataset.action === (action ?? '')) return
@@ -181,10 +179,13 @@ export function createTouch(actions) {
 			use.innerHTML = action ? `<img class="icon" src="/icons/act-${action}.png" alt="">` : ''
 			use.classList.toggle('dim', !action)
 		},
+		// The handbrake button only shows in a car.
 		setDriving(driving) {
-			if (boost.dataset.driving === String(driving)) return
-			boost.dataset.driving = String(driving)
-			boost.textContent = driving ? 'HANDBREMSE' : 'TURBO'
+			brake.hidden = !driving
+			if (!driving) {
+				brakeHeld = false
+				brake.classList.remove('on')
+			}
 		},
 	}
 }

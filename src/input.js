@@ -1,5 +1,5 @@
 // Keyboard, wheel, touch and gamepad. Held keys are polled; one-shot actions
-// fire callbacks. Touch and the pad answer the same axis, turbo and drive
+// fire callbacks. Touch and the pad answer the same axis and drive
 // questions, so the game loop only ever talks to one input source, and the
 // sources add up rather than taking over from each other.
 import { createTouch } from './touch.js'
@@ -87,9 +87,6 @@ export function createInput(actions) {
 		// Overhead keyboard movement follows the player; the sticks stay
 		// directional, pointing where you want to go.
 		steer: () => (!actions.cameraActive() && keyDown() ? keyAxis() : null),
-		// Testing: hold space for turbo; the touch boost button and the pad's B
-		// do the same.
-		turbo: () => keys.has(' ') || touch.turbo() || gamepad.turbo(),
 		// In a car: the keyboard's up/down/left/right, or a stick translated
 		// into throttle, turn and handbrake. Triggers and a thumb can be held
 		// at once, so the strongest push of each wins.

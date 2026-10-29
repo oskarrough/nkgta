@@ -396,7 +396,10 @@
 				background: rgba(232, 194, 26, 0.22);
 				border-color: rgba(232, 194, 26, 0.65);
 			}
-			#touch-boost {
+			.touch-button[hidden] {
+				display: none;
+			}
+			#touch-brake {
 				font-size: 0.62rem;
 			}
 
@@ -496,7 +499,7 @@
 		<div id="touch" aria-hidden="true">
 			<div id="stick"><div id="stick-knob"></div></div>
 			<div id="touch-actions">
-				<button class="touch-button" id="touch-boost" type="button" aria-label="Turbo oder Handbremse">Turbo</button>
+				<button class="touch-button" id="touch-brake" type="button" aria-label="Handbremse" hidden>Handbremse</button>
 				<button class="touch-button dim" id="touch-use" type="button" aria-label="Benutzen"></button>
 			</div>
 		</div>

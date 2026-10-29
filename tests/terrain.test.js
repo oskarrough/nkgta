@@ -61,7 +61,7 @@ test('cycling uphill is slower than downhill', () => {
 	const ride = (grade) => {
 		const p = createPlayer({ x: 10, y: 10 })
 		p.onBike = true
-		for (let i = 0; i < 60; i++) updatePlayer(p, { axis: () => ({ x: 1, y: 0 }), turbo: () => false }, hill(grade), 1 / 30)
+		for (let i = 0; i < 60; i++) updatePlayer(p, { axis: () => ({ x: 1, y: 0 }) }, hill(grade), 1 / 30)
 		return p.x - 10
 	}
 	expect(ride(0.06)).toBeLessThan(ride(0))
