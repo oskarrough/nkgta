@@ -21,6 +21,10 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 
 PLEASE, do not verify and visually screenshot everything single thing.
 
+## Music
+
+Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the score format, synth and player come from there too, as the `jukebox` dependency. `bun update jukebox` picks up new songs and fixes. A song's `street` and `at` heads say where it plays; `src/music.js` only decides what they mean on the map. Don't edit `node_modules/jukebox`; change it in the jukebox repo, push, then update. The jukebox itself is at https://jukebox.0sk.ar. `bun test` reads the songs off disk through `tests/songs-preload.js`, since `jukebox/songs` needs Vite.
+
 ## Map data
 
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.

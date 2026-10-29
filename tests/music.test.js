@@ -1,15 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
-import { compile, noteToMidi } from '../src/jukebox/score.js'
-import { mtof } from '../src/jukebox/synth.js'
+import { compile } from 'jukebox/score'
+import { HEAR } from 'jukebox/player'
+import { SONGS } from 'jukebox/songs'
 import {
 	CONVOY,
-	HEAR,
 	SCORES,
 	convoyCar,
-	cueAt,
-	join,
 	lead,
+	shape,
 	mix,
 	nearest,
 	nextOnAir,
@@ -18,48 +16,11 @@ import {
 	openField,
 	pickScore,
 	placeSources,
-	shape,
 	streetNear,
 } from '../src/music.js'
 import { T } from '../src/tiles.js'
 
-const score = (name) => compile(readFileSync(new URL(`../public/music/${name}.song`, import.meta.url), 'utf8'))
-
-describe('scores', () => {
-	for (const name of SCORES) {
-		test(`${name} plays without errors and loops`, () => {
-			const song = score(name)
-			expect(song.errors).toEqual([])
-			expect(song.loop.dur).toBeGreaterThan(10)
-		})
-	}
-})
-
-describe('quarter tones', () => {
-	test('q is a half-flat, a quarter tone under the note', () => {
-		expect(noteToMidi('Eq4')).toBe(63.5)
-		expect(noteToMidi('Bq3')).toBe(58.5)
-		expect(mtof(63.5) / mtof(63)).toBeCloseTo(2 ** (1 / 24))
-	})
-
-	test('half-flats play, in melodies and glides', () => {
-		const song = compile(`voice oud oud
-pattern A
-oud | D4- Eq4- F4- ~Eq4- D4------- |`)
-		expect(song.errors).toEqual([])
-		const notes = song.loop.events.map((e) => e.m[0])
-		expect(notes).toEqual([62, 63.5, 65, 63.5, 62])
-		expect(song.loop.events[3].g).toBe(65)
-	})
-
-	test('the Sonnenallee songs are in a maqam with quarter tones', () => {
-		for (const name of ['sonnenallee', 'sonnenallee-nacht']) {
-			const song = score(name)
-			expect(song.street).toBe('Sonnenallee')
-			expect(song.loop.events.some((e) => e.m?.some((m) => m % 1))).toBe(true)
-		}
-	})
-})
+const score = (name) => compile(SONGS[name])
 
 describe('songs belong to streets', () => {
 	const streets = { sonnenallee: { street: 'Sonnenallee', at: [] }, 'sonnenallee-nacht': { street: 'Sonnenallee', at: [] } }
@@ -155,7 +116,7 @@ describe('music in the street', () => {
 	test('your car radio plays the rock station, one song after another and round again', () => {
 		const homes = Object.fromEntries(SCORES.map((n) => [n, { street: score(n).street, at: score(n).at }]))
 		const pool = stationPool(homes)
-		expect(pool).toEqual(['a100', 'grenzallee', 'buschkrugallee'])
+		expect(pool.sort()).toEqual(['a100', 'buschkrugallee', 'grenzallee', 'tempo-30'])
 	})
 
 	test('a station plays every song each round in a fresh order, never one twice running', () => {
@@ -179,28 +140,6 @@ describe('music in the street', () => {
 			for (let i = 1; i < played.length; i++) expect(played[i]).not.toBe(played[i - 1])
 		}
 		expect(shuffle(['a'], rand, 'a')).toEqual(['a'])
-	})
-
-	test('coming back, a source carries on where its song had got to', () => {
-		const song = score('hermannplatz')
-		expect(cueAt(song, 0)).toEqual({ list: 'intro', i: 0, offset: 0 })
-		const later = song.intro.dur + song.loop.dur * 3 + 5
-		const cue = cueAt(song, later)
-		expect(cue.list).toBe('loop')
-		expect(cue.offset).toBeCloseTo(song.intro.dur + song.loop.dur * 3)
-		const next = song.loop.events[cue.i]
-		expect(cue.offset + next.t).toBeGreaterThanOrEqual(later)
-		expect(cue.offset + song.loop.events[cue.i - 1].t).toBeLessThan(later)
-	})
-
-	test('a source joined later is further on in its song', () => {
-		const song = score('hermannplatz')
-		const first = join(song, 100, 5)
-		const again = join(song, 100, 5 + 25)
-		expect(first.start).toBe(again.start)
-		const at = (j) => j.cue.offset + song[j.cue.list].events[j.cue.i].t
-		expect(at(again)).toBeGreaterThan(at(first) + 20)
-		expect(first.start + at(first)).toBeGreaterThanOrEqual(5)
 	})
 })
 

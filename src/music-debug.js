@@ -3,7 +3,7 @@
 // level falls off as (1 - d / reach)², so there's no full-volume inner ring.
 // The ones you hear glow and pulse with their gain. Overhead view only, like
 // the rest of the flat layer.
-import { KINDS, reach } from './music.js'
+import { KINDS, reach } from 'jukebox/player'
 
 const icon = new Image()
 icon.src = '/icons/speaker-source.png'

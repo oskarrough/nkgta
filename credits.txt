@@ -33,7 +33,7 @@ polygon-clipping 0.15.7 by Mike Fogel (MIT) - https://github.com/mfogel/polygon-
 TinyJoin 0.6.0 by James Pearce (MIT) - https://github.com/tinyplex/tinyjoin
 
 Scrimshaw score format and synth by Simon Willison (Apache-2.0) - https://tools.simonwillison.net/scrimshaw-jukebox
-  Ours to change in src/jukebox/, with its licence. The scores in public/music/ are new, written for NK GTA.
+  Ours to change in oskarrough/jukebox (github.com/oskarrough/jukebox), which keeps that licence and the songs, composed for NK GTA and Dodgethis. Every sound is synthesised; there are no samples.
 
 Build and development tools
 ---------------------------
