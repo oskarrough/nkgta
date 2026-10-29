@@ -21,6 +21,9 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 
 PLEASE, do not verify and visually screenshot everything single thing.
 
+- Test logic, not looks: no unit tests that assert HUD markup, DOM structure, CSS or what gets drawn. One look in the browser covers those. Keep tests for rules (traffic, races, songs, parsing, map building) and perf tripwires.
+- Write few code comments: only the why the code can't say. No narrating what the next line does, no section banners, no comments restating a name.
+
 ## Music
 
 Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the score format, synth and player come from there too, as the `jukebox` dependency. `bun update jukebox` picks up new songs and fixes. A song's `street` and `at` heads say where it plays; `src/music.js` only decides what they mean on the map. Don't edit `node_modules/jukebox`; change it in the jukebox repo, push, then update. The jukebox itself is at https://jukebox.0sk.ar. `bun test` reads the songs off disk through `tests/songs-preload.js`, since `jukebox/songs` needs Vite.
