@@ -13,82 +13,11 @@ const CELL = 16 // tiles: walls are filed in a grid of these, so a place only ch
 
 export function findShops(world) {
 	const free = (x, y) => !SOLID.has(world.tileAt(x, y))
-	// Each building's walls as segments, with a bounding box to skip the far ones.
-	const walls = world.buildings.map((b) => {
-		const segs = []
-		let x0 = Infinity
-		let y0 = Infinity
-		let x1 = -Infinity
-		let y1 = -Infinity
-		for (const r of b.rings) {
-			for (let i = 0; i + 3 < r.length; i += 2) {
-				// Outlines come in short pieces; a straight run is one wall.
-				const last = segs.at(-1)
-				if (last && i > 0 && straight(last, r[i + 2], r[i + 3])) {
-					last[2] = r[i + 2]
-					last[3] = r[i + 3]
-				} else segs.push([r[i], r[i + 1], r[i + 2], r[i + 3]])
-				x0 = Math.min(x0, r[i])
-				y0 = Math.min(y0, r[i + 1])
-				x1 = Math.max(x1, r[i])
-				y1 = Math.max(y1, r[i + 1])
-			}
-		}
-		return { segs, x0, y0, x1, y1 }
-	})
-	const cells = new Map()
-	walls.forEach((w, i) => {
-		for (let cy = Math.floor(w.y0 / CELL); cy <= Math.floor(w.y1 / CELL); cy++) {
-			for (let cx = Math.floor(w.x0 / CELL); cx <= Math.floor(w.x1 / CELL); cx++) {
-				const key = cy * 65536 + cx
-				if (!cells.has(key)) cells.set(key, [])
-				cells.get(key).push(i)
-			}
-		}
-	})
-	// The walls within reach of (x, y), in the order they were mapped.
-	function wallsNear(x, y) {
-		const near = new Set()
-		for (let cy = Math.floor((y - REACH) / CELL); cy <= Math.floor((y + REACH) / CELL); cy++) {
-			for (let cx = Math.floor((x - REACH) / CELL); cx <= Math.floor((x + REACH) / CELL); cx++) {
-				for (const i of cells.get(cy * 65536 + cx) ?? []) near.add(i)
-			}
-		}
-		return [...near].sort((a, b) => a - b).map((i) => walls[i])
-	}
-
+	const facadeOf = facades(world)
 	const shops = []
 	for (const p of world.pois) {
 		if (!KINDS.has(p.kind)) continue
-		let best = null
-		for (const w of wallsNear(p.x, p.y)) {
-			if (p.x < w.x0 - REACH || p.x > w.x1 + REACH || p.y < w.y0 - REACH || p.y > w.y1 + REACH) continue
-			for (const [ax, ay, bx, by] of w.segs) {
-				const len = Math.hypot(bx - ax, by - ay)
-				if (len < MARGIN * 2 + 0.4) continue
-				const ex = (bx - ax) / len
-				const ey = (by - ay) / len
-				const s = Math.max(MARGIN, Math.min(len - MARGIN, (p.x - ax) * ex + (p.y - ay) * ey))
-				const x = ax + ex * s
-				const y = ay + ey * s
-				const d = Math.hypot(p.x - x, p.y - y)
-				if (d > REACH || (best && d >= best.d)) continue
-				// Outward is whichever side you can stand on; a wall with both or
-				// neither free is a party wall or a courtyard nook.
-				for (const side of [1, -1]) {
-					const nx = -ey * side
-					const ny = ex * side
-					if (free(x - nx * 0.5, y - ny * 0.5)) continue
-					// The tiles round off the outline, so stand on the first free spot.
-					const out = STAND.find((o) => free(x + nx * o, y + ny * o) && free(x + nx * (o + 0.6), y + ny * (o + 0.6)))
-					if (out === undefined) continue
-					// Pavement beats a courtyard.
-					const street = world.tileAt(x + nx * (out + 0.6), y + ny * (out + 0.6)) === T.SIDEWALK
-					const score = d + out + (street ? 0 : 2)
-					if (!best || score < best.d) best = { d: score, x, y, nx, ny, ex, ey, out, room: Math.min(s, len - s) }
-				}
-			}
-		}
+		const best = facadeOf(p.x, p.y)
 		if (!best) continue
 		const { x, y, nx, ny, ex, ey, out, room } = best
 		shops.push({ place: p, name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
@@ -136,6 +65,90 @@ export function shopsOf(world) {
 		shops.push({ place: p, name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
 	}
 	return shops
+}
+
+// Where a place at (x, y) meets the street: the nearest stretch of wall
+// that opens onto somewhere walkable, the spot on it, which way is out and
+// where to stand, and its building `n`, `s` along a wall `len` long.
+export function facades(world) {
+	const free = (x, y) => !SOLID.has(world.tileAt(x, y))
+	// Each building's walls as segments, with a bounding box to skip the far ones.
+	const walls = world.buildings.map((b) => {
+		const segs = []
+		let x0 = Infinity
+		let y0 = Infinity
+		let x1 = -Infinity
+		let y1 = -Infinity
+		for (const r of b.rings) {
+			for (let i = 0; i + 3 < r.length; i += 2) {
+				// Outlines come in short pieces; a straight run is one wall.
+				const last = segs.at(-1)
+				if (last && i > 0 && straight(last, r[i + 2], r[i + 3])) {
+					last[2] = r[i + 2]
+					last[3] = r[i + 3]
+				} else segs.push([r[i], r[i + 1], r[i + 2], r[i + 3]])
+				x0 = Math.min(x0, r[i])
+				y0 = Math.min(y0, r[i + 1])
+				x1 = Math.max(x1, r[i])
+				y1 = Math.max(y1, r[i + 1])
+			}
+		}
+		return { segs, x0, y0, x1, y1 }
+	})
+	walls.forEach((w, n) => (w.n = n))
+	const cells = new Map()
+	walls.forEach((w, i) => {
+		for (let cy = Math.floor(w.y0 / CELL); cy <= Math.floor(w.y1 / CELL); cy++) {
+			for (let cx = Math.floor(w.x0 / CELL); cx <= Math.floor(w.x1 / CELL); cx++) {
+				const key = cy * 65536 + cx
+				if (!cells.has(key)) cells.set(key, [])
+				cells.get(key).push(i)
+			}
+		}
+	})
+	// The walls within reach of (x, y), in the order they were mapped.
+	function wallsNear(x, y) {
+		const near = new Set()
+		for (let cy = Math.floor((y - REACH) / CELL); cy <= Math.floor((y + REACH) / CELL); cy++) {
+			for (let cx = Math.floor((x - REACH) / CELL); cx <= Math.floor((x + REACH) / CELL); cx++) {
+				for (const i of cells.get(cy * 65536 + cx) ?? []) near.add(i)
+			}
+		}
+		return [...near].sort((a, b) => a - b).map((i) => walls[i])
+	}
+
+	return (px, py) => {
+		let best = null
+		for (const w of wallsNear(px, py)) {
+			if (px < w.x0 - REACH || px > w.x1 + REACH || py < w.y0 - REACH || py > w.y1 + REACH) continue
+			for (const [ax, ay, bx, by] of w.segs) {
+				const len = Math.hypot(bx - ax, by - ay)
+				if (len < MARGIN * 2 + 0.4) continue
+				const ex = (bx - ax) / len
+				const ey = (by - ay) / len
+				const s = Math.max(MARGIN, Math.min(len - MARGIN, (px - ax) * ex + (py - ay) * ey))
+				const x = ax + ex * s
+				const y = ay + ey * s
+				const d = Math.hypot(px - x, py - y)
+				if (d > REACH || (best && d >= best.d)) continue
+				// Outward is whichever side you can stand on; a wall with both or
+				// neither free is a party wall or a courtyard nook.
+				for (const side of [1, -1]) {
+					const nx = -ey * side
+					const ny = ex * side
+					if (free(x - nx * 0.5, y - ny * 0.5)) continue
+					// The tiles round off the outline, so stand on the first free spot.
+					const out = STAND.find((o) => free(x + nx * o, y + ny * o) && free(x + nx * (o + 0.6), y + ny * (o + 0.6)))
+					if (out === undefined) continue
+					// Pavement beats a courtyard.
+					const street = world.tileAt(x + nx * (out + 0.6), y + ny * (out + 0.6)) === T.SIDEWALK
+					const score = d + out + (street ? 0 : 2)
+					if (!best || score < best.d) best = { d: score, x, y, nx, ny, ex, ey, out, room: Math.min(s, len - s), n: w.n, s, len, street }
+				}
+			}
+		}
+		return best
+	}
 }
 
 // How far along a's wall b's door is, if they share a facade, else null.

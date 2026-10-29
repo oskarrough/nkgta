@@ -14,6 +14,7 @@ import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
+import { createFascia } from './fascia.js'
 import { HILLS } from './terrain.js'
 import { daylight, START_HOUR } from './daylight.js'
 import { STOREY } from './build-map.js'
@@ -238,6 +239,9 @@ export function createScene(canvas, world, shops = []) {
 			group.add(signs)
 			yield
 		}
+		// Their names on the wall above the windows, and every other shop's.
+		group.add(createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open }))
+		yield
 		// Trees in cells, so the view skips most of them, or one plain blob
 		// each across the chunk once they're too small on screen for lumps.
 		const cells = new Map()

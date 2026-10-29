@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping'
 import { T } from './tiles.js'
 import { createWorld } from './world.js'
 import { findShops, packShops } from './shops.js'
+import { findFronts, storefronts } from './fronts.js'
 
 // Road widths in metres, kerb to kerb.
 const ROADS = {
@@ -327,7 +328,15 @@ export function buildMap(osm, bbox, tileM) {
 	shapes.sort((a, b) => a.layer - b.layer)
 	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees }
 	// Where the doors are depends only on the map, so it's worked out here, once.
-	return { ...map, roadNodes, roads, signals, shops: packShops(findShops(createWorld(map)), pois) }
+	const world = createWorld(map)
+	return {
+		...map,
+		roadNodes,
+		roads,
+		signals,
+		shops: packShops(findShops(world), pois),
+		fronts: findFronts(world, storefronts(osm, toTile, W, H)),
+	}
 }
 
 const round = (n) => Math.round(n * 10) / 10
