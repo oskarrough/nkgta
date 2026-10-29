@@ -22,6 +22,8 @@ export function overpassQuery({ south, west, north, east }) {
   way["waterway"](${b});
   node["shop"](${b});
   node["amenity"](${b});
+  way["amenity"="hospital"](${b});
+  relation["amenity"="hospital"]["type"="multipolygon"](${b});
   node["leisure"="playground"](${b});
   node["railway"~"station|subway_entrance"](${b});
   node["highway"="bus_stop"](${b});

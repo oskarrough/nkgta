@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping'
 import { T } from './tiles.js'
 import { createWorld } from './world.js'
 import { findShops, packShops } from './shops.js'
+import { hospitalDoor } from './hospital.js'
 import { findFronts, storefronts } from './fronts.js'
 import { carriageway, isSett, kerbGaps, kerbLines, kerbOf } from './kerbs.js'
 import { cornerCutter } from './corners.js'
@@ -274,13 +275,26 @@ export function buildMap(osm, bbox, tileM) {
 	}
 
 	const pois = []
+	const addPoi = (kind, name, x, y, extra) => {
+		if (x < 0 || y < 0 || x >= W || y >= H) return
+		pois.push({ kind, name, x: round(x), y: round(y), ...extra })
+	}
 	for (const e of osm.elements) {
 		if (e.type !== 'node' || !e.tags) continue
 		const kind = poiKind(e.tags)
 		if (!kind) continue
 		const { x, y } = toTile(e)
-		if (x < 0 || y < 0 || x >= W || y >= H) continue
-		pois.push({ kind, name: e.tags.name ?? '', x: round(x), y: round(y) })
+		addPoi(kind, e.tags.name ?? '', x, y)
+	}
+	// A hospital is usually a campus outline, not a node. Put its place on
+	// the pavement at the edge, so getting wasted leaves you at the door.
+	for (const a of areas) {
+		if (poiKind(a.tags) !== 'hospital') continue
+		const ring = a.rings[0]
+		const door = hospitalDoor(ring, (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? T.BUILDING : tiles[(y | 0) * W + (x | 0)]))
+		if (!door) continue
+		if (pois.some((p) => p.kind === 'hospital' && Math.hypot(p.x - door.x, p.y - door.y) < 30)) continue
+		addPoi('hospital', a.tags.name ?? '', door.x, door.y, { dir: Math.round(door.dir * 1000) / 1000 })
 	}
 
 	// U-Bahn entrances and bus stops. Entrances rarely carry a name, so they
@@ -540,6 +554,7 @@ function poiKind(t) {
 	if (t.shop === 'supermarket') return 'supermarket'
 	if (t.shop === 'bakery') return 'bakery'
 	if (t.amenity === 'pharmacy') return 'pharmacy'
+	if (t.amenity === 'hospital') return 'hospital'
 	if (t.amenity === 'school') return 'school'
 	if (t.amenity === 'kindergarten') return 'kita'
 	if (t.leisure === 'playground') return 'playground'

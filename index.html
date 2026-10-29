@@ -351,6 +351,14 @@
 				letter-spacing: 0.1em;
 				color: #e23b2e;
 			}
+			#veil {
+				position: fixed;
+				inset: 0;
+				background: #000;
+				opacity: 0;
+				pointer-events: none;
+				z-index: 12;
+			}
 			#loading {
 				top: 45%;
 				left: 0;
@@ -487,6 +495,7 @@
 		</div>
 		<div class="hud" id="use" hidden><img class="icon" src="/icons/key-e.png" alt="E" /><img class="icon" id="use-act" alt="" /></div>
 		<div class="hud" id="wasted"></div>
+		<div id="veil"></div>
 		<div id="sound">
 			<button id="mute" type="button" aria-label="Lautstärke" aria-expanded="false" aria-controls="volume" title="Lautstärke (L: Ton aus)">
 				<img class="icon" src="/icons/speaker.png" alt="" />

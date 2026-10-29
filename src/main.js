@@ -4,6 +4,7 @@ import { createInput } from './input.js'
 import { createPlayer, leaveCar, nearBike, toggleBike, updatePlayer } from './player.js'
 import { createTraffic } from './traffic.js'
 import { createWasted } from './wasted.js'
+import { hospitalWake } from './hospital.js'
 import { createPfand } from './pfand.js'
 import { createCamera, ZOOM } from './camera.js'
 import { tuneZoom } from './tune.js'
@@ -57,10 +58,14 @@ const radioHud = createRadioHud((step) => {
 })
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
+const veil = document.getElementById('veil')
 const wasted = createWasted({
 	player,
 	onDown: () => pfand.spill(player.x, player.y),
-	respawn: () => Object.assign(player, createPlayer(world.startPoint(START))),
+	respawn: () => Object.assign(player, createPlayer(hospitalWake(world.pois, player.x, player.y, world.tileAt) ?? world.startPoint(START))),
+	fade: (a) => {
+		veil.style.opacity = String(a)
+	},
 })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
@@ -328,7 +333,7 @@ function frame(now) {
 	input.setUse(action)
 	input.setDriving(!!player.car)
 	radioHud.update(music.radio(), dt)
-	hud.update({ player, cam, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door, action }, dt)
+	hud.update({ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
 	if (FPS) fpsMeter(now)
 	last = now

@@ -179,6 +179,12 @@ const GLYPHS = {
 		box(g, 26, 14, 38, 50, 2)
 		box(g, 14, 26, 50, 38, 2)
 	},
+	// A hospital H.
+	hospital(g) {
+		box(g, 16, 14, 25, 50, 1)
+		box(g, 39, 14, 48, 50, 1)
+		box(g, 16, 28, 48, 36, 1)
+	},
 	// An open book.
 	school(g) {
 		poly(g, [13, 19], [30, 23], [30, 49], [13, 45])

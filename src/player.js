@@ -13,7 +13,7 @@ export function createPlayer(start) {
 	return {
 		x: start.x,
 		y: start.y,
-		dir: 0,
+		dir: start.dir ?? 0,
 		speed: 0,
 		onBike: false,
 		car: null,
