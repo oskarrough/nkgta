@@ -13,7 +13,8 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 
 - `bun run check` lints and checks formatting; `bun run format` fixes formatting. The deploy runs it first, so a file that fails it (even in docs/) stops the site updating.
 - Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
-- Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers, run `chromium-browser --headless=new --enable-gpu --ignore-gpu-blocklist --use-angle=gl --remote-debugging-port=<port> --user-data-dir=/tmp/<name> about:blank &` and `agent-browser connect <port>`; the GPU string should say Radeon. `?perf` has the timings.
+- Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers run `bun run perf`: it starts its own Vite, launches chromium on the Radeon, opens the game with `?perf&hour=11&cam=top|chase` from the fixed start, settles 3 s, samples 10 s and prints the GPU plus median / p95 frame ms for the overhead and chase camera. `bun run perf hour=20` adds url params, `--cam chase` runs one view, `--url <base>` uses a running server instead. If the GPU line doesn't say Radeon, ignore the numbers. Run it before and after a drawing change, once each.
+- `?perf` reads every pass back, so it runs slower than the game does; compare runs with each other, not with a plain 60 fps, and only when no other worktree is using the GPU. Pedestrians and traffic are random, so expect a few ms of noise.
 - After adding a dependency, restart the dev server, or Vite keeps serving stale optimized deps and the page hangs on "Lade Karte…".
 
 PLEASE, do not verify and visually screenshot everything single thing.
