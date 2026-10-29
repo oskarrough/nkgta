@@ -356,6 +356,10 @@
 			}
 			body.touch #place {
 				bottom: calc(8.5rem + env(safe-area-inset-bottom));
+				left: calc(1rem + env(safe-area-inset-left));
+				right: calc(6rem + env(safe-area-inset-right));
+				font-size: 1.2rem;
+				overflow-wrap: anywhere;
 			}
 			#stick {
 				position: absolute;
@@ -438,6 +442,12 @@
 
 			/* Narrow screens: the street name and the money share the top line. */
 			@media (max-width: 600px) {
+				#place {
+					left: calc(1rem + env(safe-area-inset-left));
+					right: calc(1rem + env(safe-area-inset-right));
+					font-size: 1.2rem;
+					overflow-wrap: anywhere;
+				}
 				#street {
 					left: calc(1rem + env(safe-area-inset-left));
 					right: auto;

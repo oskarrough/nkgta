@@ -17,3 +17,12 @@ body.touch #minimap {
 	width: min(128px, 25dvh);
 	height: min(128px, 25dvh);
 }
+
+@media (max-width: 600px) {
+	#minimap {
+		top: calc(4.5rem + env(safe-area-inset-top));
+		bottom: auto;
+		width: min(128px, 25dvh);
+		height: min(128px, 25dvh);
+	}
+}
