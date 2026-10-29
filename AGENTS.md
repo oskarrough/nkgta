@@ -11,7 +11,7 @@ See README.md for what the game is and where the code lives.
 
 Oskar values speed over certainty. Verify once and stop: one check that the change works, one before/after if you're measuring. Never re-run a check to firm up a result, re-check views you didn't change, or chase noise. Rough numbers are fine. If you catch yourself verifying a second time, stop and report what you have.
 
-- `bun run check` lints and checks formatting; `bun run format` fixes formatting.
+- `bun run check` lints and checks formatting; `bun run format` fixes formatting. The deploy runs it first, so a file that fails it (even in docs/) stops the site updating.
 - Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
 - Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers, run `chromium-browser --headless=new --enable-gpu --ignore-gpu-blocklist --use-angle=gl --remote-debugging-port=<port> --user-data-dir=/tmp/<name> about:blank &` and `agent-browser connect <port>`; the GPU string should say Radeon. `?perf` has the timings.
 - After adding a dependency, restart the dev server, or Vite keeps serving stale optimized deps and the page hangs on "Lade Karte…".
@@ -32,6 +32,15 @@ PLEASE, do not verify and visually screenshot everything single thing.
 - Buildings stand on the lowest ground under their outline; walls reach a little below it. The overhead camera rises with the ground at the view's centre so the 2D overlay lines up there. Shop interiors stay flat (`cam.ground: 0`).
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
 - `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
+
+## Working in a worktree
+
+Agents often work in parallel, each in its own bb worktree, and the lead agent lands their commits on main.
+
+- Worktrees are plain git, not jj: make one git commit on the base, don't push and don't touch main. On another machine (e.g. hetzner), push it as a branch named after the issue instead, since the lead can't reach that disk.
+- Run `bun install` first, and start your own dev server on a free port (`bunx vite --port <5300-5399> --strictPort`); :5277 belongs to the main checkout.
+- Stay inside your task. src/scene.js is shared by most look changes: touch as few of its lines as you can and put new things in their own module, so parallel work merges cleanly.
+- Finish with: the commit (or branch), one line per change the player notices, perf before/after if it draws anything, a before/after screenshot at an absolute path if it shows on screen, and what Oskar should check by eye.
 
 ## Issues
 
