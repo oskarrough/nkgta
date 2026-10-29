@@ -22,6 +22,14 @@ import { T } from '../src/tiles.js'
 
 const score = (name) => compile(SONGS[name])
 
+test('songs marked for other games stay out of the Kiez', () => {
+	const foreign = Object.keys(SONGS).filter((name) => score(name).game && score(name).game !== 'nkgta')
+	expect(foreign.length).toBeGreaterThan(0)
+	for (const name of foreign) expect(SCORES).not.toContain(name)
+	expect(SCORES).toContain('sonnenallee')
+	expect(SCORES).toContain(CONVOY)
+})
+
 describe('songs belong to streets', () => {
 	const streets = { sonnenallee: { street: 'Sonnenallee', at: [] }, 'sonnenallee-nacht': { street: 'Sonnenallee', at: [] } }
 	const picks = (street) => Array.from({ length: 600 }, (_, i) => pickScore(streets, street, '', i))

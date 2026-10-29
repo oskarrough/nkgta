@@ -6,15 +6,17 @@
 // A song can belong to a street or a kind of place (`at doener`, `at feld`);
 // sources there mostly play its songs. A big open field plays too, softly, from
 // all round you.
-import { compile } from 'jukebox/score'
+import { compile, parse } from 'jukebox/score'
 import { AHEAD, HEAR, KINDS, begin, end, feed, reach, shape as soundAt, synthFor, tune } from 'jukebox/player'
 import { SONGS } from 'jukebox/songs'
 import { muffling } from './space.js'
 import { T } from './tiles.js'
 
 // The jukebox also holds songs for other games.
-const OTHER_GAMES = ['dodgethis-theme', 'altamesa', 'overthrow', 'flagfall']
-export const SCORES = Object.keys(SONGS).filter((n) => !OTHER_GAMES.includes(n))
+export const SCORES = Object.keys(SONGS).filter((n) => {
+	const { game } = parse(SONGS[n]).song
+	return !game || game === 'nkgta'
+})
 export const CONVOY = 'konvoi' // the wedding convoy's own song, played nowhere else
 const PLACE_SCORES = SCORES.filter((s) => s !== CONVOY)
 const PLAYING = 2 // sources sounding at once
