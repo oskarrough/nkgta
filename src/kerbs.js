@@ -156,6 +156,16 @@ export function pointsGrid(points, cell = 4) {
 			}
 			return null
 		},
+		each(x, y, r, fn) {
+			for (let cx = Math.floor((x - r) / cell); cx <= Math.floor((x + r) / cell); cx++) {
+				for (let cy = Math.floor((y - r) / cell); cy <= Math.floor((y + r) / cell); cy++) {
+					for (const p of cells.get(cx * 65536 + cy) ?? []) {
+						const d = Math.hypot(p.x - x, p.y - y)
+						if (d < r) fn(p, d)
+					}
+				}
+			}
+		},
 	}
 }
 

@@ -2,6 +2,7 @@
 import { T, SOLID } from './tiles.js'
 import { driveCar, speedOf, toWorld } from './car.js'
 import { HILLS } from './terrain.js'
+import { pushFromTrunks } from './trees.js'
 
 export const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
@@ -172,4 +173,5 @@ function pushOut(p, world) {
 		}
 		if (!moved) return
 	}
+	pushFromTrunks(p, world, RADIUS)
 }

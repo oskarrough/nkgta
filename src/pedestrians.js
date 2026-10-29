@@ -6,6 +6,7 @@
 import { T, SOLID } from './tiles.js'
 import { offsetLine, pointAt } from './roads.js'
 import { LENGTH } from './car.js'
+import { pushFromTrunks } from './trees.js'
 
 const PAVE = 0.55 // tiles past the kerb people walk
 const SPACING = 0.45 // tiles from one person to the next in a queue, centre to centre
@@ -34,7 +35,10 @@ const VEHICLE = 1.5 // tiles per second: slower than this nobody needs to jump
 
 const walkable = (t) => t === T.SIDEWALK || t === T.GROUND
 
+let streetWorld = null
+
 export function createPedestrians(world, junctions) {
+	streetWorld = world
 	const people = []
 	const paths = new Map() // edge → its tracks, worked out when first near
 	const junctionAt = new Map() // road node → its junction
@@ -221,6 +225,7 @@ function place(p) {
 	const side = p.track.edge ? p.spot : p.way * (p.pause > 0 ? 0.35 : KEEP_RIGHT)
 	p.x = at.x - Math.sin(at.dir) * side + (p.off?.x ?? 0)
 	p.y = at.y + Math.cos(at.dir) * side + (p.off?.y ?? 0)
+	if (streetWorld) pushFromTrunks(p, streetWorld)
 	p.dir = p.dodge ? p.dodge.dir : p.way > 0 ? at.dir : at.dir + Math.PI
 	return p
 }

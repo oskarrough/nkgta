@@ -2,6 +2,7 @@
 // blobs, so the silhouette bumps like a painted tree. Decoration only: nothing
 // here touches the tile grid, so you walk and drive straight through them.
 import * as THREE from 'three'
+import { pointsGrid } from './kerbs.js'
 
 const CROWNS = ['#4c6f32', '#5e8636', '#365b25']
 const BOTTOM = 3 // metres from the ground to the underside of the crown
@@ -23,6 +24,40 @@ const TRUNK_SIDES = 5
 const hash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 const blobCount = (i) => BLOBS_MIN + Math.floor(hash(i * 7 + 2) * (BLOBS_MAX - BLOBS_MIN + 1))
 const mix = (range, t) => range[0] + t * (range[1] - range[0])
+
+const TRUNK_BODY = 0.22 // tiles, a person standing beside the stem
+
+function trunkGrid(world) {
+	if (!world.trunkGrid) world.trunkGrid = pointsGrid(world.trees ?? [])
+	return world.trunkGrid
+}
+
+function trunkRadius(t, tileM) {
+	return mix(TRUNK_RADIUS, Math.min(1, Math.max(0, (t.crown - 4) / 10))) / tileM
+}
+
+// Decoration trunks aren't on the tile grid; nudge feet off the stem visually.
+export function pushFromTrunks(p, world, body = TRUNK_BODY) {
+	const trees = world.trees
+	if (!trees?.length) return
+	const tileM = world.tileM
+	const reach = 0.6
+	trunkGrid(world).each(p.x, p.y, reach, (t) => {
+		let dx = p.x - t.x
+		let dy = p.y - t.y
+		let d = Math.hypot(dx, dy)
+		const need = trunkRadius(t, tileM) + body
+		if (d < 1e-6) {
+			dx = 1
+			dy = 0
+			d = 1
+		}
+		if (d >= need) return
+		const k = (need - d) / d
+		p.x += dx * k
+		p.y += dy * k
+	})
+}
 
 // `pick` is which trees, by index, so each keeps its own looks wherever
 // it's drawn. `simple` gives each tree one plain blob in its own colour,
