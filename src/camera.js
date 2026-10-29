@@ -14,15 +14,15 @@ const HOLD = 0.6 // seconds
 // tiles), getting most of the way there by `fast`. It eases out over
 // `easeOut` seconds and back in over the slower `easeIn`.
 export const ZOOM = {
-	foot: 15,
-	bike: 14,
-	car: 12.5,
+	foot: 18,
+	bike: 16.8,
+	car: 15,
 	out: 0.5,
 	calm: 2,
 	fast: 14,
 	easeOut: 0.6,
 	easeIn: 1.8,
-	boom: 2.2,
+	boom: 1.8,
 	boomOut: 2.5,
 	boomPerLength: 0.3,
 }
