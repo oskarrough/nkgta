@@ -23,6 +23,7 @@ PLEASE, do not verify and visually screenshot everything single thing.
 
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.
 - When `src/build-map.js` or `src/map-codec.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
+- `public/map.json` conflicts whenever two changes rebuild it: after a rebase, rerun `bun run build-map` instead of merging it by hand.
 - Overpass is a shared public service. Fetch once and work from `data/osm.json`; never call it in a loop.
 
 ## Ground height
@@ -36,12 +37,13 @@ PLEASE, do not verify and visually screenshot everything single thing.
 
 ## Working in a worktree
 
-Agents often work in parallel, each in its own bb worktree, and the lead agent lands their commits on main.
+Agents often work in parallel, each in its own bb worktree, with a GitHub issue as the brief. This project moves fast: no branches, no PRs.
 
-- Worktrees are plain git, not jj: make one git commit on the base, don't push and don't touch main. On another machine (e.g. hetzner), push it as a branch named after the issue instead, since the lead can't reach that disk.
+- Land your own work: commit, `git fetch && git rebase origin/main`, resolve any conflicts (you know your change best), `bun run check` and `bun test`, then `git push origin HEAD:main`. If the push is rejected, rebase and push again. Worktrees are plain git, not jj.
+- A failed deploy is fine; fix it forward straight away.
 - Run `bun install` first, and start your own dev server on a free port (`bunx vite --port <5300-5399> --strictPort`); :5277 belongs to the main checkout.
 - Stay inside your task. src/scene.js is shared by most look changes: touch as few of its lines as you can and put new things in their own module, so parallel work merges cleanly.
-- Finish with: the commit (or branch), one line per change the player notices, perf before/after if it draws anything, a before/after screenshot at an absolute path if it shows on screen, and what Oskar should check by eye.
+- Finish with: the pushed commit, one line per change the player notices, perf before/after if it draws anything, a before/after screenshot at an absolute path if it shows on screen, and what Oskar should check by eye.
 
 ## Issues
 
