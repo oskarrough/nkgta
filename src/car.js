@@ -125,7 +125,7 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 
 	// Less lock the faster you go, or the front tyres scrub off all your speed.
 	const lock = m.steer / (1 + Math.max(0, forward - 2) * m.steerFade)
-	c.steer += (turn * lock - c.steer) * Math.min(1, dt * 12)
+	c.steer += (turn * lock - c.steer) * Math.min(1, dt * 8)
 	const ground = world.tileAt(c.x, c.y)
 	const rough = ground === T.GROUND || ground === T.GRASS ? OFF_ROAD : 1
 	for (const t of c.tyres) {

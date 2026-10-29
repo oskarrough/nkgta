@@ -81,7 +81,7 @@ export const MODELS = {
 		drag: 0.015,
 		lateral: 2.2,
 		steer: 0.55,
-		steerFade: 0.12,
+		steerFade: 0.22,
 		colors: ['#9be22d', '#ff7a00', '#ffd400', '#1a1a1a', '#8a1fd1'],
 		look: [
 			// Flat and wide: a long low nose rising to a small cabin and
