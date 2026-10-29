@@ -1,6 +1,6 @@
 {
 	"$schema": "./node_modules/oxfmt/configuration_schema.json",
-	"ignorePatterns": ["public/map.json", "public/terrain.json"],
+	"ignorePatterns": ["public/map.json", "public/terrain.json", "docs/"],
 	"semi": false,
 	"singleQuote": true,
 	"useTabs": true,
