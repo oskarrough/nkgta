@@ -208,24 +208,28 @@ function baseline() {
 	}
 	return context.getImageData(0, 0, 1, 1).data[0]
 }
-const median = (values) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
 test('a decorated chunk builds and paints within the relative CPU budget', () =>
 	harness(({ build }) => {
-		// One warmup, then interleaved samples; medians tolerate a scheduler/GC pause.
+		// CPU time excludes time descheduled on busy CI hosts. Separate best
+		// samples discard GC without letting a delayed baseline hide a regression.
 		dispose(build())
 		baseline()
-		const ratios = []
+		const baselines = []
+		const chunks = []
 		for (let i = 0; i < 3; i++) {
-			const start = performance.now()
+			const start = process.cpuUsage()
 			baseline()
-			const baseMs = performance.now() - start
-			const chunkStart = performance.now()
+			const base = process.cpuUsage(start)
+			const baseMs = (base.user + base.system) / 1000
+			const chunkStart = process.cpuUsage()
 			const city = build()
-			const chunkMs = performance.now() - chunkStart
-			ratios.push(chunkMs / baseMs)
+			const chunk = process.cpuUsage(chunkStart)
+			const chunkMs = (chunk.user + chunk.system) / 1000
+			baselines.push(baseMs)
+			chunks.push(chunkMs)
 			dispose(city)
 		}
-		const ratio = median(ratios)
+		const ratio = Math.min(...chunks) / Math.min(...baselines)
 		console.info(`Chunk CPU budget: ${ratio.toFixed(2)}× baseline (limit 6×)`)
 		expect(ratio).toBeLessThan(6)
 	}))

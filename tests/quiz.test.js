@@ -1,3 +1,4 @@
+import { defaultMap } from './default-map.js'
 import { expect, test } from 'bun:test'
 import { quizLine, quizRounds, quizSpots } from '../src/quiz-rules.js'
 import { T } from '../src/tiles.js'
@@ -33,9 +34,8 @@ test('feedback is exactly one plain line, including skips and picked areas', () 
 })
 
 test('the shipped map can provide a full quiz', async () => {
-	const { decodeMap } = await import('../src/map-codec.js')
 	const { createWorld } = await import('../src/world.js')
-	const world = createWorld(decodeMap(await Bun.file('public/map.json').json()))
+	const world = createWorld(await defaultMap())
 	const rounds = quizRounds(quizSpots(world))
 	expect(rounds).toHaveLength(5)
 	for (const spot of rounds) expect(world.streetAt(spot.x, spot.y)).toBe(spot.street)

@@ -1,3 +1,4 @@
+import { defaultMap } from './default-map.js'
 import { describe, expect, test } from 'bun:test'
 import { compile } from 'jukebox/score'
 import { HEAR } from 'jukebox/player'
@@ -213,8 +214,7 @@ describe('the open field', () => {
 	})
 
 	test('Tempelhofer Feld is a field; Hasenheide and the streets are not', async () => {
-		const { decodeMap } = await import('../src/map-codec.js')
-		const map = decodeMap(await Bun.file('public/map.json').json())
+		const map = await defaultMap()
 		const near = openField({ ...map, W: map.w, H: map.h })
 		const at = (lat, lon) => {
 			const { bbox } = map

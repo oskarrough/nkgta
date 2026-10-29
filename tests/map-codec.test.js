@@ -1,10 +1,11 @@
+import { defaultMap } from './default-map.js'
 import { expect, test } from 'bun:test'
 import { decodeMap, encodeMap } from '../src/map-codec.js'
 
 const sha = (bytes) => new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
 
 test('the default map walks exactly as it did when split streets narrowed to their lanes', async () => {
-	const map = decodeMap(await Bun.file('public/map.json').json())
+	const map = await defaultMap()
 	// Hashes of the grids as shipped when split streets narrowed (#19).
 	expect(sha(map.tiles)).toBe('d9f342125a7e9ff25dc988046d6948b8793ed0133c74403d9cdbb16660ad2c0d')
 	expect(sha(new Uint8Array(map.streetOf.buffer))).toBe('a9374cfbddc5b9c95d2bdda59c608eef71c77a27a134cbfc1eaf7a553613f231')
