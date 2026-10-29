@@ -41,7 +41,6 @@ export function storefronts(osm, toTile, W, H) {
 		if (level >= 1 || level < 0) continue
 		const spaeti = kind === 'kiosk' || kind === 'convenience'
 		const name = (t.name || t.brand || (spaeti ? 'Späti' : '')).replace(/\s*\(.*?\)\s*/g, ' ').trim()
-		if (!name) continue
 		const { x, y } = toTile(e)
 		if (x < 0 || y < 0 || x >= W || y >= H) continue
 		list.push({ name, brand: t.brand ?? '', kind, x, y, openingHours: t.opening_hours ?? '' })

@@ -129,7 +129,9 @@ const unpacked = new WeakMap()
 
 export function createFascia(world, chunk, gradient, night, opening) {
 	if (!unpacked.has(world)) unpacked.set(world, frontsOf(world))
-	const mine = unpacked.get(world).filter((f) => f.x >= chunk.x && f.y >= chunk.y && f.x < chunk.x + chunk.w && f.y < chunk.y + chunk.h)
+	const mine = unpacked
+		.get(world)
+		.filter((f) => f.name && f.x >= chunk.x && f.y >= chunk.y && f.x < chunk.x + chunk.w && f.y < chunk.y + chunk.h)
 	const group = new THREE.Group()
 	const measure = document.createElement('canvas').getContext('2d')
 	let batch = []
