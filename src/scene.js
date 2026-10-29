@@ -9,6 +9,8 @@ import { createInk } from './ink.js'
 import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import { createBridges } from './bridges.js'
 import { createTrees, createTrunks } from './trees.js'
+import { createFurniture } from './street-furniture.js'
+import { SETT_ALPHA } from './map-image.js'
 import { createClouds, DECK } from './clouds.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
@@ -139,6 +141,8 @@ const GROUND_DETAIL = {
 	yardJoints: 0.08, // the gaps between their cobbles
 	pavingJoints: 0.09, // and between the pavement slabs
 	asphaltPatches: 0.1, // repaired patches in the tarmac
+	settJoints: 0.2, // the gaps between the setts of a cobbled street
+	settSize: 7, // setts per tile, about
 	waves: 0.65, // pale wave dashes on water
 	waveDrift: 0.15, // and how fast they drift, tiles a second
 	glints: 0.035, // share of sunlit water cells sparkling at any moment
@@ -258,6 +262,9 @@ export function createScene(canvas, world, shops = []) {
 			mesh.computeBoundingSphere()
 			group.add(mesh)
 		}
+		yield
+		const furniture = createFurniture(world, gradient, chunk, sky.night)
+		for (const mesh of furniture.meshes) group.add(mesh)
 		const uv = plane.geometry.attributes.uv
 		return {
 			group,
@@ -267,6 +274,7 @@ export function createScene(canvas, world, shops = []) {
 				for (const mesh of far) mesh.visible = scale < DETAIL_PX
 				if (stacks) stacks.visible = scale >= DETAIL_PX
 				if (hatchMesh) hatchMesh.visible = scale >= DETAIL_PX
+				furniture.zoom(scale)
 			},
 			// Point the ground's corners, or the roofs' world positions, at
 			// where the chunk sits in the texture.
@@ -778,7 +786,9 @@ function groundMaterial(map, world) {
 			${groundDetail}
 
 			void main() {
-				vec3 color = groundDetail(texture2D(map, vUv).rgb, vTile, time);
+				vec4 ground = texture2D(map, vUv);
+				gSett = clamp((1.0 - ground.a) / ${d(SETT_ALPHA)}, 0.0, 1.0);
+				vec3 color = groundDetail(ground.rgb, vTile, time);
 				float lit = getShadowMask();
 				color *= mix(shade, sun, lit) * vHill;
 				// Sun glints on water: a few cells at a time flash a white point,
@@ -879,6 +889,8 @@ float gJoints(vec2 p, float edge, vec2 w) {
 
 // Set by groundDetail: how much of this point is water.
 float gWater = 0.0;
+// Set before it: how much of this point is cobbled street, from the map's alpha.
+float gSett = 0.0;
 
 vec3 groundDetail(vec3 color, vec2 p, float time) {
 	float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -924,7 +936,13 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	f -= pavement * gJoints(p * 2.0, 0.86, fwidth(p) * 2.0) * ${d(GROUND_DETAIL.pavingJoints)};
 
 	float repair = gBlots(p * 0.3 + 11.3);
-	f -= tarmac * step(0.73, repair) * ${d(GROUND_DETAIL.asphaltPatches)};
+	f -= tarmac * (1.0 - gSett) * step(0.73, repair) * ${d(GROUND_DETAIL.asphaltPatches)};
+
+	// Cobbled streets: small setts, their joints thinning into a tone before
+	// they'd flicker.
+	float sett = gSetts(p * ${d(GROUND_DETAIL.settSize)});
+	float settJoint = 1.0 - smoothstep(${d(0.1 / GROUND_DETAIL.settSize)}, ${d(0.24 / GROUND_DETAIL.settSize)}, px);
+	f -= gSett * mix(0.21, step(sett, 0.12), settJoint) * ${d(GROUND_DETAIL.settJoints)};
 
 	return color * f;
 }

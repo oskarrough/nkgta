@@ -4,6 +4,7 @@ import { T } from './tiles.js'
 import { createWorld } from './world.js'
 import { findShops, packShops } from './shops.js'
 import { findFronts, storefronts } from './fronts.js'
+import { carriageway, isSett, kerbGaps, kerbLines, kerbOf } from './kerbs.js'
 
 // Road widths in metres, kerb to kerb.
 const ROADS = {
@@ -31,6 +32,8 @@ export function buildMap(osm, bbox, tileM) {
 		x: ((lon - bbox.west) * lonM) / tileM,
 		y: ((bbox.north - lat) * latM) / tileM,
 	})
+	// Kerb to kerb, in metres; see kerbs.js for split streets.
+	const widthOf = (t) => carriageway(t, ROADS[roadClass(t.highway)])
 
 	const tiles = new Uint8Array(W * H).fill(T.GROUND)
 	const streetOf = new Uint16Array(W * H)
@@ -73,8 +76,8 @@ export function buildMap(osm, bbox, tileM) {
 		}
 	}
 
-	function strokeLine(pts, widthM, type, { onlyOn, street, layer = LAYER[type] } = {}) {
-		shapes.push({ t: type, layer, w: round(widthM / tileM), line: flat(pts) })
+	function strokeLine(pts, widthM, type, { onlyOn, street, layer = LAYER[type], sett } = {}) {
+		shapes.push({ t: type, layer, w: round(widthM / tileM), line: flat(pts), ...(sett && { sett: 1 }) })
 		const r = widthM / tileM / 2
 		for (let s = 0; s + 1 < pts.length; s++) {
 			const a = pts[s]
@@ -142,7 +145,7 @@ export function buildMap(osm, bbox, tileM) {
 	)
 	for (const w of roadWays) {
 		const pts = geom(w.geometry)
-		const road = ROADS[roadClass(w.tags.highway)]
+		const road = widthOf(w.tags)
 		strokeLine(pts, road + 20, T.SIDEWALK, { onlyOn: [T.GROUND], layer: -1 })
 		strokeLine(pts, road + 8, T.SIDEWALK, { onlyOn: [T.GROUND, T.GRASS] })
 	}
@@ -170,8 +173,18 @@ export function buildMap(osm, bbox, tileM) {
 		if (rings.length) buildings.push({ h: buildingHeight(a.tags, m2), rings: rings.map(flat) })
 	}
 
-	// 5. Roads, widest first so junctions look right.
+	// 5. Roads, widest first so junctions look right. Their bike lanes and
+	// cobbled middle strips stop where another street comes in.
 	roadWays.sort((a, b) => ROADS[roadClass(a.tags.highway)] - ROADS[roadClass(b.tags.highway)])
+	const meets = new Map()
+	for (const w of roadWays) for (const id of w.nodes ?? []) meets.set(id, [...(meets.get(id) ?? []), w])
+	const crossing = (w) => (i) =>
+		Math.max(
+			0,
+			...(meets.get(w.nodes?.[i]) ?? [])
+				.filter((o) => o !== w && (!o.tags.name || o.tags.name !== w.tags.name))
+				.map((o) => widthOf(o.tags) / tileM),
+		)
 	for (const w of roadWays) {
 		let street
 		const name = w.tags.name
@@ -180,7 +193,8 @@ export function buildMap(osm, bbox, tileM) {
 			if (street < 0) street = streets.push(name) - 1
 		}
 		const pts = geom(w.geometry)
-		strokeLine(pts, ROADS[roadClass(w.tags.highway)], T.ROAD, { street })
+		strokeLine(pts, widthOf(w.tags), T.ROAD, { street, sett: isSett(w.tags) })
+		shapes.push(...kerbLines(pts, w.tags, widthOf(w.tags) / tileM, crossing(w)))
 		// Dashed centre line on the bigger two-way roads. Split carriageways
 		// come as two one-way roads and get none.
 		if (ROADS[roadClass(w.tags.highway)] >= 12 && w.tags.oneway !== 'yes') shapes.push({ t: 'mark', layer: 9, w: 0.1, line: flat(pts) })
@@ -220,7 +234,8 @@ export function buildMap(osm, bbox, tileM) {
 			return nodeIndex.get(id)
 		})
 		const oneway = ['yes', 'true', '1'].includes(t.oneway) || t.junction === 'roundabout' ? 1 : t.oneway === '-1' ? -1 : 0
-		roads.push({ w: round(ROADS[roadClass(t.highway)] / tileM), oneway, nodes })
+		const wide = round(ROADS[roadClass(t.highway)] / tileM)
+		roads.push({ w: wide, oneway, nodes, ...kerbOf(t, wide, round(widthOf(t) / tileM)) })
 	}
 
 	// Traffic lights, as points: OSM puts them at the junction or at each stop line.
@@ -325,6 +340,17 @@ export function buildMap(osm, bbox, tileM) {
 		addTree(e.tags, e.id * 31 + n, end.x, end.y)
 	}
 
+	// Where the kerb stops for a driveway or a crossing, and the street lamps
+	// OSM knows, if the data has them.
+	const tileAt = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? tiles[(y | 0) * W + (x | 0)] : T.GROUND)
+	const atKerb = ({ x, y }) => [-1.5, 0, 1.5].some((dx) => [-1.5, 0, 1.5].some((dy) => tileAt(x + dx, y + dy) === T.ROAD))
+	const gaps = kerbGaps(ways, toTile, atKerb)
+	const lamps = osm.elements
+		.filter((e) => e.type === 'node' && e.tags?.highway === 'street_lamp')
+		.map(toTile)
+		.filter((p) => p.x >= 0 && p.y >= 0 && p.x < W && p.y < H)
+		.flatMap((p) => [round(p.x), round(p.y)])
+
 	shapes.sort((a, b) => a.layer - b.layer)
 	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees }
 	// Where the doors are depends only on the map, so it's worked out here, once.
@@ -334,6 +360,8 @@ export function buildMap(osm, bbox, tileM) {
 		roadNodes,
 		roads,
 		signals,
+		kerbGaps: gaps,
+		lamps,
 		shops: packShops(findShops(world), pois),
 		fronts: findFronts(world, storefronts(osm, toTile, W, H)),
 	}

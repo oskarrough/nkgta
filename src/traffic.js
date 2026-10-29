@@ -1,16 +1,19 @@
 // Traffic: cars driving the road network on the right, parked cars along the
-// kerbs, both popping in out of sight around the player, GTA 1 style.
+// kerbs where OSM says people park (see kerbs.js), both popping in out of
+// sight around the player, GTA 1 style.
 import { createCar, driveCar, collideCars, shoveOut, forwardSpeed, speedOf, toWorld, distanceTo, LENGTH } from './car.js'
 import { MODELS, pickModel } from './models.js'
 import { SOLID, T } from './tiles.js'
 import { roadGraph, pointAt, project } from './roads.js'
 import { createJunctions } from './junctions.js'
 import { createPedestrians, glance, dodgeStep, keepClear } from './pedestrians.js'
+import { noParking, parkingSpots, spotHash, standsClear } from './kerbs.js'
 
 const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
 const SIGHT = 25 // tiles up the lane a driver watches the car ahead
 const PER_CAR = 15 // tiles of lane per moving car
-const PER_PARKED = 12 // tiles of kerb per parked car
+const PARK_REACH = 60 // tiles round the player that parked cars fill, at most
+const MAX_PARKED = 160 // the nearest this many spots, at most
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
 const DIVE_SHOUTS = ['Ey!', 'Alter!', 'Spinnst du?']
 const SHOUT_RANGE = 12 // tiles: further than this you wouldn't hear it
@@ -37,6 +40,10 @@ export function createTraffic(world, say = () => {}) {
 	let shouted = 0 // seconds since someone last yelled at you
 	let convoyIn = 20 // seconds until the next wedding convoy comes round
 	let mover = null // the player as something that could hit a car, this frame
+	const blocked = noParking(world)
+	const spotsOf = new Map() // lane → its parking spots, worked out once it's near
+	let spots = [] // the spots in reach, nearest first
+	let spotsAt = null // where the player was when they were gathered
 
 	function pick(list, weight) {
 		let r = Math.random() * list.reduce((s, e) => s + weight(e), 0)
@@ -59,22 +66,47 @@ export function createTraffic(world, say = () => {}) {
 		return true
 	}
 
-	// A spot on a random lane (or kerb) inside the ring, out of sight.
-	function spawn(near, ring, view, parked) {
+	// A spot on a random lane inside the ring, out of sight.
+	function spawn(near, ring, view) {
 		for (let tries = 0; tries < 20; tries++) {
 			const edge = pick(near, (e) => e.len)
 			const s = Math.random() * edge.len
-			const p = pointAt(parked ? edge.kerb : edge.lane, s)
+			const p = pointAt(edge.lane, s)
 			const d = Math.hypot(p.x - ring.x, p.y - ring.y)
 			if (d > ring.max || d < 3 || (started && inView(view, p.x, p.y, 2))) continue
-			if (parked && junctions.near(p.x, p.y, 2)) continue
-			const model = pickModel(!parked && edge.w >= BIG_ROAD)
+			const model = pickModel(edge.rank >= BIG_ROAD)
 			if (!fits(p.x, p.y, p.dir, model)) continue
-			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: parked ? 0 : edge.speed * 0.8 })
+			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: edge.speed * 0.8 })
 			if (model === MODELS.bus && busLines.length) car.line = busLines[Math.floor(Math.random() * busLines.length)]
-			if (!parked) car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
+			car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
 			cars.push(car)
 			return
+		}
+	}
+
+	// Parked cars stand in fixed spots along the kerbs, the nearest ones
+	// filled out of sight. The same spot always holds the same car, unless
+	// it's been driven off.
+	function park(ring, view, reach) {
+		if (!spotsAt || Math.hypot(spotsAt.x - ring.x, spotsAt.y - ring.y) > 4 || spotsAt.reach !== reach) {
+			spots = []
+			for (const e of edges) {
+				if (Math.hypot(e.mid.x - ring.x, e.mid.y - ring.y) > reach + e.len / 2) continue
+				if (!spotsOf.has(e)) spotsOf.set(e, parkingSpots(e, blocked, BIG_ROAD))
+				for (const spot of spotsOf.get(e)) if (Math.hypot(spot.x - ring.x, spot.y - ring.y) < reach) spots.push(spot)
+			}
+			spots.sort((a, b) => Math.hypot(a.x - ring.x, a.y - ring.y) - Math.hypot(b.x - ring.x, b.y - ring.y))
+			spots.length = Math.min(spots.length, MAX_PARKED)
+			spotsAt = { x: ring.x, y: ring.y, reach }
+		}
+		for (const spot of spots) {
+			if ((spot.car && !spot.car.gone) || (started && inView(view, spot.x, spot.y, 2))) continue
+			const r = spotHash(spot.seed, 1)
+			const model = r < 0.2 ? MODELS.suv : r < 0.23 ? MODELS.lambo : MODELS.car
+			if (!standsClear(world, spot.x, spot.y, spot.angle, model)) continue
+			const color = model.colors[Math.floor(spotHash(spot.seed, 2) * model.colors.length)]
+			spot.car = createCar({ x: spot.x, y: spot.y, angle: spot.angle, model, color })
+			cars.push(spot.car)
 		}
 	}
 
@@ -164,7 +196,8 @@ export function createTraffic(world, say = () => {}) {
 		let blocked = false
 		let standoff = false // blocked by someone crossing, coming the other way, or not driving at all
 		if (!ai.ignore) {
-			const others = [...cars.filter((o) => o !== c), player.car ? null : player, ...walkers.people].filter(Boolean)
+			const close = (o) => o !== c && Math.abs(o.x - c.x) + Math.abs(o.y - c.y) < 16
+			const others = [...cars.filter(close), player.car ? null : player, ...walkers.people].filter(Boolean)
 			for (const o of others) {
 				const [ox, oy] = local(o.x, o.y)
 				// The other one's size seen along our heading and across it.
@@ -275,7 +308,7 @@ export function createTraffic(world, say = () => {}) {
 		const out = edge.to.out.filter((e) => e !== edge.twin)
 		const onMap = out.filter((e) => !e.to.off)
 		let choices = onMap.length ? onMap : out
-		const big = choices.filter((e) => e.w >= BIG_ROAD)
+		const big = choices.filter((e) => e.rank >= BIG_ROAD)
 		if (model === MODELS.bus && big.length) choices = big
 		const next = choices.length ? choices[Math.floor(Math.random() * choices.length)] : edge.twin
 		turns?.set(edge, next)
@@ -300,19 +333,19 @@ export function createTraffic(world, say = () => {}) {
 		const laneLength = near.reduce((s, e) => s + e.len, 0)
 
 		// Out of sight and far away: gone, unless it's a car you've driven.
+		const reach = Math.min(ring.max, PARK_REACH)
 		for (let i = cars.length - 1; i >= 0; i--) {
 			const c = cars[i]
-			if (c.kept || inView(view, c.x, c.y, 4) || Math.hypot(c.x - ring.x, c.y - ring.y) < ring.max + 10) continue
+			if (c.kept || inView(view, c.x, c.y, 4) || Math.hypot(c.x - ring.x, c.y - ring.y) < (c.ai ? ring.max : reach) + 10) continue
 			cars.splice(i, 1)
+			c.gone = true
 		}
 		const moving = cars.filter((c) => c.ai).length
-		const parked = cars.length - moving
 		if (near.length) {
 			// All at once on the first frame, then a couple per frame.
-			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(80, laneLength / PER_CAR); i++) spawn(near, ring, view, false)
-			for (let i = 0, n = started ? 2 : 999; i < n && parked + i < Math.min(60, laneLength / 2 / PER_PARKED); i++)
-				spawn(near, ring, view, true)
+			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(80, laneLength / PER_CAR); i++) spawn(near, ring, view)
 		}
+		park(ring, view, reach)
 		// One wedding convoy at a time, the next one to two and a half minutes after.
 		if (near.length && !cars.some((c) => c.convoy) && (convoyIn -= dt) < 0)
 			convoyIn = spawnConvoy(near, ring, view) ? 60 + Math.random() * 90 : 5

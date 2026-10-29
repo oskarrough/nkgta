@@ -26,6 +26,7 @@ export function overpassQuery({ south, west, north, east }) {
   node["railway"~"station|subway_entrance"](${b});
   node["highway"="bus_stop"](${b});
   node["highway"="traffic_signals"](${b});
+  node["highway"="street_lamp"](${b});
   node["natural"="tree"](${b});
   way["natural"="tree_row"](${b});
 );

@@ -32,8 +32,8 @@ export function createJunctions(edges, signals = []) {
 			e.heading = heading(e)
 			entryOf.set(e, j)
 		}
-		// The widest road through gets the first green, its cross roads the second.
-		const main = j.entries.reduce((a, b) => (b.w > a.w ? b : a), j.entries[0])
+		// The biggest road through gets the first green, its cross roads the second.
+		const main = j.entries.reduce((a, b) => (b.rank > a.rank ? b : a), j.entries[0])
 		for (const e of j.entries) e.phase = across(e, main) ? 1 : 0
 		j.r = j.spread + Math.max(...j.entries.map((e) => e.w)) / 2
 		j.signal = signalNear(j, j.r + 5)
@@ -132,7 +132,7 @@ export function waveOffset(p, heading) {
 // Bigger road first. Between equals, whoever comes from the right: their
 // heading is ours turned a quarter to the left.
 function goesFirst(a, b) {
-	if (Math.abs(a.w - b.w) > 0.5) return a.w > b.w
+	if (Math.abs(a.rank - b.rank) > 0.5) return a.rank > b.rank
 	const turn = Math.atan2(Math.sin(a.heading - b.heading), Math.cos(a.heading - b.heading))
 	return Math.abs(turn + Math.PI / 2) < Math.PI / 4
 }

@@ -69,6 +69,14 @@ const GRAVEL_EDGE = '#8f8a68'
 const GRAVEL_EDGE_WIDTH = 0.3
 const HATCH_INK = '#877e70'
 const HATCH_WIDTH = 2
+// Kerb paint (see kerbs.js): green bike lanes edged white, red cycle tracks on
+// the pavement, and cobbles, a paler, warmer grey than tarmac. Cobbles also
+// take some of the texture's alpha away, which is how the ground shader
+// knows to lay setts there.
+const BIKE_LANE = '#4f9d5d'
+const BIKE_EDGE = 0.1
+const SETT = '#5d5b57'
+export const SETT_ALPHA = 0.5
 
 // Flat second tone for parks and water, one step lighter than the base.
 const TONES = {
@@ -367,6 +375,12 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 		g.lineWidth = width
 		g.stroke()
 	}
+	const cobble = (s) => {
+		stroke(s, SETT, s.w)
+		g.globalCompositeOperation = 'destination-out'
+		stroke(s, `rgba(0, 0, 0, ${SETT_ALPHA})`, s.w)
+		g.globalCompositeOperation = 'source-over'
+	}
 
 	// Water waits until everything under the roads is down, so pavements and
 	// paths stop at the bank, and goes on top of them with its bridges.
@@ -423,8 +437,18 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 			const run = shapes.slice(k, end).filter(near)
 			for (const r of run) stroke(r, KERB, r.w + KERB_EXTRA)
 			for (const r of run) stroke(r, INK, r.w + ROAD_INK_EXTRA)
-			for (const r of run) stroke(r, COLORS[T.ROAD], r.w)
+			for (const r of run) {
+				if (r.sett) cobble(r)
+				else stroke(r, COLORS[T.ROAD], r.w)
+			}
 			k = end - 1
+		} else if (s.t === 'sett') {
+			cobble(s)
+		} else if (s.t === 'bike') {
+			stroke(s, MARK, s.w + BIKE_EDGE * 2)
+			stroke(s, BIKE_LANE, s.w)
+		} else if (s.t === 'track') {
+			stroke(s, COLORS[T.CYCLEWAY], s.w)
 		} else {
 			if (s.t === T.SIDEWALK && s.w <= FOOTPATH && inPark(shapes, s)) {
 				stroke(s, GRAVEL_EDGE, s.w + GRAVEL_EDGE_WIDTH)

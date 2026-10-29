@@ -27,12 +27,18 @@ export function roadGraph(world) {
 			start = i
 			const pts = ids.map((n) => ({ x: node(n).x, y: node(n).y }))
 			const lane = (points, from, to) => {
+				// Kerb to kerb, which on a split street is less than its class.
+				const w = r.kw ?? r.w
 				const edge = {
 					from: node(from),
 					to: node(to),
-					w: r.w,
-					lane: offsetLine(points, r.oneway ? 0 : r.w / 4),
-					kerb: offsetLine(points, r.w / 2 + 0.1),
+					w,
+					rank: r.w, // the street's class by its usual width: who goes first, where buses go
+					road: r,
+					forward: points === pts,
+					centre: points,
+					lane: offsetLine(points, r.oneway ? 0 : w / 4),
+					kerb: offsetLine(points, w / 2 + 0.1),
 					// Tiles per second: 60 km/h on the big roads, 45 elsewhere.
 					speed: r.w >= 5 ? 5.5 : 4,
 				}

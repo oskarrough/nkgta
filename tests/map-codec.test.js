@@ -3,11 +3,11 @@ import { decodeMap, encodeMap } from '../src/map-codec.js'
 
 const sha = (bytes) => new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
 
-test('the default map walks exactly as it did before map.json shrank', async () => {
+test('the default map walks exactly as it did when split streets narrowed to their lanes', async () => {
 	const map = decodeMap(await Bun.file('public/map.json').json())
-	// Hashes of the grids as shipped before #22.
-	expect(sha(map.tiles)).toBe('2f96c93447a87c12fe6dfaf97a57af60e6350df39580959c50110e24f421bf0c')
-	expect(sha(new Uint8Array(map.streetOf.buffer))).toBe('dfe8671b2a64b180a9f565b6b137835963dd9a04c9c2429ae4c75ab8a296827d')
+	// Hashes of the grids as shipped when split streets narrowed (#19).
+	expect(sha(map.tiles)).toBe('d9f342125a7e9ff25dc988046d6948b8793ed0133c74403d9cdbb16660ad2c0d')
+	expect(sha(new Uint8Array(map.streetOf.buffer))).toBe('a9374cfbddc5b9c95d2bdda59c608eef71c77a27a134cbfc1eaf7a553613f231')
 })
 
 test('a map comes back from JSON exactly as it went in', () => {
