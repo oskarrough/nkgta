@@ -3,7 +3,7 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { groundGeometry, groundMaterial } from './scene-ground.js'
-import { WALL, SHOP_GLOW, wallGeometry, wallMaterial } from './scene-walls.js'
+import { SHOP_GLOW, wallGeometry, wallMaterial } from './scene-walls.js'
 import { house, chimneys, hatches, roofGeometry, roofMaterial } from './scene-roofs.js'
 import { createSkyLighting } from './scene-sky.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -21,6 +21,8 @@ import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
 import { createFascia } from './fascia.js'
+import { createFrontPanels } from './front-panels.js'
+import { createOpening } from './opening.js'
 import { createLandmarks } from './landmarks.js'
 import { START_HOUR } from './daylight.js'
 import { createFirewalls } from './firewalls.js'
@@ -45,7 +47,7 @@ const FOV = 40
 // their shadow crisp and stops them speckling.
 const CAR_SHADOW = { opacity: 0.42, offset: 0.34, stretch: 1.15 }
 
-export function createScene(canvas, world, shops = []) {
+export function createScene(canvas, world, shops = [], opening) {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
 	renderer.setPixelRatio(devicePixelRatio)
 	const scene = new THREE.Scene()
@@ -80,7 +82,7 @@ export function createScene(canvas, world, shops = []) {
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
 	// Before the chunks and firewalls: a landmark lowers the plain block under it.
 	const landmarks = createLandmarks(world, gradient, sky)
-	const city = createCity(world, renderer, { shops, gradient, sky, time, wallLook, weather })
+	const city = createCity(world, renderer, { shops, gradient, sky, time, wallLook, weather, opening })
 	scene.add(city.group, landmarks)
 	const clouds = createClouds(world, gradient)
 	scene.add(clouds.layer)
@@ -222,7 +224,7 @@ export function createScene(canvas, world, shops = []) {
 }
 
 // Shared by the live scene and the CPU performance tripwires.
-export function createCity(world, renderer, { shops = [], gradient, sky, time, wallLook, weather }) {
+export function createCity(world, renderer, { shops = [], gradient, sky, time, wallLook, weather, opening = createOpening() }) {
 	const firewalls = createFirewalls(world)
 	const murals = createMurals(world, firewalls, gradient)
 	// A generator, so chunks can be built a building at a time between frames.
@@ -270,16 +272,21 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
 		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
 		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt)
+			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt, opening)
 			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
 			signs.layers.set(1)
 			group.add(signs)
 			yield
 		}
 		// Their names on the wall above the windows, and every other shop's.
-		const fascia = createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open })
+		const fascia = createFascia(world, chunk, gradient, sky.night, opening)
 		fascia.traverse((mesh) => mesh.layers.set(1))
 		group.add(fascia)
+		const panels = createFrontPanels(world, chunk, opening, sky.night)
+		if (panels) {
+			panels.layers.set(1)
+			group.add(panels)
+		}
 		yield
 		// Trees in cells, so the view skips most of them, or one plain blob
 		// each across the chunk once they're too small on screen for lumps.
@@ -298,7 +305,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 			group.add(mesh)
 		}
 		yield
-		const pools = createNightPools(world, chunk, shops, sky.night)
+		const pools = createNightPools(world, chunk, shops, sky.night, opening)
 		if (pools) group.add(pools)
 		const furniture = createFurniture(world, gradient, chunk, sky.night)
 		weather.ground(plane.material, chunk, furniture.lamps)
@@ -336,12 +343,15 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 function glowAtNight(material, strength, night) {
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.night = night
+		shader.vertexShader =
+			'attribute float isOpen; varying float vOpen;\n' +
+			shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvOpen = isOpen;')
 		shader.fragmentShader =
-			'uniform float night;\n' +
+			'uniform float night; varying float vOpen;\n' +
 			shader.fragmentShader.replace(
 				'#include <emissivemap_fragment>',
 				`#include <emissivemap_fragment>
-			totalEmissiveRadiance += diffuseColor.rgb * night * ${strength.toFixed(2)};`,
+			totalEmissiveRadiance += diffuseColor.rgb * vOpen * night * ${strength.toFixed(2)};`,
 			)
 	}
 }

@@ -1,10 +1,12 @@
+import { openAttribute } from './front-panels.js'
 import * as THREE from 'three'
 import { furnitureIn } from './kerbs.js'
 
-export function createNightPools(world, chunk, shops, night) {
+export function createNightPools(world, chunk, shops, night, opening) {
 	const positions = []
 	const uvs = []
 	const kinds = []
+	const ranges = []
 	function patch(x, y, ex, ey, nx, ny, width, depth, kind) {
 		const steps = 4
 		const vertex = (u, v) => {
@@ -35,13 +37,16 @@ export function createNightPools(world, chunk, shops, night) {
 	}
 	for (const shop of shops) {
 		if (shop.x < chunk.x || shop.x >= chunk.x + chunk.w || shop.y < chunk.y || shop.y >= chunk.y + chunk.h) continue
+		const start = positions.length / 3
 		patch(shop.x, shop.y, shop.ex, shop.ey, shop.nx, shop.ny, 2.4, 2.2, 1)
+		ranges.push([shop.place, start, positions.length / 3])
 	}
 	if (!positions.length) return null
 	const geometry = new THREE.BufferGeometry()
 	geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
 	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
 	geometry.setAttribute('kind', new THREE.Float32BufferAttribute(kinds, 1))
+	openAttribute(geometry, ranges, opening)
 	const material = new THREE.ShaderMaterial({
 		uniforms: { night },
 		transparent: true,
@@ -49,13 +54,13 @@ export function createNightPools(world, chunk, shops, night) {
 		depthWrite: false,
 		polygonOffset: true,
 		polygonOffsetFactor: -1,
-		vertexShader: `attribute float kind; varying vec2 vUv; varying float vKind;
-			void main() { vUv = uv; vKind = kind; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-		fragmentShader: `uniform float night; varying vec2 vUv; varying float vKind;
+		vertexShader: `attribute float kind; attribute float isOpen; varying vec2 vUv; varying float vKind; varying float vOpen;
+			void main() { vUv = uv; vKind = kind; vOpen = isOpen; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+		fragmentShader: `uniform float night; varying vec2 vUv; varying float vKind; varying float vOpen;
 			void main() {
 				float circle = 1.0 - smoothstep(0.32, 0.5, length(vUv - 0.5));
 				float band = (1.0 - smoothstep(0.75, 1.0, vUv.y)) * (1.0 - smoothstep(0.4, 0.5, abs(vUv.x - 0.5)));
-				float glow = mix(circle, band, vKind) * night;
+				float glow = mix(circle, band * vOpen, vKind) * night;
 				gl_FragColor = vec4(1.0, 0.67, 0.30, glow * 0.28);
 				#include <colorspace_fragment>
 			}`,

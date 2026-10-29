@@ -6,6 +6,7 @@
 import * as THREE from 'three'
 import { POSTER_FONT } from './poster.js'
 import { frontsOf } from './fronts.js'
+import { openAttribute } from './front-panels.js'
 
 // Chains by brand or name: what the board says, its colour, the lettering,
 // and a stripe along the bottom in a third colour.
@@ -126,10 +127,7 @@ const ATLAS_W = 2048
 const GLOW = 0.8 // how much of its colour a lit board shines at night
 const unpacked = new WeakMap()
 
-// The boards for the fronts in `chunk`, a mesh per full atlas. `open` is
-// the wall shader's share of shops open at night, `bay` its window spacing
-// in metres, so a board is lit just when the window under it is.
-export function createFascia(world, chunk, gradient, night, { bay, open }) {
+export function createFascia(world, chunk, gradient, night, opening) {
 	if (!unpacked.has(world)) unpacked.set(world, frontsOf(world))
 	const mine = unpacked.get(world).filter((f) => f.x >= chunk.x && f.y >= chunk.y && f.x < chunk.x + chunk.w && f.y < chunk.y + chunk.h)
 	const group = new THREE.Group()
@@ -144,17 +142,17 @@ export function createFascia(world, chunk, gradient, night, { bay, open }) {
 		const w = Math.max(CELL, Math.min(ATLAS_W, Math.ceil(textW + CELL * 0.8), Math.round(f.half * 2 * PX)))
 		if (x + w > ATLAS_W) [x, y] = [0, y + CELL]
 		if (y + CELL > ATLAS_W) {
-			group.add(boards(world, batch, gradient, night, bay, open))
+			group.add(boards(world, batch, gradient, night, opening))
 			;[batch, x, y] = [[], 0, 0]
 		}
 		batch.push({ f, look, cell: { x, y, w } })
 		x += w
 	}
-	if (batch.length) group.add(boards(world, batch, gradient, night, bay, open))
+	if (batch.length) group.add(boards(world, batch, gradient, night, opening))
 	return group
 }
 
-function boards(world, batch, gradient, night, bayM, open) {
+function boards(world, batch, gradient, night, opening) {
 	const canvas = document.createElement('canvas')
 	canvas.width = ATLAS_W
 	canvas.height = Math.max(...batch.map((b) => b.cell.y)) + CELL
@@ -164,8 +162,7 @@ function boards(world, batch, gradient, night, bayM, open) {
 	const pos = []
 	const uv = []
 	const tone = []
-	const bays = []
-	const bay = bayM / world.tileM
+	const ranges = []
 	for (const { f, cell } of batch) {
 		const b = world.buildings[f.n]
 		const h = b.h / world.tileM
@@ -181,7 +178,7 @@ function boards(world, batch, gradient, night, bayM, open) {
 		const u = (px) => (cell.x + px) / canvas.width
 		const v = (py) => 1 - (cell.y + py) / canvas.height
 		const plain = [u(2), v(CELL / 2)]
-		const k = tone.length
+		const k = pos.length / 3
 		const quad = (corners, uvs) => {
 			for (const i of [0, 1, 2, 0, 2, 3]) {
 				pos.push(...corners[i])
@@ -209,11 +206,10 @@ function boards(world, batch, gradient, night, bayM, open) {
 		quad([at(-half, OUT[0], z0), at(half, OUT[0], z0), at(half, OUT[1], z0), at(-half, OUT[1], z0)])
 		quad([at(-half, OUT[0], z0), at(-half, OUT[1], z0), at(-half, OUT[1], z1), at(-half, OUT[0], z1)])
 		quad([at(half, OUT[1], z0), at(half, OUT[0], z0), at(half, OUT[0], z1), at(half, OUT[1], z1)])
+		ranges.push([f, k, pos.length / 3])
 		const avg = average(g, cell)
-		const id = wallBay(b, h, f, bay)
 		for (let i = k; i < pos.length / 3; i++) {
 			tone.push(avg.r, avg.g, avg.b)
-			bays.push(...id)
 		}
 	}
 
@@ -224,20 +220,18 @@ function boards(world, batch, gradient, night, bayM, open) {
 	geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
 	geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
 	geo.setAttribute('tone', new THREE.Float32BufferAttribute(tone, 3))
-	geo.setAttribute('shopBay', new THREE.Float32BufferAttribute(bays, 3))
+	openAttribute(geo, ranges, opening)
 	geo.computeVertexNormals()
 	const material = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient })
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.night = night
 		shader.vertexShader =
-			'attribute vec3 tone;\nattribute vec3 shopBay;\nvarying vec3 vTone;\nvarying float vOpen;\n' +
+			'attribute float isOpen;\nattribute vec3 tone;\nvarying vec3 vTone;\nvarying float vOpen;\n' +
 			shader.vertexShader.replace(
 				'#include <project_vertex>',
 				`#include <project_vertex>
 				vTone = tone;
-				// The wall shader's hash for the shop window under the board.
-				float bay = fract(sin(dot(shopBay, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-				vOpen = step(${(1 - open).toFixed(2)}, fract(bay * 5.1));`,
+				vOpen = isOpen;`,
 			)
 		shader.fragmentShader =
 			`uniform float night;\nvarying vec3 vTone;\nvarying float vOpen;\n` +
@@ -324,36 +318,6 @@ function base(world, n) {
 	if (!Number.isFinite(low)) low = 0
 	bases.set(b, low)
 	return low
-}
-
-// The wall shader's window bay under the board's middle and its wall's
-// number, as it hashes them: the outline's edge along the board, run the
-// way scene.js runs its walls, with the windows centred on it.
-function wallBay(b, h, f, bay) {
-	const dir = [f.ny, -f.nx] // the wall's way in tiles, facing out to the right
-	let best = null
-	for (const r of b.rings) {
-		let m = r.length / 2
-		if (m > 1 && r[0] === r[r.length - 2] && r[1] === r[r.length - 1]) m--
-		for (let i = 0; i < m; i++) {
-			const j = (i + 1) % m
-			const p = [r[i * 2], r[i * 2 + 1]]
-			const q = [r[j * 2], r[j * 2 + 1]]
-			const len = Math.hypot(q[0] - p[0], q[1] - p[1])
-			if (len < 0.01 || Math.abs(((q[0] - p[0]) * dir[0] + (q[1] - p[1]) * dir[1]) / len) < 0.9) continue
-			const t = Math.max(0, Math.min(1, ((f.x - p[0]) * (q[0] - p[0]) + (f.y - p[1]) * (q[1] - p[1])) / len ** 2))
-			const d = Math.hypot(p[0] + (q[0] - p[0]) * t - f.x, p[1] + (q[1] - p[1]) * t - f.y)
-			if (best && d >= best.d) continue
-			const a = (p[0] - q[0]) * dir[0] + (p[1] - q[1]) * dir[1] < 0 ? p : q
-			best = { d, a, len }
-		}
-	}
-	const wall = Math.round(Math.fround(h) * 8)
-	if (!best) return [0, 0, wall]
-	const fit = Math.floor(best.len / bay)
-	const lead = (best.len - fit * bay) / 2
-	const along = ((f.x - best.a[0]) * dir[0] + (f.y - best.a[1]) * dir[1] - lead) / bay
-	return [Math.floor(along), 0, fit + wall]
 }
 
 function hash(s) {

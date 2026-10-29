@@ -16,7 +16,7 @@ const smooth = (t) => t * t * (3 - 2 * t)
 const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-export function createVisit({ city3d, shops, player, pfand, say, heightAt = () => 0 }) {
+export function createVisit({ city3d, shops, player, pfand, say, heightAt = () => 0, opening }) {
 	const interior = createInterior(city3d.gradient)
 	const doener = createDoener(pfand.bag, say)
 	const portal = createPortal(city3d.renderer, {
@@ -144,6 +144,10 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			if (player.car || player.onBike) return false
 			const s = shopAt(shops, player.x, player.y)
 			if (!s) return false
+			if (!opening.isOpen(s.place)) {
+				say(`${s.name} ist geschlossen.`)
+				return true
+			}
 			open(s)
 			going = true
 			return true
@@ -177,8 +181,12 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) pfand.cashIn(shop.name, say)
 				return
 			}
+			if (shop && !opening.isOpen(shop.place) && portal.phase !== 'closed') {
+				going = false
+				portal.collapse()
+			}
 			const at = !player.car && !player.onBike && shopAt(shops, player.x, player.y)
-			const walking = at && pushing({ x: at.nx, y: at.ny }) && armed
+			const walking = at && opening.isOpen(at.place) && pushing({ x: at.nx, y: at.ny }) && armed
 			if (!at || !pushing({ x: at.nx, y: at.ny })) armed = true
 			if (walking && (at !== shop || !portal.isOpen)) open(at)
 			if (!shop || portal.phase === 'closed') return
@@ -215,7 +223,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			}
 			if (player.car || player.onBike) return null
 			const s = shopAt(shops, player.x, player.y)
-			if (!s) return null
+			if (!s || !opening.isOpen(s.place)) return null
 			return `E: ${s.name} betreten`
 		},
 	}

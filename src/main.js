@@ -1,3 +1,4 @@
+import { createOpening } from './opening.js'
 import { loadMap } from './load-map.js'
 import { createWorld } from './world.js'
 import { createInput } from './input.js'
@@ -47,7 +48,8 @@ if (URL_PARAMS.get('cam') === 'chase') camera.toggle(player)
 const canvas = document.getElementById('overlay')
 const shops = shopsOf(world)
 phase('shops')
-const city3d = createScene(document.getElementById('city'), world, shops)
+const opening = createOpening()
+const city3d = createScene(document.getElementById('city'), world, shops, opening)
 const clock = createClock()
 const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
@@ -64,7 +66,7 @@ const pocket = createPocket({
 	toggleMute,
 })
 const draw = createRenderer(canvas, world, shops)
-const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
+const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt, opening })
 const veil = document.getElementById('veil')
 const wasted = createWasted({
 	player,
@@ -378,6 +380,7 @@ function frame(now) {
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
 	city3d.weather.update(dt, player, inside)
 	city3d.setHour(clock.hour)
+	opening.set(clock.hour, clock.elapsedDays)
 	visit.render(cam, traffic.cars, dt)
 	draw({
 		cam,

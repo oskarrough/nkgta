@@ -154,6 +154,9 @@ export function createClock(hour = START_HOUR) {
 			return hour
 		},
 		get day() {
+			return day % 7
+		},
+		get elapsedDays() {
 			return day
 		},
 		set(h) {
@@ -161,7 +164,7 @@ export function createClock(hour = START_HOUR) {
 		},
 		tick(dt) {
 			const elapsed = hour + dt / HOUR_SECONDS
-			day = (day + Math.floor(elapsed / 24)) % 7
+			day += Math.floor(elapsed / 24)
 			hour = elapsed % 24
 		},
 	}

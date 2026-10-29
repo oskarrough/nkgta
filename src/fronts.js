@@ -44,7 +44,7 @@ export function storefronts(osm, toTile, W, H) {
 		if (!name) continue
 		const { x, y } = toTile(e)
 		if (x < 0 || y < 0 || x >= W || y >= H) continue
-		list.push({ name, brand: t.brand ?? '', kind, x, y })
+		list.push({ name, brand: t.brand ?? '', kind, x, y, openingHours: t.opening_hours ?? '' })
 	}
 	return list
 }
@@ -88,7 +88,7 @@ export function findFronts(world, list) {
 		}
 		const mid = (lo + hi) / 2
 		const at = [f.x + f.ex * mid, f.y + f.ey * mid, f.nx, f.ny, f.ex, f.ey, (hi - lo) / 2].map(round)
-		return [f.name, f.brand, f.kind, f.n, ...at]
+		return [f.name, f.brand, f.kind, f.n, ...at, f.openingHours]
 	})
 }
 
@@ -103,9 +103,10 @@ const near = (a, b) => Math.abs(a.x - b.x) < WANT * 4 && Math.abs(a.y - b.y) < W
 export function frontsOf(world) {
 	const packed = world.fronts ?? []
 	const fronts = []
-	for (let i = 0; i < packed.length; i += 11) {
-		const [name, brand, kind, n, x, y, nx, ny, ex, ey, half] = packed.slice(i, i + 11)
-		fronts.push({ name, brand, kind, n, x, y, nx, ny, ex, ey, half })
+	const stride = world.frontsVersion === 2 ? 12 : 11
+	for (let i = 0; i < packed.length; i += stride) {
+		const [name, brand, kind, n, x, y, nx, ny, ex, ey, half, openingHours] = packed.slice(i, i + stride)
+		fronts.push({ name, brand, kind, n, x, y, nx, ny, ex, ey, half, openingHours })
 	}
 	return fronts
 }

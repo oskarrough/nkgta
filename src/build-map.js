@@ -284,7 +284,10 @@ export function buildMap(osm, bbox, tileM) {
 		const kind = poiKind(e.tags)
 		if (!kind) continue
 		const { x, y } = toTile(e)
-		addPoi(kind, e.tags.name ?? '', x, y)
+		addPoi(kind, e.tags.name ?? '', x, y, {
+			openingKind: e.tags.shop ?? e.tags.amenity,
+			...(e.tags.opening_hours ? { openingHours: e.tags.opening_hours } : {}),
+		})
 	}
 	// A hospital is usually a campus outline, not a node. Put its place on
 	// the pavement at the edge, so getting wasted leaves you at the door.
@@ -402,6 +405,7 @@ export function buildMap(osm, bbox, tileM) {
 		lamps,
 		shops: packShops(findShops(world), pois),
 		fronts: findFronts(world, storefronts(osm, toTile, W, H)),
+		frontsVersion: 2,
 	}
 }
 

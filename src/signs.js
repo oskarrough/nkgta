@@ -1,3 +1,4 @@
+import { openAttribute } from './front-panels.js'
 // An awning over every shop door with the shop's name painted on it, readable
 // from above, where walls are seen edge on. One atlas, one mesh, one draw,
 // for the shops in `pick`, by index; each still makes room for every other.
@@ -15,7 +16,7 @@ const CELL = 96 // atlas pixels across the awning's depth
 const TYPE = 54 // type size in those pixels
 const ATLAS_W = 2048
 
-export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0) {
+export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0, opening) {
 	const list = [...pick]
 	if (!list.length) return new THREE.Group()
 	const measure = document.createElement('canvas').getContext('2d')
@@ -35,8 +36,10 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 
 	const pos = []
 	const uv = []
+	const ranges = []
 	list.forEach((i, k) => {
 		const shop = shops[i]
+		const start = pos.length / 3
 		const cell = cells[k]
 		const color = CLOTH[hash(shop.name) % CLOTH.length]
 		// Scene coordinates: y points north. Text reads from the street, its
@@ -81,6 +84,7 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 			pos.push(...p)
 			uv.push((cell.x + s * cell.w) / canvas.width, 1 - (cell.y + (1 - t) * CELL) / canvas.height)
 		}
+		ranges.push([shop.place, start, pos.length / 3])
 	})
 
 	const tex = new THREE.CanvasTexture(canvas)
@@ -89,6 +93,7 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 	const geo = new THREE.BufferGeometry()
 	geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
 	geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+	if (opening) openAttribute(geo, ranges, opening)
 	geo.computeVertexNormals()
 	const material = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient })
 	// One-sided, and the sun sees its top, so its shadow needs both sides.
