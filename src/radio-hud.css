@@ -1,0 +1,145 @@
+/* A little silver player: LCD screen on top, click wheel below. */
+#radio {
+	--s: 0.7;
+	position: fixed;
+	z-index: 11;
+	top: calc(3.7rem + env(safe-area-inset-top));
+	left: 50%;
+	width: 7.6rem;
+	padding: 0.45rem 0.45rem 0.55rem;
+	box-sizing: border-box;
+	border: 2px solid #1a1e1b;
+	border-radius: 1rem;
+	background: linear-gradient(160deg, #f1f1ee, #b9bab6);
+	box-shadow:
+		0 3px 0 #000,
+		inset 0 2px 0 rgba(255, 255, 255, 0.8);
+	transform: translateX(-50%) scale(var(--s));
+	transform-origin: top center;
+	transition:
+		transform 0.18s ease-out,
+		opacity 0.18s;
+	font-family: system-ui, sans-serif;
+	touch-action: none;
+}
+#radio.open {
+	--s: 1;
+}
+#radio.gone {
+	opacity: 0;
+	pointer-events: none;
+	transform: translateX(-50%) translateY(-1rem) scale(var(--s));
+}
+#radio .screen {
+	height: 2.3rem;
+	padding: 0.25rem 0.4rem;
+	box-sizing: border-box;
+	overflow: hidden;
+	border: 2px solid #3b4a36;
+	border-radius: 0.4rem;
+	background: #b9cfa4;
+	box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.18);
+	color: #1f2d1b;
+	line-height: 1.25;
+	text-shadow: none;
+}
+#radio .screen b,
+#radio .screen span {
+	display: block;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+#radio .screen b {
+	font-size: 0.7rem;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+#radio .screen span {
+	font-size: 0.62rem;
+	font-weight: 700;
+}
+#radio.off .screen {
+	background: #a5b394;
+}
+#radio.off .screen b {
+	opacity: 0.55;
+}
+#radio .wheel {
+	position: relative;
+	width: 3.8rem;
+	height: 3.8rem;
+	margin: 0.5rem auto 0;
+	overflow: hidden;
+	border-radius: 50%;
+	background: #e4e4e1;
+	box-shadow:
+		0 2px 0 #82837f,
+		inset 0 0 0 2px #a9aaa6;
+}
+#radio .wheel button {
+	position: absolute;
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+#radio .back,
+#radio .next {
+	top: 0;
+	bottom: 0;
+	width: 32%;
+}
+#radio .back {
+	left: 0;
+}
+#radio .next {
+	right: 0;
+}
+/* The wheel's marks: skip arrows left and right, drawn from borders. */
+#radio .back::after,
+#radio .next::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	margin-top: -0.28rem;
+	border: 0.28rem solid transparent;
+}
+#radio .back::after {
+	left: 0.5rem;
+	border-right: 0.4rem solid #6b6c68;
+	border-left: 0;
+}
+#radio .next::after {
+	right: 0.5rem;
+	border-left: 0.4rem solid #6b6c68;
+	border-right: 0;
+}
+#radio .mid {
+	left: 50%;
+	top: 50%;
+	width: 1.7rem;
+	height: 1.7rem;
+	margin: -0.85rem 0 0 -0.85rem;
+	border-radius: 50%;
+	background: linear-gradient(160deg, #f4f4f2, #c9cac6);
+	box-shadow:
+		0 1px 0 #82837f,
+		inset 0 0 0 2px #a9aaa6;
+}
+/* Clicks go in a hair, like hardware. */
+#radio .wheel button:active {
+	transform: translateY(1px);
+}
+#radio .mid:active {
+	background: #bdbeba;
+}
+#radio .back:active::after,
+#radio .next:active::after {
+	filter: brightness(0.6);
+}
+#radio button:focus-visible {
+	outline: 2px solid #e8c21a;
+}

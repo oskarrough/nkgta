@@ -440,6 +440,10 @@ export const sound = {
 		duck(0.4)
 		cue('till', 0.13)
 	},
+	// A click on the radio's wheel.
+	tick() {
+		burst(2800, 0.04, 0.035)
+	},
 	isMuted: () => muted,
 	toggleMute() {
 		muted = !muted

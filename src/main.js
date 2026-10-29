@@ -18,6 +18,7 @@ import { createActors } from './actors.js'
 
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
+import { createRadioHud } from './radio-hud.js'
 
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
 
@@ -42,8 +43,12 @@ const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
 const traffic = createTraffic(world, (text) => hud.say(text))
-const music = createMusic(world, shops, (text) => hud.say(text))
+const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
+const radioHud = createRadioHud((step) => {
+	sound.start()
+	if (music.nextStation(!!player.car, step)) sound.tick()
+})
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
 const wasted = createWasted({
@@ -312,6 +317,7 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car)
+	radioHud.update(music.radio(), dt)
 	hud.update({ player, cam, bag: pfand.bag, showTransit, wasted: wasted.active(), inside: visit.shop(), door, action }, dt)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
 	if (FPS) fpsMeter(now)

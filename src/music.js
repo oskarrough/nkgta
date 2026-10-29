@@ -356,7 +356,7 @@ export function end(p, context) {
 	}, 2000)
 }
 
-export function createMusic(world, shops, say = () => {}, rand = Math.random) {
+export function createMusic(world, shops, rand = Math.random) {
 	const songs = new Map()
 	// Sources are placed once every song is in, since a song says where it belongs.
 	let fixed = null
@@ -374,6 +374,7 @@ export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 	let ridden = null // the car you sit in
 	const dials = new WeakMap() // what each car's radio was last left on
 	let tunedIn = null // the station and song last announced
+	let onAir = null // what the radio display shows: { name, title }, name null when off
 	let announceAt = Infinity
 	let wasInCar = false
 	let bus = null
@@ -455,13 +456,13 @@ export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 		return [station]
 	}
 
-	// What's on, in the place line: the station and the song, once each.
+	// What's on, for the radio display: the station and the song, once each.
 	function announce(now) {
 		const station = stations[dial]
 		const key = station ? `${station.name}:${station.score}` : 'off'
 		if (key === tunedIn || now < announceAt) return
 		tunedIn = key
-		say(station ? `${station.name} · ${songs.get(station.score)?.title ?? station.score}` : 'Radio aus')
+		onAir = station ? { name: station.name, title: songs.get(station.score)?.title ?? station.score } : { name: null, title: null }
 	}
 
 	function convoyOf(cars, listener) {
@@ -507,6 +508,7 @@ export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 		}
 		const own = stationIn(listener.car, now)
 		if (inCar && (!own.length || songs.has(own[0].score))) announce(now)
+		else if (!inCar) onAir = null
 		const sources = fixed.concat(
 			cars
 				.filter((c) => c.ai && !c.convoy && c !== listener.car)
@@ -538,10 +540,11 @@ export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 		bus.tone.frequency.setTargetAtTime(m.cutoff, now, down ? 0.25 : 0.15)
 	}
 
-	// R: the next station, or off. Only in a car; nothing on the dial on foot.
-	function nextStation(inCar) {
+	// R: the next station, or off (`step` -1: the one before). Only in a car;
+	// nothing on the dial on foot.
+	function nextStation(inCar, step = 1) {
 		if (!inCar || !fixed) return false
-		dial = (dial + 1) % stations.length
+		dial = (dial + step + stations.length) % stations.length
 		if (ridden) dials.set(ridden, dial)
 		announceAt = 0
 		return true
@@ -550,6 +553,8 @@ export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 	return {
 		update,
 		nextStation,
+		// What the radio display shows while you're in a car, or null.
+		radio: () => onAir,
 		// Musik-Debug: every source, and the gain of the ones playing.
 		debug: () => ({ sources: heard ?? [], gains: new Map([...playing].map(([src, p]) => [src, p.level.gain.value])) }),
 		inspect: () =>
