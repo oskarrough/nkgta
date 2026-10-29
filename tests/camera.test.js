@@ -131,7 +131,8 @@ describe('vehicle orbit camera', () => {
 		expect(step(20).x).toBeCloseTo(blocked.x)
 		const recovering = step(30)
 		expect(recovering.x).toBeLessThan(blocked.x)
-		expect(recovering.x).toBeGreaterThan(open.x + 1)
+		// Still partway back, regardless of how long the default boom is tuned.
+		expect(recovering.x).toBeGreaterThan(open.x + (blocked.x - open.x) * 0.25)
 		expect(step(180).x).toBeCloseTo(open.x, 2)
 	})
 
