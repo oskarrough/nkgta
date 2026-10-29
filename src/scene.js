@@ -204,110 +204,7 @@ export function createScene(canvas, world, shops = []) {
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
 	// Before the chunks and firewalls: a landmark lowers the plain block under it.
 	const landmarks = createLandmarks(world, gradient, sky)
-	const firewalls = createFirewalls(world)
-	const murals = createMurals(world, firewalls, gradient)
-	// A generator, so chunks can be built a building at a time between frames.
-	const city = createChunks(world, renderer, function* (chunk) {
-		const group = new THREE.Group()
-		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
-		weather.ground(plane.material, chunk)
-		plane.receiveShadow = true
-		Object.assign(plane.material.uniforms, { time, sun: sky.sun, shade: sky.shade, deck: sky.deck, toSun: sky.toSun })
-		group.add(plane)
-		const houses = []
-		const wallParts = []
-		const roofParts = []
-		const spots = []
-		const lids = []
-		for (const n of chunk.buildings) {
-			const h = house(world.buildings[n], n, world)
-			houses.push(h)
-			wallParts.push(wallGeometry([h], world, firewalls))
-			const roof = roofGeometry([h])
-			if (roof) roofParts.push(roof)
-			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
-			lids.push(...roofHatches(world.buildings[n], n, h.roof))
-			yield
-		}
-		const roofRect = new THREE.Vector4()
-		const top = roofParts.length ? new THREE.Mesh(mergeGeometries(roofParts), roofMaterial(roofRect, gradient, BLANK.roofs)) : null
-		const sides = houses.length ? new THREE.Mesh(mergeGeometries(wallParts), wallLook) : null
-		for (const mesh of [sides, top]) {
-			if (!mesh) continue
-			mesh.castShadow = true
-			mesh.receiveShadow = true
-			group.add(mesh)
-		}
-		const paintings = murals.decals(houses)
-		if (paintings) group.add(paintings)
-		yield
-		const bridges = createBridges(world, chunk, gradient)
-		if (bridges) group.add(bridges)
-		yield
-		const byIndex = []
-		for (const h of houses) byIndex[h.n] = h
-		const stacks = spots.length && chimneys(spots, byIndex, gradient)
-		const hatchMesh = lids.length && hatches(lids, byIndex, gradient)
-		yield
-		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
-		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
-		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt)
-			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
-			group.add(signs)
-			yield
-		}
-		// Their names on the wall above the windows, and every other shop's.
-		group.add(createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open }))
-		yield
-		// Trees in cells, so the view skips most of them, or one plain blob
-		// each across the chunk once they're too small on screen for lumps.
-		const cells = new Map()
-		for (const i of chunk.trees) {
-			const t = world.trees[i]
-			const key = Math.floor(t.x / TREE_CELL) * 4096 + Math.floor(t.y / TREE_CELL)
-			cells.set(key, [...(cells.get(key) ?? []), i])
-		}
-		const near = [...cells.values()].flatMap((pick) => [createTrees(world, gradient, pick), createTrunks(world, gradient, pick)])
-		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
-		for (const mesh of [stacks, hatchMesh, ...near, ...far]) {
-			if (!mesh) continue
-			mesh.frustumCulled = true
-			mesh.computeBoundingSphere()
-			group.add(mesh)
-		}
-		yield
-		const pools = createNightPools(world, chunk, shops, sky.night)
-		if (pools) group.add(pools)
-		const furniture = createFurniture(world, gradient, chunk, sky.night)
-		for (const mesh of furniture.meshes) group.add(mesh)
-		const uv = plane.geometry.attributes.uv
-		return {
-			group,
-			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
-			zoom(scale) {
-				for (const mesh of near) mesh.visible = scale >= DETAIL_PX
-				for (const mesh of far) mesh.visible = scale < DETAIL_PX
-				if (stacks) stacks.visible = scale >= DETAIL_PX
-				if (hatchMesh) hatchMesh.visible = scale >= DETAIL_PX
-				furniture.zoom(scale)
-			},
-			// Point the ground's corners, or the roofs' world positions, at
-			// where the chunk sits in the texture.
-			show(kind, texture, area) {
-				if (kind === 'roofs') {
-					if (!top) return
-					top.material.map = texture
-					roofRect.set(area.x, area.y, area.w, area.h)
-					return
-				}
-				plane.material.uniforms.map.value = texture
-				const at = plane.geometry.attributes.position
-				for (let i = 0; i < uv.count; i++) uv.setXY(i, (at.getX(i) - area.x) / area.w, 1 - (-at.getY(i) - area.y) / area.h)
-				uv.needsUpdate = true
-			},
-		}
-	})
+	const city = createCity(world, renderer, { shops, gradient, sky, time, wallLook, weather })
 	scene.add(city.group, landmarks)
 	const clouds = createClouds(world, gradient)
 	scene.add(clouds.layer)
@@ -508,6 +405,114 @@ export function createScene(canvas, world, shops = []) {
 			return look
 		},
 	}
+}
+
+// Shared by the live scene and the CPU performance tripwires.
+export function createCity(world, renderer, { shops = [], gradient, sky, time, wallLook, weather }) {
+	const firewalls = createFirewalls(world)
+	const murals = createMurals(world, firewalls, gradient)
+	// A generator, so chunks can be built a building at a time between frames.
+	return createChunks(world, renderer, function* (chunk) {
+		const group = new THREE.Group()
+		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
+		weather.ground(plane.material, chunk)
+		plane.receiveShadow = true
+		Object.assign(plane.material.uniforms, { time, sun: sky.sun, shade: sky.shade, deck: sky.deck, toSun: sky.toSun })
+		group.add(plane)
+		const houses = []
+		const wallParts = []
+		const roofParts = []
+		const spots = []
+		const lids = []
+		for (const n of chunk.buildings) {
+			const h = house(world.buildings[n], n, world)
+			houses.push(h)
+			wallParts.push(wallGeometry([h], world, firewalls))
+			const roof = roofGeometry([h])
+			if (roof) roofParts.push(roof)
+			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
+			lids.push(...roofHatches(world.buildings[n], n, h.roof))
+			yield
+		}
+		const roofRect = new THREE.Vector4()
+		const top = roofParts.length ? new THREE.Mesh(mergeGeometries(roofParts), roofMaterial(roofRect, gradient, BLANK.roofs)) : null
+		const sides = houses.length ? new THREE.Mesh(mergeGeometries(wallParts), wallLook) : null
+		for (const mesh of [sides, top]) {
+			if (!mesh) continue
+			mesh.castShadow = true
+			mesh.receiveShadow = true
+			group.add(mesh)
+		}
+		const paintings = murals.decals(houses)
+		if (paintings) group.add(paintings)
+		yield
+		const bridges = createBridges(world, chunk, gradient)
+		if (bridges) group.add(bridges)
+		yield
+		const byIndex = []
+		for (const h of houses) byIndex[h.n] = h
+		const stacks = spots.length && chimneys(spots, byIndex, gradient)
+		const hatchMesh = lids.length && hatches(lids, byIndex, gradient)
+		yield
+		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
+		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
+		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
+			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt)
+			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
+			group.add(signs)
+			yield
+		}
+		// Their names on the wall above the windows, and every other shop's.
+		group.add(createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open }))
+		yield
+		// Trees in cells, so the view skips most of them, or one plain blob
+		// each across the chunk once they're too small on screen for lumps.
+		const cells = new Map()
+		for (const i of chunk.trees) {
+			const t = world.trees[i]
+			const key = Math.floor(t.x / TREE_CELL) * 4096 + Math.floor(t.y / TREE_CELL)
+			cells.set(key, [...(cells.get(key) ?? []), i])
+		}
+		const near = [...cells.values()].flatMap((pick) => [createTrees(world, gradient, pick), createTrunks(world, gradient, pick)])
+		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
+		for (const mesh of [stacks, hatchMesh, ...near, ...far]) {
+			if (!mesh) continue
+			mesh.frustumCulled = true
+			mesh.computeBoundingSphere()
+			group.add(mesh)
+		}
+		yield
+		const pools = createNightPools(world, chunk, shops, sky.night)
+		if (pools) group.add(pools)
+		const furniture = createFurniture(world, gradient, chunk, sky.night)
+		for (const mesh of furniture.meshes) group.add(mesh)
+		const uv = plane.geometry.attributes.uv
+		return {
+			group,
+			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
+			zoom(scale) {
+				for (const mesh of near) mesh.visible = scale >= DETAIL_PX
+				for (const mesh of far) mesh.visible = scale < DETAIL_PX
+				if (stacks) stacks.visible = scale >= DETAIL_PX
+				if (hatchMesh) hatchMesh.visible = scale >= DETAIL_PX
+				furniture.zoom(scale)
+			},
+			// Point the ground's corners, or the roofs' world positions, at
+			// where the chunk sits in the texture.
+			show(kind, texture, area) {
+				if (kind === 'roofs') {
+					if (!top) return
+					top.material.map = texture
+					roofRect.set(area.x, area.y, area.w, area.h)
+					return
+				}
+				plane.material.uniforms.map.value = texture
+				const at = plane.geometry.attributes.position
+				for (let i = 0; i < uv.count; i++) uv.setXY(i, (at.getX(i) - area.x) / area.w, 1 - (-at.getY(i) - area.y) / area.h)
+				uv.needsUpdate = true
+			},
+		}
+	})
 }
 
 // At night a material glows this much of its own colour, lit from inside.
