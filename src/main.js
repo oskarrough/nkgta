@@ -20,7 +20,7 @@ import { createActors } from './actors.js'
 
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
-import { createRadioHud } from './radio-hud.js'
+import { createPocket } from './pocket.js'
 import { createRacing } from './racing.js'
 import { createFeedback, shortAgent } from './feedback.js'
 import { createQuiz } from './quiz.js'
@@ -56,9 +56,11 @@ const hud = createHud(world)
 const traffic = createTraffic(world, (text) => hud.say(text))
 const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
-const radioHud = createRadioHud((step) => {
-	sound.start()
-	if (music.nextStation(!!player.car, step)) sound.tick()
+const pocket = createPocket({
+	turnStation(step) {
+		if (music.nextStation(!!player.car, step)) sound.tick()
+	},
+	toggleMute,
 })
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt })
@@ -94,45 +96,10 @@ try {
 	// Debug views just start off when storage is blocked.
 }
 
-// Tap the speaker for a volume slider; L still mutes.
-const muteButton = document.getElementById('mute')
-const volumePanel = document.getElementById('volume')
-const volumeMute = document.getElementById('volume-mute')
-const volumeSlider = document.getElementById('volume-slider')
-function showMute(muted) {
-	const volume = sound.volume()
-	muteButton.querySelector('img').src = `/icons/${muted ? 'speaker-off' : volume < 0.5 ? 'speaker-low' : 'speaker'}.png`
-	volumeMute.querySelector('img').src = `/icons/${muted ? 'speaker' : 'speaker-off'}.png`
-	volumeMute.ariaLabel = volumeMute.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
-	const percent = muted ? 0 : Math.round(volume * 100)
-	volumeSlider.value = String(percent)
-	volumeSlider.style.setProperty('--level', `${percent}%`)
-}
+// L, the menu and the pocket device's switch all mute; the device shows it.
 function toggleMute() {
-	const muted = sound.toggleMute()
-	showMute(muted)
+	sound.toggleMute()
 }
-function showVolume(open) {
-	volumePanel.hidden = !open
-	muteButton.classList.toggle('on', open)
-	muteButton.ariaExpanded = String(open)
-}
-showMute(sound.isMuted())
-muteButton.addEventListener('click', () => {
-	sound.start()
-	showVolume(volumePanel.hidden)
-	muteButton.blur()
-})
-volumeMute.addEventListener('click', () => {
-	toggleMute()
-	volumeMute.blur()
-})
-volumeSlider.addEventListener('input', () => showMute(sound.setVolume(volumeSlider.valueAsNumber / 100)))
-// Hand the keys straight back to the game once the slider lets go.
-volumeSlider.addEventListener('change', () => volumeSlider.blur())
-addEventListener('pointerdown', (e) => {
-	if (!volumePanel.hidden && !e.target.closest('#sound')) showVolume(false)
-})
 const actions = {
 	cameraActive: camera.active,
 	look: camera.look,
@@ -264,10 +231,8 @@ function showMenu(open) {
 	menu.hidden = !open
 	menuButton.ariaExpanded = String(open)
 	input.release()
-	if (open) {
-		showVolume(false)
-		showMenuState()
-	} else document.activeElement?.blur()
+	if (open) showMenuState()
+	else document.activeElement?.blur()
 }
 function showDebug(open) {
 	debug.hidden = !open
@@ -287,7 +252,7 @@ menuButton.addEventListener('click', () => {
 	showMenu(menu.hidden)
 	menuButton.blur()
 })
-// Esc closes the volume pill first, otherwise opens or closes the menu. While
+// Esc opens or closes the menu. While
 // the menu is open the game doesn't hear walking or E.
 const GAME_KEYS = new Set([
 	'ArrowUp',
@@ -311,8 +276,7 @@ addEventListener(
 	(e) => {
 		if (feedback.isOpen() || quiz.active()) return
 		if (e.key === 'Escape') {
-			if (!volumePanel.hidden) showVolume(false)
-			else showMenu(menu.hidden)
+			showMenu(menu.hidden)
 		} else if (!menu.hidden && GAME_KEYS.has(e.key.length === 1 ? e.key.toLowerCase() : e.key)) e.stopPropagation()
 		else if (!menu.hidden || !debug.hidden) setTimeout(showMenuState)
 	},
@@ -429,7 +393,7 @@ function frame(now) {
 	input.setUse(action)
 	input.setDriving(!!player.car)
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() })
-	radioHud.update(music.radio(), dt)
+	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car }, dt)
 	hud.update(
 		{ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action, gate: racing.target() },
 		dt,

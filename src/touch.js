@@ -87,7 +87,7 @@ export function createTouch(actions) {
 	function down(e) {
 		if (e.pointerType !== 'touch') return
 		if (!enabled) show(true)
-		if (e.target.closest('.touch-button, #sound, #menu, #menu-button, #radio, #doener-dialog, #race button')) return
+		if (e.target.closest('.touch-button, #pocket, #menu, #menu-button, #doener-dialog, #race button')) return
 		e.preventDefault()
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 		if (pointers.size === 1 && e.clientX < innerWidth / 2) {

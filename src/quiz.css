@@ -1,4 +1,4 @@
-body.quizzing :is(.hud, #minimap, #radio, #race, #touch-actions, #menu-button, #menu, #debug) {
+body.quizzing :is(.hud, #minimap, #pocket, #race, #touch-actions, #menu-button, #menu, #debug) {
 	display: none !important;
 }
 #quiz {

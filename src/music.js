@@ -72,7 +72,8 @@ export function placeSources(world, shops, homes = {}) {
 	const sources = []
 	for (const [i, shop] of shops.entries()) {
 		const [kind, every] = SHOPS[shop.kind] ?? []
-		if (kind && hash(1000 + i) * every < 1) sources.push(source(world, homes, kind, shop.x, shop.y, 1000 + i, shop.kind))
+		if (kind && hash(1000 + i) * every < 1)
+			sources.push({ ...source(world, homes, kind, shop.x, shop.y, 1000 + i, shop.kind), place: shop.name })
 	}
 	for (const [i, b] of world.buildings.entries()) {
 		if (hash(i) * WINDOW_EVERY >= 1) continue
@@ -231,6 +232,26 @@ export function shape(kind, d, own = false, inCar = false, walled = 0) {
 	return { ...s, level: s.level * (1 - 0.3 * walled), cutoff: s.cutoff * (1 - 0.65 * walled) }
 }
 
+// The loudest of the sources playing, your own radio aside. The one before
+// keeps the lead until another is clearly louder, so the name doesn't flicker
+// between two about as loud.
+function loudestOf(want, shapes, own, before) {
+	let best = null
+	let bestLevel = 0
+	for (const [i, src] of want.entries()) {
+		if (own.includes(src)) continue
+		const level = shapes[i].level * (src === before ? 1.25 : 1)
+		if (level > bestLevel) [best, bestLevel] = [src, level]
+	}
+	return best
+}
+
+// What a source is called on the pocket device's screen.
+function placeOf(src) {
+	if (src.place) return src.place
+	return { window: 'Offenes Fenster', car: 'Autoradio', convoy: 'Hochzeitskorso', field: 'Auf dem Feld', bar: 'Bar' }[src.kind] ?? 'Radio'
+}
+
 // The PLAYING sources nearest (x, y), within earshot, nearness measured
 // against how far each carries.
 export function nearest(sources, x, y) {
@@ -265,6 +286,7 @@ export function createMusic(world, shops, rand = Math.random) {
 	const playing = new Map()
 	let synth = null
 	let heard = null // every source in the last frame, for the music debug view
+	let loudest = null // the source you hear most, outside your own car radio
 	for (const name of SCORES) {
 		const text = SONGS[name]
 		const song = compile(text)
@@ -356,6 +378,7 @@ export function createMusic(world, shops, rand = Math.random) {
 	function update(audio, cars, listener, view, { inCar = false, inside = false, down = false } = {}) {
 		if (!audio || audio.muted) {
 			heard = fixed
+			loudest = null
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
 		}
@@ -404,6 +427,7 @@ export function createMusic(world, shops, rand = Math.random) {
 			want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar, walled(src))),
 			want.map((src) => src.kind),
 		)
+		loudest = loudestOf(want, shapes, own, loudest)
 		for (const [i, src] of want.entries()) {
 			let p = playing.get(src)
 			if (!p) playing.set(src, (p = begin(synth, context, src, songs.get(src.score))))
@@ -432,6 +456,8 @@ export function createMusic(world, shops, rand = Math.random) {
 		nextStation,
 		// What the radio display shows while you're in a car, or null.
 		radio: () => onAir,
+		// The song you hear most and where it comes from, { name, title }, or null.
+		hearing: () => loudest && { name: placeOf(loudest), title: songs.get(loudest.score)?.title ?? loudest.score },
 		// Musik-Debug: every source, and the gain of the ones playing.
 		debug: () => ({ sources: heard ?? [], gains: new Map([...playing].map(([src, p]) => [src, p.level.gain.value])) }),
 		inspect: () =>
