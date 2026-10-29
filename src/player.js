@@ -66,7 +66,7 @@ export function updatePlayer(p, input, world, dt) {
 	// of the way walks that much slower.
 	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
 	let cap = p.onBike ? 3.6 : 1.6
-	if (p.onBike && (here === T.GRASS || here === T.GROUND)) cap *= 0.55
+	if (p.onBike && here === T.GRASS) cap *= 0.55
 	if (p.onBike && here === T.CYCLEWAY) cap *= 1.2
 	// Uphill is slower going, on foot a little, on the bike a lot; downhill
 	// is quicker, and a bike rolls on by itself. See HILLS.
