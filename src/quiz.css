@@ -52,6 +52,9 @@ body.quizzing :is(.hud, #minimap, #pocket, #race, #touch-actions, #menu-button, 
 	justify-content: space-between;
 }
 #quiz canvas {
+	position: static;
+	height: auto;
+	margin: 0 auto;
 	width: min(360px, 100%);
 	max-height: 35dvh;
 	object-fit: contain;
