@@ -176,7 +176,7 @@ export function openField(world) {
 }
 
 // Your own car's radio is a station: the songs that say `at autoradio` (any
-// song, if none do), each played through once, then the next.
+// song, if none do), each played through once, then the next in a shuffled order.
 export function stationPool(homes) {
 	const own = SCORES.filter((n) => homes[n]?.at?.includes('autoradio'))
 	return own.length ? own : PLACE_SCORES
@@ -187,7 +187,30 @@ export const STATIONS = [
 	{ name: 'Kiezfunk', pool: (homes) => PLACE_SCORES.filter((n) => !stationPool(homes).includes(n)) },
 	{ name: null }, // off
 ]
-export const nextOnAir = (pool, score) => pool[(pool.indexOf(score) + 1) % pool.length]
+
+// The pool in a fresh random order that doesn't open with `last`, so a song
+// never plays twice running, not even across the turn of the round.
+export function shuffle(pool, rand, last) {
+	const order = [...pool]
+	for (let i = order.length - 1; i > 0; i--) {
+		const j = Math.floor(rand() * (i + 1))
+		;[order[i], order[j]] = [order[j], order[i]]
+	}
+	if (order.length > 1 && order[0] === last) {
+		const j = 1 + Math.floor(rand() * (order.length - 1))
+		;[order[0], order[j]] = [order[j], order[0]]
+	}
+	return order
+}
+
+// What a station plays after `station.score`: the rest of this round, or a
+// new shuffled round once it is through.
+export function nextOnAir(station, pool, rand) {
+	if (!station.queue?.length) station.queue = shuffle(pool, rand, station.score)
+	return station.queue.shift()
+}
+// Getting into a car, the radio is off this often (one in this many), else on a station.
+const RADIO_OFF = 5
 
 // A convoy plays from whichever of its cars is nearest (x, y), so the song
 // carries on until the last one has gone by.
@@ -333,7 +356,7 @@ export function end(p, context) {
 	}, 2000)
 }
 
-export function createMusic(world, shops, say = () => {}) {
+export function createMusic(world, shops, say = () => {}, rand = Math.random) {
 	const songs = new Map()
 	// Sources are placed once every song is in, since a song says where it belongs.
 	let fixed = null
@@ -346,10 +369,10 @@ export function createMusic(world, shops, say = () => {}) {
 	let convoy = null // the convoy's song, while it lasts
 	// Your car radio, on whenever you sit in a car and still on air while you
 	// don't. Every station keeps going while you listen to another.
-	const stations = STATIONS.map(
-		(s, i) => s.name && { kind: 'car', x: 0, y: 0, score: null, since: 0, name: s.name, pool: s.pool, seed: 7000 + i },
-	)
+	const stations = STATIONS.map((s) => s.name && { kind: 'car', x: 0, y: 0, score: null, since: 0, name: s.name, pool: s.pool, queue: [] })
 	let dial = 0
+	let ridden = null // the car you sit in
+	const dials = new WeakMap() // what each car's radio was last left on
 	let tunedIn = null // the station and song last announced
 	let announceAt = Infinity
 	let wasInCar = false
@@ -420,12 +443,12 @@ export function createMusic(world, shops, say = () => {}) {
 		const pool = station.pool(homes)
 		const length = (n) => (songs.has(n) ? songs.get(n).intro.dur + songs.get(n).loop.dur : Infinity)
 		if (!station.score) {
-			station.score = pool[Math.floor(hash(station.seed + 0.5) * pool.length)]
-			station.since = hash(station.seed + 0.25) * length(station.score)
+			station.score = nextOnAir(station, pool, rand)
+			station.since = rand() * length(station.score)
 		}
 		for (let guard = 0; guard < 100 && now + station.since >= length(station.score); guard++) {
 			station.since -= length(station.score)
-			station.score = nextOnAir(pool, station.score)
+			station.score = nextOnAir(station, pool, rand)
 		}
 		station.x = car.x
 		station.y = car.y
@@ -475,6 +498,13 @@ export function createMusic(world, shops, say = () => {}) {
 			tunedIn = null
 		}
 		wasInCar = inCar
+		if (listener.car !== ridden) {
+			ridden = listener.car
+			// Each car has its own radio habit: the first time in one, it's on a random station, or off.
+			if (ridden && !dials.has(ridden))
+				dials.set(ridden, rand() * RADIO_OFF < 1 ? stations.length - 1 : Math.floor(rand() * (stations.length - 1)))
+			if (ridden) dial = dials.get(ridden)
+		}
 		const own = stationIn(listener.car, now)
 		if (inCar && (!own.length || songs.has(own[0].score))) announce(now)
 		const sources = fixed.concat(
@@ -512,6 +542,7 @@ export function createMusic(world, shops, say = () => {}) {
 	function nextStation(inCar) {
 		if (!inCar || !fixed) return false
 		dial = (dial + 1) % stations.length
+		if (ridden) dials.set(ridden, dial)
 		announceAt = 0
 		return true
 	}

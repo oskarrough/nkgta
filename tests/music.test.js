@@ -13,6 +13,7 @@ import {
 	mix,
 	nearest,
 	nextOnAir,
+	shuffle,
 	stationPool,
 	openField,
 	pickScore,
@@ -155,8 +156,29 @@ describe('music in the street', () => {
 		const homes = Object.fromEntries(SCORES.map((n) => [n, { street: score(n).street, at: score(n).at }]))
 		const pool = stationPool(homes)
 		expect(pool).toEqual(['a100', 'grenzallee', 'buschkrugallee'])
-		expect(nextOnAir(pool, 'a100')).toBe('grenzallee')
-		expect(nextOnAir(pool, 'buschkrugallee')).toBe('a100')
+	})
+
+	test('a station plays every song each round in a fresh order, never one twice running', () => {
+		// A small seeded generator, so the test is the same every run.
+		let a = 42
+		const rand = () => {
+			a = (a + 0x6d2b79f5) | 0
+			let t = Math.imul(a ^ (a >>> 15), 1 | a)
+			t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+			return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32
+		}
+		for (const pool of [
+			['a', 'b'],
+			['a', 'b', 'c'],
+			['a', 'b', 'c', 'd', 'e', 'f'],
+		]) {
+			const station = { score: null, queue: [] }
+			const played = []
+			for (let i = 0; i < pool.length * 40; i++) played.push((station.score = nextOnAir(station, pool, rand)))
+			for (let r = 0; r < 40; r++) expect(played.slice(r * pool.length, (r + 1) * pool.length).sort()).toEqual(pool)
+			for (let i = 1; i < played.length; i++) expect(played[i]).not.toBe(played[i - 1])
+		}
+		expect(shuffle(['a'], rand, 'a')).toEqual(['a'])
 	})
 
 	test('coming back, a source carries on where its song had got to', () => {
