@@ -33,6 +33,10 @@ PLEASE, do not verify and visually screenshot everything single thing.
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
 - `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
 
+## Issues
+
+Ideas, bugs and the roadmap live in GitHub issues, using the labels `now`, `next` and `later`. Not in Linear and not in the bb inbox.
+
 ## Version control
 
 This repo uses jj (colocated with git). Commit messages say what changed for the player, not how.
