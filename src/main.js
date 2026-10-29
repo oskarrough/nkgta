@@ -23,6 +23,7 @@ import { createMusic } from './music.js'
 import { createRadioHud } from './radio-hud.js'
 import { createRacing } from './racing.js'
 import { createFeedback, shortAgent } from './feedback.js'
+import { createQuiz } from './quiz.js'
 import { areaFromUrl } from './area-url.js'
 
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
@@ -189,7 +190,37 @@ const feedback = createFeedback({
 		version: typeof __GAME_VERSION__ === 'undefined' ? 'dev' : __GAME_VERSION__,
 	}),
 })
-const input = createInput(actions)
+const quiz = createQuiz({
+	world,
+	player,
+	camera,
+	city3d,
+	area: URL_PARAMS.get('area') ?? 'default',
+	say: hud.say,
+	prepare() {
+		if (visit.busy() || wasted.active()) {
+			hud.say('Geh erst zurück auf die Straße.')
+			return false
+		}
+		showMenu(false)
+		showDebug(false)
+		racing.abort()
+		input.release()
+		return true
+	},
+	restore: () => input.release(),
+})
+// All input sources share the same guard; the quiz owns its answer controls.
+const quizInput = Object.fromEntries(
+	Object.entries(actions).map(([key, action]) => [
+		key,
+		(...args) => {
+			if (!quiz.active() || ['cameraActive', 'look', 'setLooking', 'move', 'zoom', 'toggleMute', 'menuOpen'].includes(key))
+				return action(...args)
+		},
+	]),
+)
+const input = createInput(quizInput)
 
 // The menu: what the keys do, as buttons, with each toggle's state.
 const menu = document.getElementById('menu')
@@ -201,6 +232,7 @@ tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 // Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
+	quiz: [() => quiz.start(), () => null],
 	streets: [actions.toggleStreetNames, () => showStreetNames],
 	transit: [actions.toggleTransit, () => showTransit],
 	walls: [actions.toggleWalls, () => showWalls],
@@ -277,7 +309,7 @@ const GAME_KEYS = new Set([
 addEventListener(
 	'keydown',
 	(e) => {
-		if (feedback.isOpen()) return
+		if (feedback.isOpen() || quiz.active()) return
 		if (e.key === 'Escape') {
 			if (!volumePanel.hidden) showVolume(false)
 			else showMenu(menu.hidden)
@@ -356,7 +388,8 @@ function frame(now) {
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
 	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
-	visit.update(dt, heading())
+	if (quiz.active()) quiz.tick(now, from)
+	else visit.update(dt, heading())
 	wasted.update(dt)
 	const inside = visit.inside()
 	const indoors = visit.indoors()
@@ -366,8 +399,8 @@ function frame(now) {
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
 	const hit = traffic.update(dt, street, streetView)
-	if (!inside && !visit.warping()) wasted.hit(hit)
-	if (!inside && !player.car && !wasted.active()) pfand.update(player)
+	if (!quiz.active() && !inside && !visit.warping()) wasted.hit(hit)
+	if (!quiz.active() && !inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
@@ -395,7 +428,7 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car)
-	racing.update(dt, from, { inside: visit.busy(), down: wasted.active() })
+	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() })
 	radioHud.update(music.radio(), dt)
 	hud.update(
 		{ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action, gate: racing.target() },
@@ -414,6 +447,7 @@ await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
 phase('first textures')
 loading.remove()
 requestAnimationFrame(frame)
+if (URL_PARAMS.has('quiz')) quiz.start()
 
 // For poking at the game from the console and automated browser tests while developing.
 if (import.meta.env.DEV)

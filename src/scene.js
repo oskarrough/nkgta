@@ -286,6 +286,7 @@ export function createScene(canvas, world, shops = []) {
 	timePasses(renderer, ['color', 'ink', 'blit'])
 
 	// The look, cycled with P; see looks.js for what each one does.
+	let quizClues = true
 	let look = DEFAULT_LOOK
 
 	// The game frame is the canvas at one texel per game pixel, blown up by a
@@ -320,6 +321,8 @@ export function createScene(canvas, world, shops = []) {
 	// level, top-left corner at (cam.x, cam.y) in those pixels.
 	function aim(cam) {
 		fit(cam.scale)
+		camera.layers.set(0)
+		if (quizClues) camera.layers.enable(1)
 		const { width, height } = ink.frame
 		camera.fov = cam.third ? 65 : FOV
 		camera.near = cam.third ? 0.03 : 0.1
@@ -376,6 +379,7 @@ export function createScene(canvas, world, shops = []) {
 
 	return {
 		render,
+		showQuizClues: (show) => (quizClues = show),
 		weather,
 		setHour,
 		renderer,
@@ -458,11 +462,14 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
 			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt)
 			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
+			signs.layers.set(1)
 			group.add(signs)
 			yield
 		}
 		// Their names on the wall above the windows, and every other shop's.
-		group.add(createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open }))
+		const fascia = createFascia(world, chunk, gradient, sky.night, { bay: WALL.bay, open: SHOP_GLOW.open })
+		fascia.traverse((mesh) => mesh.layers.set(1))
+		group.add(fascia)
 		yield
 		// Trees in cells, so the view skips most of them, or one plain blob
 		// each across the chunk once they're too small on screen for lumps.

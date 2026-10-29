@@ -94,7 +94,19 @@ export function createGamepad(actions, blocked = () => false) {
 		// Start is the way back out of the menu, so it keeps working while
 		// everything else on the pad is mute.
 		if (fired(START)) actions.toggleMenu()
-		if (blocked()) return null
+		if (blocked()) {
+			const menu = document.getElementById('menu')
+			if (menu && !menu.hidden) {
+				const buttons = [...menu.querySelectorAll('button')]
+				let selected = buttons.indexOf(document.activeElement)
+				if (fired(UP) || fired(LEFT)) selected = (selected - 1 + buttons.length) % buttons.length
+				if (fired(DOWN) || fired(RIGHT)) selected = (selected + 1) % buttons.length
+				if (selected < 0) selected = 0
+				buttons[selected]?.focus()
+				if (fired(A)) buttons[selected]?.click()
+			}
+			return null
+		}
 		if (fired(A)) actions.use()
 		if (fired(LEFT)) actions.shiftChoice(-1)
 		if (fired(RIGHT)) actions.shiftChoice(1)

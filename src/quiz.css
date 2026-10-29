@@ -1,0 +1,68 @@
+body.quizzing :is(.hud, #minimap, #radio, #race, #touch-actions, #menu-button, #menu, #debug) {
+	display: none !important;
+}
+#quiz {
+	position: fixed;
+	z-index: 20;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: min(560px, calc(100% - 32px));
+	max-height: calc(100dvh - 48px);
+	overflow: auto;
+	color: #fff4d0;
+	text-align: center;
+	font:
+		16px system-ui,
+		sans-serif;
+	text-shadow: 0 2px 4px #000;
+}
+#quiz h2 {
+	margin: 8px 0;
+	font-size: 28px;
+}
+#quiz p {
+	font-size: 13px;
+}
+#quiz button {
+	min-height: 48px;
+	padding: 10px 16px;
+	border: 2px solid #fff4d0;
+	border-radius: 8px;
+	background: #192321eb;
+	color: #fff4d0;
+	font: inherit;
+	cursor: pointer;
+}
+#quiz button:is(:focus, :hover) {
+	outline: 3px solid #ffe369;
+	outline-offset: 2px;
+}
+.quiz-choices {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+	padding: 5px;
+}
+.quiz-choices button:last-child {
+	grid-column: 1 / -1;
+}
+.quiz-turn {
+	display: flex;
+	justify-content: space-between;
+}
+#quiz canvas {
+	width: min(360px, 100%);
+	max-height: 35dvh;
+	object-fit: contain;
+	border-radius: 8px;
+}
+#quiz ol {
+	text-align: left;
+	background: #192321ed;
+	padding: 12px 12px 12px 36px;
+	border-radius: 8px;
+}
+#quiz li {
+	padding: 3px 0;
+}
