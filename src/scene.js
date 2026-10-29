@@ -13,6 +13,7 @@ import { createFurniture } from './street-furniture.js'
 import { createNightPools } from './night-pools.js'
 import { SETT_ALPHA } from './map-image.js'
 import { createClouds, DECK } from './clouds.js'
+import { createWeather } from './weather.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
@@ -198,6 +199,8 @@ export function createScene(canvas, world, shops = []) {
 		night: { value: 0 },
 		home: { value: 0 },
 	}
+	const weather = createWeather(world, shops, sky.night)
+	scene.add(weather.streaks)
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
 	// Before the chunks and firewalls: a landmark lowers the plain block under it.
 	const landmarks = createLandmarks(world, gradient, sky)
@@ -207,6 +210,7 @@ export function createScene(canvas, world, shops = []) {
 	const city = createChunks(world, renderer, function* (chunk) {
 		const group = new THREE.Group()
 		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
+		weather.ground(plane.material, chunk)
 		plane.receiveShadow = true
 		Object.assign(plane.material.uniforms, { time, sun: sky.sun, shade: sky.shade, deck: sky.deck, toSun: sky.toSun })
 		group.add(plane)
@@ -377,7 +381,11 @@ export function createScene(canvas, world, shops = []) {
 	}
 	setHour(START_HOUR)
 
-	const ink = createInk(renderer, [skids.mesh, ...cars.beams], [skids.mesh, clouds.layer, ...cars.shadows, ...cars.beams])
+	const ink = createInk(
+		renderer,
+		[skids.mesh, weather.streaks, ...cars.beams],
+		[skids.mesh, clouds.layer, weather.streaks, ...cars.shadows, ...cars.beams],
+	)
 	timePasses(renderer, ['color', 'ink', 'blit'])
 
 	// The look, cycled with P; see looks.js for what each one does.
@@ -471,6 +479,7 @@ export function createScene(canvas, world, shops = []) {
 
 	return {
 		render,
+		weather,
 		setHour,
 		renderer,
 		scene,

@@ -8,6 +8,7 @@ import { createPfand } from './pfand.js'
 import { createCamera, ZOOM } from './camera.js'
 import { tuneZoom } from './tune.js'
 import { createClock, tuneClock } from './daylight.js'
+import { tuneWeather } from './weather.js'
 import { createRenderer } from './draw.js'
 import { createScene } from './scene.js'
 import { createHud, useAction, useHint } from './hud.js'
@@ -152,6 +153,7 @@ const menuButton = document.getElementById('menu-button')
 // `: the debug menu, the same kind of panel, open from the start with ?tune.
 const debug = document.getElementById('debug')
 tuneClock(document.getElementById('clock'), clock)
+tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 // Each item: what it does, and whether it's on (null: nothing to be on).
 const menuItems = {
@@ -302,6 +304,7 @@ function frame(now) {
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
+	city3d.weather.update(dt, player, inside)
 	city3d.setHour(clock.hour)
 	visit.render(cam, traffic.cars, dt)
 	draw({
@@ -339,4 +342,5 @@ loading.remove()
 requestAnimationFrame(frame)
 
 // For poking at the game from the console and automated browser tests while developing.
-if (import.meta.env.DEV) window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound, clock }
+if (import.meta.env.DEV)
+	window.nkgta = window.__nkgta = { world, player, shops, visit, pfand, camera, traffic, music, sound, clock, weather: city3d.weather }
