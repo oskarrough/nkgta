@@ -21,6 +21,8 @@ import { HILLS } from './terrain.js'
 import { daylight, START_HOUR } from './daylight.js'
 import { STOREY } from './build-map.js'
 import { T } from './tiles.js'
+import { createFirewalls } from './firewalls.js'
+import { createMurals, firewallShader } from './murals.js'
 
 // Altbau plaster, mostly pale: white, pale grey, cream, pale yellow, warm
 // grey, with the odd salmon or red-brick house. Each house is lighter or
@@ -195,6 +197,8 @@ export function createScene(canvas, world, shops = []) {
 		home: { value: 0 },
 	}
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
+	const firewalls = createFirewalls(world)
+	const murals = createMurals(world, firewalls, gradient)
 	// A generator, so chunks can be built a building at a time between frames.
 	const city = createChunks(world, renderer, function* (chunk) {
 		const group = new THREE.Group()
@@ -210,7 +214,7 @@ export function createScene(canvas, world, shops = []) {
 		for (const n of chunk.buildings) {
 			const h = house(world.buildings[n], n, world)
 			houses.push(h)
-			wallParts.push(wallGeometry([h], world))
+			wallParts.push(wallGeometry([h], world, firewalls))
 			const roof = roofGeometry([h])
 			if (roof) roofParts.push(roof)
 			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
@@ -226,6 +230,8 @@ export function createScene(canvas, world, shops = []) {
 			mesh.receiveShadow = true
 			group.add(mesh)
 		}
+		const paintings = murals.decals(houses)
+		if (paintings) group.add(paintings)
 		yield
 		const bridges = createBridges(world, chunk, gradient)
 		if (bridges) group.add(bridges)
@@ -1031,7 +1037,7 @@ function house(b, n, world) {
 // Every edge of every outline becomes one wall quad, outer rings
 // anticlockwise and courtyards clockwise, so walls face away from the
 // building. Each building gets a plaster colour from a stable hash.
-function wallGeometry(houses, world) {
+function wallGeometry(houses, world, firewalls) {
 	const bay = WALL.bay / world.tileM
 	const pos = []
 	const nor = []
@@ -1056,9 +1062,11 @@ function wallGeometry(houses, world) {
 					if (len < 0.01) continue
 					const nx = (e.y - a.y) / len
 					const ny = -(e.x - a.x) / len
-					// Centre the windows on the wall; too short a wall gets none.
-					const fit = Math.floor(len / bay)
-					const lead = (len - fit * bay) / 2
+					// Centre the windows on the wall; too short a wall gets none,
+					// and a firewall (fit -1) none at all.
+					const fire = firewalls?.at(n, (a.x + e.x) / 2, -(a.y + e.y) / 2)
+					const fit = fire ? -1 : Math.floor(len / bay)
+					const lead = fire ? 0 : (len - fit * bay) / 2
 					// Fewer balconies over the big roads; one past 1 means none.
 					const wide = roadAcross(world, (a.x + e.x) / 2, (a.y + e.y) / 2, nx, ny) >= BALCONY.wide
 					const balconies = roll < (wide ? BALCONY.main : BALCONY.side) ? seed : seed + 1
@@ -1284,6 +1292,7 @@ function wallMaterial(tileM, gradient, sky) {
 	const bayT = (WALL.bay / tileM).toFixed(3)
 	const rooms = { value: 0 }
 	material.userData.rooms = rooms
+	const fire = firewallShader(WALL.bay / tileM, glsl)
 	// What a room averages out to once its window is under a pixel, lamp off and on.
 	const paper = mean(ROOMS.papers)
 	const darkRoom = paper.clone().multiplyScalar(ROOMS.dim)
@@ -1316,6 +1325,7 @@ function wallMaterial(tileM, gradient, sky) {
 			'uniform float rooms;\nuniform float night;\nuniform float home;\n' +
 			decl +
 			pulse +
+			fire.head +
 			shader.fragmentShader
 				.replace(
 					'#include <color_fragment>',
@@ -1484,11 +1494,12 @@ function wallMaterial(tileM, gradient, sky) {
 				}
 				// Cornice: a pale stucco band under the roof with a dark line of
 				// its own shadow beneath.
-				if (vWall.z > 2.0) {
+				if (vWall.z > 2.0 && vWall.y > -0.5) {
 					float down = vWall.z - vZ;
 					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, 0.45 * box(down, 0.0, ${WALL.cornice[0].toFixed(3)}, az));
 					diffuseColor.rgb *= 1.0 - 0.38 * box(down, ${WALL.cornice[0].toFixed(3)}, ${WALL.cornice[1].toFixed(3)}, az);
 				}
+				${fire.body}
 				// Darker towards the foot, in two steps, where the street's
 				// grime and the ground's shade reach up the wall.
 				diffuseColor.rgb *= 1.0 + (${FOOT[2].toFixed(2)} - 1.0) * box(vZ, -100.0, ${FOOT[0].toFixed(3)}, az) + (${FOOT[3].toFixed(2)} - 1.0) * box(vZ, ${FOOT[0].toFixed(3)}, ${FOOT[1].toFixed(3)}, az);`,

@@ -5,6 +5,7 @@ import { createWorld } from './world.js'
 import { findShops, packShops } from './shops.js'
 import { findFronts, storefronts } from './fronts.js'
 import { carriageway, isSett, kerbGaps, kerbLines, kerbOf } from './kerbs.js'
+import { cornerCutter } from './corners.js'
 
 // Road widths in metres, kerb to kerb.
 const ROADS = {
@@ -163,15 +164,23 @@ export function buildMap(osm, bbox, tileM) {
 	// 4. Buildings, onto the tiles for walking into, and as outlines with a
 	// height in metres for the 3D city. Passages are cut out of the outlines,
 	// so from above you see the gap you can walk through.
+	// Street corners are cut at an angle in 3D; the tiles keep the square
+	// corner, a tile or so of building you can't walk into.
+	const houses = areas.filter((a) => a.tags.building && !underground(a.tags))
+	const cutCorner = cornerCutter(
+		roadWays.map((w) => ({ pts: geom(w.geometry), r: ROADS[roadClass(w.tags.highway)] / tileM / 2 })),
+		overlapping(houses.map((a) => ({ rings: a.rings, box: bounds(a.rings) }))),
+		tileM,
+	)
 	const buildings = []
-	for (const a of areas) {
-		if (!a.tags.building || underground(a.tags)) continue
+	houses.forEach((a, i) => {
 		fillRings(a.rings, T.BUILDING)
-		const rings = cutPassages(a.rings, corridors)
 		// A small building can sit entirely inside a passage and be cut away.
 		const m2 = Math.abs(ringArea(a.rings[0])) * tileM * tileM
-		if (rings.length) buildings.push({ h: buildingHeight(a.tags, m2), rings: rings.map(flat) })
-	}
+		const h = buildingHeight(a.tags, m2)
+		const rings = cutPassages(cutCorner(a.rings, h, i), corridors)
+		if (rings.length) buildings.push({ h, rings: rings.map(flat) })
+	})
 
 	// 5. Roads, widest first so junctions look right. Their bike lanes and
 	// cobbled middle strips stop where another street comes in.
@@ -351,8 +360,23 @@ export function buildMap(osm, bbox, tileM) {
 		.filter((p) => p.x >= 0 && p.y >= 0 && p.x < W && p.y < H)
 		.flatMap((p) => [round(p.x), round(p.y)])
 
+	// Murals, painted on the nearest blank wall: where, how wide if it's
+	// mapped as a line along the wall, and roughly what of.
+	const murals = []
+	for (const e of osm.elements) {
+		const t = e.tags
+		if (t?.tourism !== 'artwork' || t.artwork_type !== 'mural') continue
+		const pts = e.type === 'node' ? [toTile(e)] : e.geometry ? geom(e.geometry) : []
+		if (!pts.length) continue
+		const x = pts.reduce((s, p) => s + p.x, 0) / pts.length
+		const y = pts.reduce((s, p) => s + p.y, 0) / pts.length
+		if (x < 0 || y < 0 || x >= W || y >= H) continue
+		const w = pts.length > 1 ? Math.hypot(pts.at(-1).x - pts[0].x, pts.at(-1).y - pts[0].y) : 0
+		murals.push({ x: round(x), y: round(y), w: round(w), seed: e.id % 100003, of: muralSubject(t) })
+	}
+
 	shapes.sort((a, b) => a.layer - b.layer)
-	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees }
+	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees, murals }
 	// Where the doors are depends only on the map, so it's worked out here, once.
 	const world = createWorld(map)
 	return {
@@ -443,13 +467,16 @@ function overlapping(items, size = 32) {
 	}
 }
 
+function bounds(rings) {
+	const xs = rings.flat().map((p) => p.x)
+	const ys = rings.flat().map((p) => p.y)
+	return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+}
+
 // Building rings minus any corridors crossing them, `corridors(x0, y0, x1,
 // y1)` being those whose box overlaps. Rings are even-odd, so courtyards stay holes.
 function cutPassages(rings, corridors) {
-	const xs = rings.flat().map((p) => p.x)
-	const ys = rings.flat().map((p) => p.y)
-	const [x0, y0, x1, y1] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
-	const hits = corridors(x0, y0, x1, y1)
+	const hits = corridors(...bounds(rings))
 	if (!hits.length) return rings
 	const area = polygonClipping.xor(...rings.map((r) => [r.map((p) => [p.x, p.y])]))
 	const cut = polygonClipping.difference(area, ...hits.flatMap((c) => c.polys))
@@ -517,6 +544,18 @@ function poiKind(t) {
 	if (t.amenity === 'kindergarten') return 'kita'
 	if (t.leisure === 'playground') return 'playground'
 	return null
+}
+
+// What a mural shows, as far as its tags say: faces, animals, plants and
+// landscapes, or bold shapes; '' if the tags don't say.
+function muralSubject(t) {
+	const about = [t['artwork:subject'], t.artwork_subject, t.subject, t.name, t.description].join(' ').toLowerCase()
+	if (/portrait|person|people|face|frau|mann|kind|woman|man|girl|boy|child|gesicht/.test(about)) return 'face'
+	if (/animal|tier|bird|vogel|fish|fisch|cat|katze|dog|hund|bear|bär|fox|fuchs/.test(about)) return 'creature'
+	if (/nature|natur|landscape|landschaft|flower|blume|plant|pflanze|\btrees?\b|baum|sea|meer|sky|himmel|garden|garten/.test(about))
+		return 'garden'
+	if (/abstract|pattern|muster|geometr/.test(about)) return 'shapes'
+	return ''
 }
 
 // Multipolygon members arrive as loose way pieces; chain them end to end

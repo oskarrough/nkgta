@@ -2,6 +2,7 @@
 // its door on the nearest stretch of wall that opens onto somewhere walkable.
 import { SOLID, T } from './tiles.js'
 import { placeName } from './places.js'
+import { isCutCorner } from './corners.js'
 
 const KINDS = new Set(['spaeti', 'doener', 'imbiss', 'cafe', 'bar', 'restaurant', 'bikeshop', 'supermarket', 'bakery', 'pharmacy'])
 const REACH = 6 // how far a place may be from its facade, tiles
@@ -10,6 +11,10 @@ const MARGIN = 0.6 // door at least this far from a corner, tiles
 const SPACING = 1.8 // doors on one facade at least this far apart, tiles
 const AT_DOOR = { along: 0.75, out: 0.8 } // how close to where you stand counts as at the door
 const CELL = 16 // tiles: walls are filed in a grid of these, so a place only checks the ones near it
+// Kiosks, Spätis and Eckkneipen take the cut corner if it's within this many
+// tiles more than their nearest front.
+const CORNER = new Set(['spaeti', 'bar', 'imbiss', 'doener', 'cafe', 'bakery'])
+const CORNER_PULL = 1.5
 
 export function findShops(world) {
 	const free = (x, y) => !SOLID.has(world.tileAt(x, y))
@@ -17,8 +22,11 @@ export function findShops(world) {
 	const shops = []
 	for (const p of world.pois) {
 		if (!KINDS.has(p.kind)) continue
-		const best = facadeOf(p.x, p.y)
+		// One door per corner: the next shop there stays on its front.
+		let best = facadeOf(p.x, p.y, p.kind)
+		if (best?.seg?.taken) best = best.front
 		if (!best) continue
+		if (best.seg) best.seg.taken = true
 		const { x, y, nx, ny, ex, ey, out, room } = best
 		shops.push({ place: p, name: placeName(p), kind: p.kind, x, y, nx, ny, ex, ey, out, room, stand: { x: x + nx * out, y: y + ny * out } })
 	}
@@ -80,6 +88,7 @@ export function facades(world) {
 		let x1 = -Infinity
 		let y1 = -Infinity
 		for (const r of b.rings) {
+			const first = segs.length
 			for (let i = 0; i + 3 < r.length; i += 2) {
 				// Outlines come in short pieces; a straight run is one wall.
 				const last = segs.at(-1)
@@ -92,6 +101,14 @@ export function facades(world) {
 				x1 = Math.max(x1, r[i])
 				y1 = Math.max(y1, r[i + 1])
 			}
+			// Cut corners, where the corner shop has its door.
+			const ring = segs.slice(first)
+			const dir = ([ax, ay, bx, by]) => [bx - ax, by - ay]
+			ring.forEach((seg, k) => {
+				const before = ring[(k + ring.length - 1) % ring.length]
+				const after = ring[(k + 1) % ring.length]
+				if (ring.length > 3 && isCutCorner(dir(before), dir(seg), dir(after), world.tileM)) seg.corner = true
+			})
 		}
 		return { segs, x0, y0, x1, y1 }
 	})
@@ -117,20 +134,25 @@ export function facades(world) {
 		return [...near].sort((a, b) => a - b).map((i) => walls[i])
 	}
 
-	return (px, py) => {
+	// A place of `kind` may be pulled onto a cut corner; `front` is then the
+	// best spot off it.
+	return (px, py, kind) => {
 		let best = null
+		let front = null
 		for (const w of wallsNear(px, py)) {
 			if (px < w.x0 - REACH || px > w.x1 + REACH || py < w.y0 - REACH || py > w.y1 + REACH) continue
-			for (const [ax, ay, bx, by] of w.segs) {
+			for (const seg of w.segs) {
+				const [ax, ay, bx, by] = seg
 				const len = Math.hypot(bx - ax, by - ay)
-				if (len < MARGIN * 2 + 0.4) continue
+				if (len < MARGIN * 2 + 0.4 && !seg.corner) continue
 				const ex = (bx - ax) / len
 				const ey = (by - ay) / len
-				const s = Math.max(MARGIN, Math.min(len - MARGIN, (px - ax) * ex + (py - ay) * ey))
+				// On a cut corner the door is in the middle of the slant.
+				const s = seg.corner ? len / 2 : Math.max(MARGIN, Math.min(len - MARGIN, (px - ax) * ex + (py - ay) * ey))
 				const x = ax + ex * s
 				const y = ay + ey * s
 				const d = Math.hypot(px - x, py - y)
-				if (d > REACH || (best && d >= best.d)) continue
+				if (d > REACH || (best && front && d >= Math.max(best.d, front.d))) continue
 				// Outward is whichever side you can stand on; a wall with both or
 				// neither free is a party wall or a courtyard nook.
 				for (const side of [1, -1]) {
@@ -142,11 +164,14 @@ export function facades(world) {
 					if (out === undefined) continue
 					// Pavement beats a courtyard.
 					const street = world.tileAt(x + nx * (out + 0.6), y + ny * (out + 0.6)) === T.SIDEWALK
-					const score = d + out + (street ? 0 : 2)
-					if (!best || score < best.d) best = { d: score, x, y, nx, ny, ex, ey, out, room: Math.min(s, len - s), n: w.n, s, len, street }
+					const score = d + out + (street ? 0 : 2) - (seg.corner && CORNER.has(kind) ? CORNER_PULL : 0)
+					const spot = { d: score, x, y, nx, ny, ex, ey, out, room: Math.min(s, len - s), n: w.n, s, len, street, seg: seg.corner && seg }
+					if (!best || score < best.d) best = spot
+					if (!seg.corner && (!front || score < front.d)) front = spot
 				}
 			}
 		}
+		if (best) best.front = front
 		return best
 	}
 }

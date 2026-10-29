@@ -29,6 +29,7 @@ export function overpassQuery({ south, west, north, east }) {
   node["highway"="street_lamp"](${b});
   node["natural"="tree"](${b});
   way["natural"="tree_row"](${b});
+  nw["tourism"="artwork"]["artwork_type"="mural"](${b});
 );
 out geom;
 // Which lines stop where: route relations through the stops, members by id only.
