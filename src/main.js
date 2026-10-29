@@ -22,6 +22,7 @@ import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createRadioHud } from './radio-hud.js'
 import { createRacing } from './racing.js'
+import { createFeedback, shortAgent } from './feedback.js'
 import { areaFromUrl } from './area-url.js'
 
 const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
@@ -168,7 +169,26 @@ const actions = {
 	finishRace: () => racing.finish(),
 	restartRace: () => racing.restart(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
+	openFeedback() {
+		showMenu(false)
+		feedback.open()
+	},
 }
+const feedback = createFeedback({
+	thank: () => hud.say('Danke fürs Feedback!'),
+	context: () => ({
+		url: location.href,
+		area: URL_PARAMS.get('area') ?? 'default',
+		x: player.x,
+		y: player.y,
+		street: world.streetAt(player.x, player.y),
+		hour: clock.hour,
+		vehicle: player.car ? player.car.model.name : player.onBike ? 'bike' : 'foot',
+		camera: camera.selected() ? 'third person' : 'overhead',
+		agent: shortAgent(navigator.userAgent, document.body.classList.contains('touch')),
+		version: typeof __GAME_VERSION__ === 'undefined' ? 'dev' : __GAME_VERSION__,
+	}),
+})
 const input = createInput(actions)
 
 // The menu: what the keys do, as buttons, with each toggle's state.
@@ -196,6 +216,7 @@ const menuItems = {
 		() => null,
 	],
 	area: [actions.pickArea, () => null],
+	feedback: [actions.openFeedback, () => null],
 }
 function showMenuState() {
 	for (const button of document.querySelectorAll('.panel button[data-action]')) {
@@ -256,6 +277,7 @@ const GAME_KEYS = new Set([
 addEventListener(
 	'keydown',
 	(e) => {
+		if (feedback.isOpen()) return
 		if (e.key === 'Escape') {
 			if (!volumePanel.hidden) showVolume(false)
 			else showMenu(menu.hidden)

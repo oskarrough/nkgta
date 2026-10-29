@@ -37,6 +37,11 @@ export function createInput(actions) {
 		if (key === 'p') actions.cycleLook()
 		if (key === 'm') actions.pickArea()
 		if (key === 'j') actions.toggleMusicDebug()
+		if (key === 'b') {
+			// Or the key would be typed into the box it opens.
+			e.preventDefault()
+			actions.openFeedback()
+		}
 		if (key === 'r') actions.nextStation()
 		if (key === 'g') actions.placeGate()
 		if (key === 'f') actions.finishRace()
