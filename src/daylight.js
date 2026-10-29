@@ -5,7 +5,7 @@
 import * as THREE from 'three'
 
 export const HOUR_SECONDS = 60 // seconds of play per hour of the day
-export const START_HOUR = 17 // late afternoon, so golden hour comes soon
+export const START_HOUR = 11 // late morning, so the first look is in daylight
 
 // Sky light and sun (or moon) light as colour and strength, how dark cast
 // shadows are, what the map's colours are multiplied by in sun and in shade,

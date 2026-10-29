@@ -439,14 +439,19 @@ const nearest = (nodes, p) =>
 
 // Metres tall. Most of Neukölln is five-storey Altbau, so that's the guess
 // when OSM doesn't say; sheds, garages and anything with a footprint smaller
-// than a flat (a container café, a kiosk on a square) get one storey.
+// than a flat (a container café, a kiosk on a square) get one storey. Altbau
+// storeys are high, the ground floor with its shops higher still; the wall
+// shader draws its windows to the same storeys.
+export const STOREY = { ground: 4.4, upper: 3.6 }
 const LOW = ['garage', 'garages', 'shed', 'hut', 'kiosk', 'roof', 'carport', 'container', 'toilets']
 const SMALL_M2 = 50
 function buildingHeight(t, m2 = Infinity) {
 	const h = parseFloat(t.height)
 	if (h > 0) return Math.min(255, Math.round(h))
-	const levels = parseFloat(t['building:levels']) || (LOW.includes(t.building) || m2 < SMALL_M2 ? 1 : 5)
-	return Math.min(255, Math.round(levels * 3.2 + (parseFloat(t['roof:levels']) || 0) * 2.5 + 1))
+	const low = LOW.includes(t.building) || m2 < SMALL_M2
+	const levels = parseFloat(t['building:levels']) || (low ? 1 : 5)
+	const walls = low ? levels * 3 : STOREY.ground + Math.max(0, levels - 1) * STOREY.upper
+	return Math.min(255, Math.round(walls + (parseFloat(t['roof:levels']) || 0) * 2.5 + 1))
 }
 
 function ringArea(pts) {

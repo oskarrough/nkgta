@@ -16,21 +16,38 @@ import { BLANK, createChunks } from './chunks.js'
 import { createSigns } from './signs.js'
 import { HILLS } from './terrain.js'
 import { daylight, START_HOUR } from './daylight.js'
+import { STOREY } from './build-map.js'
 
-// Altbau plaster: cream, ochre, sandstone, grey, salmon, off-white.
-const FACADES = ['#d8c6a2', '#c9a266', '#bfa98a', '#a8a39b', '#c98f72', '#e2dacb']
+// Altbau plaster, mostly pale: white, pale grey, cream, pale yellow, warm
+// grey, with the odd salmon or red-brick house. Each house is lighter or
+// darker on top, so neighbours differ in value, not just in hue.
+const FACADES = ['#e4e1d9', '#d2d0ca', '#e2d8c0', '#e4d4a2', '#c4bcae', '#dcdad2', '#cfc6b2', '#c99682', '#9c5a46']
+const FACADE_VALUE = 0.16
 
 // Facade details, drawn in the wall shader. Cornice is two depths below the
-// roof in tiles: the pale band, then its shadow. Sills are in storeys.
+// roof in tiles: the pale band, then its shadow. Window sizes are in metres:
+// one window every `bay` along the wall, tall and white-framed, split by a
+// mullion and a transom; shop windows are wider. Sills are in storeys.
 const WALL = {
 	glass: '#1c2229',
 	glint: '#5b6b78',
 	lit: '#e6b45a',
 	stucco: '#ece4d2',
-	sill: 0.07,
+	frame: '#f2efe8',
+	sill: 0.05,
 	cornice: [0.13, 0.21],
 	awnings: 0.45, // share of shopfronts with an awning
+	bay: 2.5,
+	window: [1.2, 2.3], // wide, tall
+	shop: 2.0, // wide
+	bar: 0.07, // frame, mullion and transom
+	upperGlow: 0.75, // flats glow less than shops, there are so many more of them
 }
+// Balconies under some upper windows, the same columns all the way up:
+// share of houses with any, share of their columns, how far the slab
+// reaches past the window each side and the railing's height (metres),
+// iron bars per bay.
+const BALCONY = { houses: 0.55, columns: 0.3, reach: 0.3, rail: 0.95, bars: 18, iron: '#2c2e30', slab: '#ddd8cc' }
 const AWNINGS = ['#b8352c', '#2f6b3c', '#d9a326', '#2f4f7a']
 // The flats behind the upper windows, only in the chase camera: depth in
 // tiles, the share of rooms with the lamp on, how dark the others are by
@@ -152,7 +169,7 @@ export function createScene(canvas, world, shops = []) {
 		for (const n of chunk.buildings) {
 			const h = house(world.buildings[n], n, world)
 			houses.push(h)
-			wallParts.push(wallGeometry([h]))
+			wallParts.push(wallGeometry([h], world.tileM))
 			const roof = roofGeometry([h])
 			if (roof) roofParts.push(roof)
 			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
@@ -956,11 +973,12 @@ function house(b, n, world) {
 // Every edge of every outline becomes one wall quad, outer rings
 // anticlockwise and courtyards clockwise, so walls face away from the
 // building. Each building gets a plaster colour from a stable hash.
-function wallGeometry(houses) {
+function wallGeometry(houses, tileM) {
+	const bay = WALL.bay / tileM
 	const pos = []
 	const nor = []
 	const col = []
-	const wall = [] // per vertex: distance along the wall, windows that fit, building height
+	const wall = [] // per vertex: windows along the wall, windows that fit, building height, the building's own number
 	const foot = [] // per vertex: the ground the building stands on
 	const plaster = FACADES.map((f) => new THREE.Color(f))
 	const c = new THREE.Color()
@@ -968,7 +986,8 @@ function wallGeometry(houses) {
 		// Downhill a hair below the ground, so no light shows under the wall.
 		const z0 = base - WALL_FOOT
 		const j = roofHash(n + 500)
-		c.copy(plaster[Math.floor(j * plaster.length)]).offsetHSL(0, 0, (roofHash(n + 900) - 0.5) * 0.08)
+		c.copy(plaster[Math.floor(j * plaster.length)]).offsetHSL(0, 0, (roofHash(n + 900) - 0.5) * FACADE_VALUE)
+		const seed = roofHash(n + 1300)
 		for (const { outer, holes } of parts) {
 			for (const ring of [outer, ...holes]) {
 				for (let i = 0; i < ring.length; i++) {
@@ -979,8 +998,8 @@ function wallGeometry(houses) {
 					const nx = (e.y - a.y) / len
 					const ny = -(e.x - a.x) / len
 					// Centre the windows on the wall; too short a wall gets none.
-					const fit = len < 0.7 ? 0 : Math.floor(len)
-					const lead = (len - fit) / 2
+					const fit = Math.floor(len / bay)
+					const lead = (len - fit * bay) / 2
 					// Up to the roof, which under a pitched one is above the eaves.
 					const ta = top(a.x, a.y)
 					const te = top(e.x, e.y)
@@ -996,7 +1015,7 @@ function wallGeometry(houses) {
 						pos.push(p.x, p.y, z)
 						nor.push(nx, ny, 0)
 						col.push(c.r, c.g, c.b)
-						wall.push(d - lead, fit, h)
+						wall.push((d - lead) / bay, fit, h, seed)
 						foot.push(base)
 					}
 				}
@@ -1007,7 +1026,7 @@ function wallGeometry(houses) {
 	geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
 	geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
 	geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
-	geo.setAttribute('wall', new THREE.Float32BufferAttribute(wall, 3))
+	geo.setAttribute('wall', new THREE.Float32BufferAttribute(wall, 4))
 	geo.setAttribute('foot', new THREE.Float32BufferAttribute(foot, 1))
 	return geo
 }
@@ -1178,15 +1197,17 @@ const tarPaper = `
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
 
-// Walls draw their own windows: one per 3 m along the wall and per storey up
-// it, wider shop windows on the ground floor, a ledge between storeys and the
-// flats with the lamp on lit, more of them as night falls, always the same
-// ones first. At night those glow, and so do open shops. Sheds and garages
+// Walls draw their own windows: one per bay along the wall and per storey up
+// it, tall and white-framed, wider shop windows on the ground floor, a ledge
+// between storeys, balconies on some houses and the flats with the lamp on
+// lit, more of them as night falls, always the same ones first. At night those glow, and so do open shops. Sheds and garages
 // stay blank. In the chase camera (`material.userData.rooms`) each upper
 // window looks into a room.
 function wallMaterial(tileM, gradient, sky) {
 	const material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradient })
-	const storey = (3.2 / tileM).toFixed(3)
+	const storey = (STOREY.upper / tileM).toFixed(3)
+	const ground = (STOREY.ground / tileM).toFixed(3)
+	const bayT = (WALL.bay / tileM).toFixed(3)
 	const rooms = { value: 0 }
 	material.userData.rooms = rooms
 	// What a room averages out to once its window is under a pixel, lamp off and on.
@@ -1197,9 +1218,9 @@ function wallMaterial(tileM, gradient, sky) {
 		shader.uniforms.rooms = rooms
 		shader.uniforms.night = sky.night
 		shader.uniforms.home = sky.home
-		const decl = 'varying vec3 vWall;\nvarying float vZ;\nvarying vec3 vRoomP;\nvarying vec2 vTan;\n'
+		const decl = 'varying vec4 vWall;\nvarying float vZ;\nvarying vec3 vRoomP;\nvarying vec2 vTan;\n'
 		shader.vertexShader =
-			'attribute vec3 wall;\nattribute float foot;\n' +
+			'attribute vec4 wall;\nattribute float foot;\n' +
 			decl +
 			shader.vertexShader.replace(
 				'#include <project_vertex>',
@@ -1217,23 +1238,48 @@ function wallMaterial(tileM, gradient, sky) {
 				'#include <color_fragment>',
 				`#include <color_fragment>
 				float along = vWall.x;
-				vec2 aa = fwidth(vec2(along, vZ / ${storey}));
-				float az = aa.y * ${storey};
+				// Storeys up the wall, the ground floor taller than the rest.
+				float zf = vZ < ${ground} ? vZ / ${ground} : 1.0 + (vZ - ${ground}) / ${storey};
+				vec2 aa = fwidth(vec2(along, zf));
+				float az = fwidth(vZ);
 				if (vWall.z > 2.0 && along > 0.0 && along < vWall.y && vZ < vWall.z - 0.3) {
-					float f = floor(vZ / ${storey});
-					float fz = fract(vZ / ${storey});
+					float f = floor(zf);
+					float fz = fract(zf);
 					float u = fract(along);
 					float shop = f < 0.5 ? 1.0 : 0.0;
-					float halfW = mix(0.22, 0.4, shop);
-					float lo = mix(0.35, 0.1, shop);
-					float hi = mix(0.8, 0.74, shop);
+					// Rounded, because interpolated varyings wobble in their last bits
+					// and the hash would blow that up into speckle.
+					float house = floor(vWall.w * 1000.0 + 0.5);
+					// Balconies stand under the same columns all the way up, from the
+					// first floor to the one below the top, and their windows are doors.
+					float zt = vWall.z - 0.3;
+					float top = floor(zt < ${ground} ? zt / ${ground} : 1.0 + (zt - ${ground}) / ${storey});
+					float column = step(house, ${(BALCONY.houses * 1000).toFixed(1)}) * step(fract(sin(dot(vec2(floor(along), house), vec2(12.9898, 78.233))) * 43758.5453), ${BALCONY.columns.toFixed(2)});
+					float balcony = column * step(1.0, f) * step(f, top - 1.0);
+					float halfW = mix(${d(WALL.window[0] / 2 / WALL.bay)}, ${d(WALL.shop / 2 / WALL.bay)}, shop);
+					float lo = mix(mix(0.2, 0.03, balcony), 0.1, shop);
+					float hi = mix(${d(0.2 + WALL.window[1] / STOREY.upper)}, 0.72, shop);
 					float wx = pulse(u, 0.5 - halfW, 0.5 + halfW, aa.x);
 					float wz = pulse(fz, lo, hi, aa.y);
+					// The white frame round each upper window, and the mullion and
+					// the transom under the fanlight that split it.
+					vec2 bar = vec2(${d(WALL.bar / WALL.bay)}, ${d(WALL.bar / STOREY.upper)}) * (1.0 - shop);
+					float frame = pulse(u, 0.5 - halfW - bar.x, 0.5 + halfW + bar.x, aa.x) * pulse(fz, lo - bar.y, hi + bar.y, aa.y) * (1.0 - shop);
+					float transom = hi - ${d(0.55 / STOREY.upper)};
+					float bars = max(box(u, 0.5 - bar.x * 0.5, 0.5 + bar.x * 0.5, aa.x), box(fz, transom - bar.y * 0.5, transom + bar.y * 0.5, aa.y)) * (1.0 - shop);
+					// The balcony: a slab at the floor and an iron railing on it, bars
+					// and a handrail.
+					float reach = halfW + ${d(BALCONY.reach / WALL.bay)};
+					float slabW = pulse(u, 0.5 - reach, 0.5 + reach, aa.x);
+					float slab = balcony * slabW * box(fz, 0.0, ${d(0.16 / STOREY.upper)}, aa.y);
+					float railTop = ${d((0.16 + BALCONY.rail) / STOREY.upper)};
+					float rail = balcony * slabW * box(fz, ${d(0.16 / STOREY.upper)}, railTop, aa.y) * max(box(fz, railTop - ${d(0.05 / STOREY.upper)}, railTop, aa.y), pulse(along * ${BALCONY.bars.toFixed(1)}, 0.0, 0.3, aa.x * ${BALCONY.bars.toFixed(1)}));
+					// Under the slab above, its shadow.
+					float under = column * step(f + 1.0, top - 1.0) * slabW * box(fz, 0.95, 1.0, aa.y);
+					float pane = wx * wz * (1.0 - bars) * (1.0 - rail);
 					// Below about a pixel a window, the details that pick one window
 					// out (lit, glint, sill, stripes) give way to their average.
 					float near = 1.0 - smoothstep(0.25, 0.6, max(aa.x, aa.y));
-					// Rounded, because interpolated varyings wobble in their last bits
-					// and the hash would blow that up into speckle.
 					float wallId = floor(vWall.y + 0.5) + floor(vWall.z * 8.0 + 0.5);
 					float bay = fract(sin(dot(vec3(floor(along), f, wallId), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 					// Dark glass with a pale glint across its top corner. Each storey
@@ -1256,13 +1302,14 @@ function wallMaterial(tileM, gradient, sky) {
 					vec3 far = mix(${glsl(WALL.glass)}, ${glsl(WALL.lit)}, share);
 					float glow = on * night * ${SHOP_GLOW.window.toFixed(2)};
 					float farGlow = share * night * ${SHOP_GLOW.window.toFixed(2)};
-					if (rooms > 0.5 && shop < 0.5) {
+					if (rooms > 0.5 && shop < 0.5 && pane > 0.0) {
 						// Follow the view ray into a box behind the wall: a room two or
-						// three windows wide, so its walls stand behind the piers.
+						// three windows wide, so its walls stand behind the piers. Only
+						// where there's glass to see it through.
 						vec3 ray = normalize(vRoomP - cameraPosition);
 						vec3 d = vec3(dot(ray.xy, vTan), ray.z, max(abs(dot(ray.xy, vec2(vTan.y, -vTan.x))), 0.05));
-						vec2 o = vec2(along, fz * ${storey});
-						float tx = (d.x > 0.0 ? x0 + span - o.x : o.x - x0) / max(abs(d.x), 0.0001);
+						vec2 o = vec2(along * ${bayT}, fz * ${storey});
+						float tx = (d.x > 0.0 ? (x0 + span) * ${bayT} - o.x : o.x - x0 * ${bayT}) / max(abs(d.x), 0.0001);
 						float ty = (d.y > 0.0 ? ${storey} - o.y : o.y) / max(abs(d.y), 0.0001);
 						float tz = ${ROOMS.depth.toFixed(2)} / d.z;
 						float t = min(tz, min(tx, ty));
@@ -1270,8 +1317,8 @@ function wallMaterial(tileM, gradient, sky) {
 						vec3 paper = pick < 0.25 ? ${glsl(ROOMS.papers[0])} : pick < 0.5 ? ${glsl(ROOMS.papers[1])} : pick < 0.75 ? ${glsl(ROOMS.papers[2])} : ${glsl(ROOMS.papers[3])};
 						vec3 hit = vec3(o + d.xy * t, d.z * t);
 						// Where on the room's wall or ceiling the ray lands, 0 to 1.
-						vec2 back = vec2((hit.x - x0) / span, hit.y / ${storey});
-						vec2 up = vec2((hit.x - x0) / span, hit.z / ${ROOMS.depth.toFixed(2)});
+						vec2 back = vec2((hit.x / ${bayT} - x0) / span, hit.y / ${storey});
+						vec2 up = vec2(back.x, hit.z / ${ROOMS.depth.toFixed(2)});
 						vec3 c = t == tz ? paper : t == tx ? paper * 0.62 : d.y > 0.0 ? paper * 1.08 : ${glsl(ROOMS.floor)};
 						if (t == tz) {
 							// A door to the hall on one side, a picture on the other.
@@ -1283,7 +1330,7 @@ function wallMaterial(tileM, gradient, sky) {
 						// Darker away from the window, with a lamp in the middle of the
 						// ceiling in the lit ones.
 						c *= 1.0 - 0.55 * hit.z / ${ROOMS.depth.toFixed(2)};
-						if (t == ty && d.y > 0.0) c = mix(c, vec3(1.0), on * step(length((up - 0.5) * vec2(span, 1.4)), 0.16));
+						if (t == ty && d.y > 0.0) c = mix(c, vec3(1.0), on * step(length((up - 0.5) * vec2(span * ${bayT}, 1.4)), 0.16));
 						c *= on > 0.5 ? ${glsl(ROOMS.lamp)} : vec3(${ROOMS.dim.toFixed(2)});
 						// Curtains hang at the pane, drawn on the glass, some to the sides.
 						float cw = 0.14 + 0.2 * fract(bay * 17.9);
@@ -1299,11 +1346,12 @@ function wallMaterial(tileM, gradient, sky) {
 						farGlow = home * lamp;
 					}
 					glass = mix(glass, ${glsl(WALL.glint)}, glint * near * (1.0 - on * night));
-					totalEmissiveRadiance += mix(far * farGlow, glass * glow, near) * wx * wz;
+					totalEmissiveRadiance += mix(far * farGlow, glass * glow, near) * pane * mix(${WALL.upperGlow.toFixed(2)}, 1.0, shop);
 					glass = mix(far, glass, near);
-					diffuseColor.rgb = mix(diffuseColor.rgb, glass, wx * wz);
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.frame)}, frame);
+					diffuseColor.rgb = mix(diffuseColor.rgb, glass, pane);
 					// A pale sill under each upper window.
-					float sill = box(fz, lo - ${WALL.sill.toFixed(3)}, lo, aa.y) * pulse(u, 0.46 - halfW, 0.54 + halfW, aa.x) * (1.0 - shop);
+					float sill = box(fz, lo - bar.y - ${WALL.sill.toFixed(3)}, lo - bar.y, aa.y) * pulse(u, 0.47 - halfW, 0.53 + halfW, aa.x) * (1.0 - shop) * (1.0 - balcony);
 					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(WALL.stucco)}, sill * 0.8);
 					// Shopfronts: an awning over some, plain or striped.
 					float awning = shop * step(bay, ${WALL.awnings.toFixed(2)}) * box(fz, hi + 0.03, 0.97, aa.y) * pulse(u, 0.44 - halfW, 0.56 + halfW, aa.x);
@@ -1314,6 +1362,9 @@ function wallMaterial(tileM, gradient, sky) {
 					totalEmissiveRadiance += cloth * awning * open * night * ${SHOP_GLOW.awning.toFixed(2)};
 					float ledge = mix(0.025, 1.0 - smoothstep(0.0, 0.05, fz), near);
 					diffuseColor.rgb *= 1.0 - 0.3 * ledge * (1.0 - shop);
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(BALCONY.slab)}, slab);
+					diffuseColor.rgb *= 1.0 - 0.45 * under;
+					diffuseColor.rgb = mix(diffuseColor.rgb, ${glsl(BALCONY.iron)}, rail);
 				}
 				// Cornice: a pale stucco band under the roof with a dark line of
 				// its own shadow beneath.
