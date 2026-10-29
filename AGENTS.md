@@ -49,6 +49,8 @@ Agents often work in parallel, each in its own bb worktree, with a GitHub issue 
 
 Ideas, bugs and the roadmap live in GitHub issues, using the labels `now`, `next` and `later`. Not in Linear and not in the bb inbox.
 
+Questions of taste or opinion for Oskar go in an issue assigned to him (`--assignee oskarrough`), with screenshots attached (`gh issue create --attach ./shot.png#Alt`). Keep working on something else meanwhile.
+
 ## Version control
 
 This repo uses jj (colocated with git). Commit messages say what changed for the player, not how.
