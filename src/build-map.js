@@ -165,7 +165,8 @@ export function buildMap(osm, bbox, tileM) {
 		fillRings(a.rings, T.BUILDING)
 		const rings = cutPassages(a.rings, corridors)
 		// A small building can sit entirely inside a passage and be cut away.
-		if (rings.length) buildings.push({ h: buildingHeight(a.tags), rings: rings.map(flat) })
+		const m2 = Math.abs(ringArea(a.rings[0])) * tileM * tileM
+		if (rings.length) buildings.push({ h: buildingHeight(a.tags, m2), rings: rings.map(flat) })
 	}
 
 	// 5. Roads, widest first so junctions look right.
@@ -437,13 +438,25 @@ const nearest = (nodes, p) =>
 	)
 
 // Metres tall. Most of Neukölln is five-storey Altbau, so that's the guess
-// when OSM doesn't say; sheds and garages get one storey.
+// when OSM doesn't say; sheds, garages and anything with a footprint smaller
+// than a flat (a container café, a kiosk on a square) get one storey.
 const LOW = ['garage', 'garages', 'shed', 'hut', 'kiosk', 'roof', 'carport', 'container', 'toilets']
-function buildingHeight(t) {
+const SMALL_M2 = 50
+function buildingHeight(t, m2 = Infinity) {
 	const h = parseFloat(t.height)
 	if (h > 0) return Math.min(255, Math.round(h))
-	const levels = parseFloat(t['building:levels']) || (LOW.includes(t.building) ? 1 : 5)
+	const levels = parseFloat(t['building:levels']) || (LOW.includes(t.building) || m2 < SMALL_M2 ? 1 : 5)
 	return Math.min(255, Math.round(levels * 3.2 + (parseFloat(t['roof:levels']) || 0) * 2.5 + 1))
+}
+
+function ringArea(pts) {
+	let a = 0
+	for (let i = 0; i < pts.length; i++) {
+		const p = pts[i]
+		const q = pts[(i + 1) % pts.length]
+		a += p.x * q.y - q.x * p.y
+	}
+	return a / 2
 }
 
 // Places worth walking to.
