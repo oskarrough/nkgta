@@ -73,8 +73,6 @@ export function house(b, n, world) {
 	return { n, h, base, parts, roof, axis, top: roof ? (x, y) => base + h + roofHeight(roof, x, y) : () => base + h }
 }
 
-// Every chimney is one instance of one box, so the whole city's stacks are a
-// single draw, and they cast real shadows down the roof.
 export function chimneys(list, houses, gradient) {
 	const geo = new THREE.BoxGeometry(CHIMNEY.length, CHIMNEY.width, CHIMNEY.height).translate(0, 0, CHIMNEY.height / 2)
 	const mesh = new THREE.InstancedMesh(geo, new THREE.MeshToonMaterial({ color: '#fff', gradientMap: gradient }), list.length)
@@ -95,8 +93,6 @@ export function chimneys(list, houses, gradient) {
 	return mesh
 }
 
-// Roof hatches: a frame with a lid, all of them one instance each of one
-// box pair, so they're a single draw and cast real shadows on the tar.
 export function hatches(list, houses, gradient) {
 	const { size, height, lid } = HATCH
 	const frame = new THREE.BoxGeometry(size, size, height).translate(0, 0, height / 2)
@@ -239,7 +235,6 @@ const tarPaper = `
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
 
-// As a chunk feature: the chimneys and hatches on the chunk's houses, which go when the view is far enough out.
 export function build({ world, houses, gradient }) {
 	const byIndex = []
 	const spots = []

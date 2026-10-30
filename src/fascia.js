@@ -328,7 +328,6 @@ function hash(s) {
 	return h
 }
 
-// As a chunk feature: the names on the walls above the windows.
 export function build({ world, chunk, gradient, sky, opening }) {
 	const group = createFascia(world, chunk, gradient, sky.night, opening)
 	group.traverse((mesh) => mesh.layers.set(1))

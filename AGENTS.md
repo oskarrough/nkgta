@@ -6,6 +6,7 @@ See README.md for what the game is and where the code lives.
 
 - `ast-grep outline src/` lists the symbols, imports and exports per file. Start there before reading whole files.
 - `ast-grep run -p '<pattern>' src/` searches by syntax, e.g. `ast-grep run -p 'strokeLine($$$)' src/`. Prefer it over grep for code.
+- Check every HTML entry in `vite.config.js` before deleting an apparently unimported module; `pick.js` is loaded by `pick.html`.
 
 ## Testing
 

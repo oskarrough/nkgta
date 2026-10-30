@@ -19,7 +19,6 @@ float box(float x, float a, float b, float w) {
 `
 
 export const d = (v) => v.toFixed(3)
-// The average of some colours.
 export function mean(hexes) {
 	const c = new THREE.Color(0, 0, 0)
 	for (const hex of hexes) c.add(new THREE.Color(hex))

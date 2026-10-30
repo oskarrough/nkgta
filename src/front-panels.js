@@ -58,7 +58,6 @@ function createFrontPanels(world, chunk, opening, night) {
 	return new THREE.Mesh(geo, material)
 }
 
-// As a chunk feature: the shop fronts' panels.
 export function build({ world, chunk, sky, opening }) {
 	const panels = createFrontPanels(world, chunk, opening, sky.night)
 	if (!panels) return null

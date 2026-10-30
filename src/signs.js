@@ -155,7 +155,6 @@ function glowAtNight(material, strength, night) {
 const PER_ATLAS = 24
 const inChunk = (c, { x, y }) => x >= c.x && y >= c.y && x < c.x + c.w && y < c.y + c.h
 
-// As a chunk feature: awnings over the chunk's shop doors, a few atlases' worth between frames.
 export function* build({ world, chunk, shops, gradient, sky, opening }) {
 	const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
 	const meshes = []
