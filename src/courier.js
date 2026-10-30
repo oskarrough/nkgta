@@ -72,7 +72,7 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 			if ((hintIn -= dt) <= 0) {
 				hintIn = Infinity
 				remember('hinted', true)
-				pocket.say('Schalter „Kurier“ an: Jobs', 5)
+				pocket.say('Schalter „Kurier“ an, dann gibt’s Jobs', 5)
 			}
 			if (mode === 'idle' && kurier.on && !inside && !busy && !down && (wait -= dt) <= 0) {
 				job = offerJob(shops, doors, player.x, player.y)
