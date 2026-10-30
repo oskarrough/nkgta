@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test'
 import { dailyQuizResult, dailyRace, dateKey, saveDailyQuiz, seeded } from '../src/daily.js'
 import { quizRounds, streetSpots } from '../src/quiz-rules.js'
-import { decodeMap } from '../src/map-codec.js'
+import { defaultMap } from './default-map.js'
 import { createWorld } from '../src/world.js'
 import { T } from '../src/tiles.js'
 
-const world = createWorld(decodeMap(await Bun.file('public/map.json').json()))
+const world = createWorld(await defaultMap())
 
 test('the day turns over at midnight in Berlin', () => {
 	expect(dateKey(new Date('2026-10-30T22:30:00Z'))).toBe('2026-10-30')
@@ -31,9 +31,11 @@ test('the daily race runs between gates on roads, on different streets', () => {
 })
 
 test('the daily quiz is the same five spots and choices for everyone', () => {
-	const round = () => quizRounds(streetSpots(world), seeded('quiz|default|2026-10-30'))
-	expect(round()).toEqual(round())
-	expect(quizRounds(streetSpots(world), seeded('quiz|default|2026-10-31'))).not.toEqual(round())
+	const streets = new Map(Array.from({ length: 8 }, (_, i) => [`Street ${i}`, [{ street: `Street ${i}`, x: i * 10, y: 2 }]]))
+	const today = quizRounds(streets, seeded('quiz|default|2026-10-30'))
+	expect(today).toHaveLength(5)
+	expect(quizRounds(streets, seeded('quiz|default|2026-10-30'))).toEqual(today)
+	expect(quizRounds(streets, seeded('quiz|default|2026-10-31'))).not.toEqual(today)
 })
 
 test('your daily quiz score is for today only and keeps the best', () => {
