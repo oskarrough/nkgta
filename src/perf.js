@@ -2,7 +2,7 @@
 // GPU fields arrive a few frames later; absent means unavailable, not zero.
 // Color excludes shadows on the GPU; CPU render timings include nested calls.
 // Read window.perf in the console.
-export const PERF = new URLSearchParams(location.search).has('perf')
+export const PERF = new URLSearchParams(globalThis.location?.search).has('perf')
 
 const perf = { phases: [], frames: [], frame: null }
 if (PERF) globalThis.perf = perf
