@@ -43,6 +43,7 @@
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 	white-space: normal;
+	text-wrap: balance;
 	font-size: 0.8rem;
 }
 #pocket .app-job .offer {

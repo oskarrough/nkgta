@@ -8,6 +8,7 @@ const MOVED = 5 // px a pointer moves before it's a drag, not a tap
 const EDGE = 8 // px from the screen's edge
 const CORNER = 0.2 // this close to a second edge, it goes in the corner
 const STORE = 'nk-pocket'
+const SETTLE = 3 // seconds after it first shows when a new song doesn't make it jump
 
 function soundApp() {
 	const page = document.createElement('div')
@@ -34,6 +35,8 @@ function soundApp() {
 export function createPocket({ turnStation, toggleMute }) {
 	const el = document.createElement('div')
 	el.id = 'pocket'
+	// Hidden until its first frame is drawn, so it appears once, settled.
+	el.className = 'asleep'
 	el.innerHTML = `
 		<button type="button" class="switch" aria-label="Ton aus (L)" title="Ton aus (L)"></button>
 		<i class="led"></i>
@@ -58,6 +61,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	let back = null // the app to go back to once an alert is over
 	let key = null
 	let open = 0
+	let awake = 0
 
 	function add(app) {
 		apps.push(app)
@@ -70,9 +74,9 @@ export function createPocket({ turnStation, toggleMute }) {
 		button.title = button.ariaLabel = app.label
 		button.innerHTML = `<img src="/icons/${app.icon}.png" alt="">`
 		keys.append(button)
-		if (!current) show(app.id)
+		if (!current) show(app.id, { quiet: true })
 	}
-	function show(id) {
+	function show(id, { quiet = false } = {}) {
 		const app = apps.find((a) => a.id === id)
 		if (!app) return
 		back = null
@@ -85,7 +89,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			app.shown?.()
 			showTags()
 		}
-		open = OPEN
+		if (!quiet) open = OPEN
 	}
 	function next(step = 1) {
 		const i = apps.indexOf(current)
@@ -294,7 +298,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			const level = muted ? 0 : Math.round(volume * 10)
 			const next = `${sounds.draw({ radio, hearing, muted })}:${level}`
 			if (next !== key) {
-				if (key !== null && current === sounds) open = OPEN
+				if (key !== null && current === sounds && awake > SETTLE) open = OPEN
 				key = next
 			}
 			volumeBars.style.setProperty('--level', String(level))
@@ -309,6 +313,8 @@ export function createPocket({ turnStation, toggleMute }) {
 			knob.ariaLabel = car ? 'Sender wechseln (R)' : 'Lautstärke'
 			muteSwitch.ariaLabel = muteSwitch.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
 			current?.update?.(dt)
+			if (!awake) el.classList.remove('asleep')
+			awake += dt
 		},
 	}
 }

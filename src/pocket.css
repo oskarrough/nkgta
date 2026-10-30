@@ -22,13 +22,20 @@
 		inset 0 -4px 0 rgba(0, 0, 0, 0.16);
 	transform: scale(var(--s));
 	transform-origin: 100% 0;
-	transition: transform 0.18s ease-out;
+	transition:
+		transform 0.18s ease-out,
+		opacity 0.25s ease-out;
 	font-family: system-ui, sans-serif;
 	touch-action: none;
 	user-select: none;
 	-webkit-user-select: none;
 	-webkit-touch-callout: none;
 	cursor: grab;
+}
+#pocket.asleep {
+	opacity: 0;
+	visibility: hidden;
+	transition: none;
 }
 #pocket.open,
 #pocket:focus-within {
@@ -195,6 +202,15 @@
 #pocket .page[hidden] {
 	display: none;
 }
+/* A new app comes up the way an LCD redraws: in a couple of grey steps. */
+#pocket .page {
+	animation: pocket-page 0.15s steps(3, jump-start);
+}
+@keyframes pocket-page {
+	from {
+		opacity: 0.2;
+	}
+}
 /* Pictures on the glass print in the screen's own ink. */
 #pocket .page img {
 	filter: grayscale(1) contrast(1.4);
@@ -247,6 +263,14 @@
 	height: 16px;
 	image-rendering: pixelated;
 	pointer-events: none;
+}
+#pocket .keys button {
+	transition:
+		translate 0.06s,
+		background 0.1s;
+}
+#pocket .keys button:active {
+	translate: 0 2px;
 }
 #pocket .keys button.on {
 	translate: 0 2px;

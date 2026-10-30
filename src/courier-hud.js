@@ -78,7 +78,7 @@ export function createCourierHud({ accept, pocket }) {
 				tock = null
 				for (const img of page.querySelectorAll('.kitchen')) img.src = badgeOf(j.from.kind)
 				$('.from').textContent = j.from.name
-				$('.to').textContent = `${j.to.street} ${j.to.number}`
+				$('.to').textContent = `${j.to.street}\u00a0${j.to.number}`
 				$('.pay').textContent = euro(j.pay)
 				$('.limit').textContent = mmss(j.limit)
 			})
@@ -86,7 +86,7 @@ export function createCourierHud({ accept, pocket }) {
 			const riding = mode === 'pickup' || mode === 'deliver'
 			if (riding) {
 				set('where', `${mode}:${job.from.name}:${job.to.street}:${job.to.number}`, () => {
-					$('.where').textContent = mode === 'pickup' ? job.from.name : `${job.to.street} ${job.to.number}`
+					$('.where').textContent = mode === 'pickup' ? job.from.name : `${job.to.street}\u00a0${job.to.number}`
 					ride.dataset.leg = mode
 				})
 				set('items', `${job.items.join()}:${spilt}`, () => {
