@@ -77,7 +77,7 @@ export function createScene(canvas, world, shops = [], opening) {
 		night: { value: 0 },
 		home: { value: 0 },
 	}
-	const weather = createWeather(world, shops, sky.night)
+	const weather = createWeather(world, shops, sky.night, location.search, opening)
 	scene.add(weather.streaks)
 	const wallLook = wallMaterial(world.tileM, gradient, sky)
 	// Before the chunks and firewalls: a landmark lowers the plain block under it.
@@ -164,6 +164,7 @@ export function createScene(canvas, world, shops = [], opening) {
 	// for the street seen through a shop's portal.
 	function render(cam, carList, { view = aim(cam), target = null } = {}) {
 		cars.update(carList)
+		weather.reflectCars(carList, view.position)
 		wallLook.userData.rooms.value = cam.third ? 1 : 0
 		for (const c of carList) {
 			for (const m of c.marks) skids.add(...m)

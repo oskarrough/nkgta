@@ -27,6 +27,7 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 
 PLEASE, do not verify and visually screenshot everything single thing.
 
+- Force soaked rain with `?weather=rain&hour=11` (or `hour=22`); `nkgta.weather.setMode('rain')` instead wets gradually. Road nodes include curve points, so only the first and last node of a road should interrupt gutter puddles at junctions.
 - Test logic, not looks: no unit tests that assert HUD markup, DOM structure, CSS or what gets drawn. One look in the browser covers those. Keep tests for rules (traffic, races, songs, parsing, map building) and perf tripwires.
 - `bunx oxlint --deny no-unused-vars` exposes unused imports and parameters hidden by the quiet check.
 - Write few code comments: only the why the code can't say. No narrating what the next line does, no section banners, no comments restating a name.

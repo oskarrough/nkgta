@@ -41,7 +41,7 @@ export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () 
 		const shop = shops[i]
 		const start = pos.length / 3
 		const cell = cells[k]
-		const color = CLOTH[hash(shop.name) % CLOTH.length]
+		const color = signColor(shop.name)
 		// Scene coordinates: y points north. Text reads from the street, its
 		// top towards the wall, turned round when that would put it upside down.
 		const n = [shop.nx, -shop.ny]
@@ -122,6 +122,10 @@ function paintCell(g, { x, y, w }, name, color, flip) {
 	}
 	posterText(g, name, w / 2, flip ? CELL * 0.58 : CELL * 0.42, TYPE, w - CELL * 0.4)
 	g.restore()
+}
+
+export function signColor(name) {
+	return CLOTH[hash(name) % CLOTH.length]
 }
 
 function hash(s) {

@@ -67,6 +67,7 @@ const traffic = createTraffic(
 	(text) => hud.say(text),
 	(p) => chatter.shout(p),
 )
+city3d.weather.setSignals(traffic.lights())
 const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, traffic.lights())
 const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
