@@ -58,7 +58,7 @@ export function createHud(world) {
 	let toast = null
 
 	return {
-		say: (text) => (toast = { text, t: 3 }),
+		say: (text, t = 3) => (toast = { text, t }),
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door, or a note to read instead.
 		// `wasted` is the big word across the screen, WASTED or BUSTED, if any.
@@ -76,7 +76,9 @@ export function createHud(world) {
 				dot(null)
 				return
 			}
-			street = world.streetAt(player.x, player.y) || street
+			const onStreet = world.streetAt(player.x, player.y)
+			if (onStreet) street = onStreet
+			else if (!street) street = world.nearestStreet(player.x, player.y)
 			const p = nearestPlace(world.pois, player.x, player.y, 2.5)
 			const stop = showTransit && nearestPlace(world.transit ?? [], player.x, player.y, 2.5)
 			set('street', street)

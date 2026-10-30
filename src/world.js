@@ -5,6 +5,19 @@ export function createWorld(map) {
 	const { w: W, h: H, tiles, streetOf, bbox, tileM } = map
 	const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? T.BUILDING : tiles[(y | 0) * W + (x | 0)])
 	const streetAt = (x, y) => map.streets[streetOf[(y | 0) * W + (x | 0)]] || ''
+	function nearestStreet(x, y, maxR = 12) {
+		const ix = x | 0
+		const iy = y | 0
+		for (let r = 0; r <= maxR; r++) {
+			for (let dy = -r; dy <= r; dy++) {
+				for (let dx = -r; dx <= r; dx++) {
+					const name = streetAt(ix + dx, iy + dy)
+					if (name) return name
+				}
+			}
+		}
+		return ''
+	}
 
 	const lonM = 111320 * Math.cos((((bbox.north + bbox.south) / 2) * Math.PI) / 180)
 	const fromLatLon = ({ lat, lon }) => ({
@@ -35,7 +48,7 @@ export function createWorld(map) {
 	const cobbles = cobbledTiles(map.shapes ?? [], W, H)
 	const cobbled = (x, y) => x >= 0 && y >= 0 && x < W && y < H && cobbles[(y | 0) * W + (x | 0)] === 1
 
-	return { ...map, W, H, tileAt, streetAt, startPoint, heightAt, slopeAt, flat, cobbled }
+	return { ...map, W, H, tileAt, streetAt, nearestStreet, startPoint, heightAt, slopeAt, flat, cobbled }
 }
 
 // The tiles under every cobbled shape, stroked the way build-map.js strokes
