@@ -1,3 +1,4 @@
+import { PHONE } from './device.js'
 import { PX } from './map-image.js'
 import { gameUpscale } from './looks.js'
 import { T } from './tiles.js'
@@ -171,7 +172,9 @@ export function createCamera(world) {
 				// Settle for good, or the zoom creeps on for seconds.
 				if (Math.abs(want - zoom) < 0.002) zoom = want
 			}
-			const scale = PX * zoom * devicePixelRatio
+			// Keep the same metres across as the 1280px desktop view.
+			const framing = PHONE && !suspended ? Math.min(1, canvas.width / devicePixelRatio / 1280) : 1
+			const scale = PX * zoom * devicePixelRatio * framing
 			// Only pixel art needs whole game pixels. Rounding the smooth looks
 			// makes slow pans alternate between standing still and jumping, and
 			// lets the player wobble around the centre while zoom is changing.

@@ -15,6 +15,7 @@ const output = flag('out', join(tmpdir(), `nkgta-memory-${process.pid}`))
 const MiB = 2 ** 20
 const BUDGET = { cpu: 450 * MiB, gpu: 256 * MiB, total: 650 * MiB }
 const base = flag('url')
+const screenshot = flag('screenshot')
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
 async function freePort() {
@@ -180,6 +181,8 @@ try {
 		await sample()
 	}
 	await run('clearInterval(memoryRide)')
+	if (screenshot)
+		await send('Page.captureScreenshot', { format: 'png' }).then((r) => writeFileSync(screenshot, Buffer.from(r.data, 'base64')))
 	const end = samples.at(-1)
 	const cpuBytes = (s) =>
 		s.heap.usedSize + (s.heap.backingStorageSize ?? 0) + s.workers.reduce((n, w) => n + w.usedSize + (w.backingStorageSize ?? 0), 0)

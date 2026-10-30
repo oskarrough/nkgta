@@ -401,6 +401,34 @@
 				font-size: 0.62rem;
 			}
 
+			.hud-top {
+				display: contents;
+			}
+			body.touch .hud-top {
+				position: fixed;
+				top: calc(1rem + env(safe-area-inset-top));
+				left: calc(4.5rem + env(safe-area-inset-left));
+				right: calc(1.5rem + env(safe-area-inset-right));
+				display: flex;
+				align-items: baseline;
+				gap: 0.75rem;
+				pointer-events: none;
+			}
+			body.touch #street {
+				position: static;
+				flex: 1;
+				min-width: 0;
+				font-size: clamp(0.75rem, 3vw, 1.2rem);
+				text-align: left;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			body.touch #money {
+				position: static;
+				flex-shrink: 0;
+			}
+
 			/* Narrow screens: the street name and the money share the top line. */
 			@media (max-width: 600px) {
 				#place {
@@ -420,8 +448,10 @@
 		<canvas id="city"></canvas>
 		<canvas id="overlay"></canvas>
 		<div class="hud" id="loading">Lade Karte…</div>
-		<div class="hud" id="street"></div>
-		<div class="hud" id="money"></div>
+		<div class="hud-top">
+			<div class="hud" id="street"></div>
+			<div class="hud" id="money"></div>
+		</div>
 		<div class="hud" id="bag"></div>
 		<div class="hud" id="heat"></div>
 		<div class="hud" id="doener-carried"></div>

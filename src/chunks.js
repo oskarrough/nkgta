@@ -12,7 +12,7 @@ import { note, PERF } from './perf.js'
 
 export const CHUNK = 128 // tiles a side
 // Texture pixels per tile, finest first. Every chunk keeps the last one.
-const LEVELS = PHONE ? [6, 3, 1.5] : [12, 6, 3, 1.5]
+const LEVELS = [12, 6, 3, 1.5]
 const FAR = LEVELS.at(-1)
 // A level will do while a screen pixel covers no more than this many of
 // its texels, a little under one, so zooming out lets go of detail early.
@@ -230,7 +230,7 @@ export function createChunks(world, renderer, build) {
 
 	function show(c) {
 		for (const kind of KINDS) {
-			const entry = pick(c, kind, c.target)
+			const entry = pick(c, kind, c.target[kind])
 			if (entry) entry.used = frame
 			if (c.shown[kind] === entry) continue
 			c.shown[kind] = entry
@@ -294,20 +294,39 @@ export function createChunks(world, renderer, build) {
 		for (const entry of queue) entry.state = 'new'
 		queue.length = 0
 		let room = BUDGET
+		const phoneTextures = []
 		for (const [d, c] of order) {
 			if (!c.parts) continue
 			const kinds = c.buildings.length ? KINDS : ['ground']
 			// A chunk's coarse texture before its finer ones, so the first
 			// view shows soon and sharpens after.
 			for (const kind of kinds) want(c, kind, FAR, true, d - 0.5)
-			c.target = FAR
+			c.target = { ground: FAR, roofs: FAR }
 			if (d > MARGIN) continue
+			if (PHONE) {
+				for (const kind of kinds) phoneTextures.push({ c, kind, d })
+				continue
+			}
 			for (const l of LEVELS.slice(LEVELS.indexOf(level), -1)) {
 				const cost = kinds.reduce((sum, kind) => sum + bytesOf(areaOf(c, kind, l).width, areaOf(c, kind, l).height), 0)
 				if (cost > room) continue
 				room -= cost
-				c.target = l
+				c.target = { ground: l, roofs: l }
 				for (const kind of kinds) want(c, kind, l, false, d)
+				break
+			}
+		}
+		// Roads get first claim on the phone cache; roofs can stay softer.
+		phoneTextures.sort((a, b) => Number(a.kind === 'roofs') - Number(b.kind === 'roofs') || a.d - b.d)
+		for (const { c, kind, d } of phoneTextures) {
+			for (const l of LEVELS.slice(LEVELS.indexOf(level), -1)) {
+				if (kind === 'roofs' && l > 6) continue
+				const area = areaOf(c, kind, l)
+				const cost = bytesOf(area.width, area.height)
+				if (cost > room) continue
+				room -= cost
+				c.target[kind] = l
+				want(c, kind, l, false, d + (kind === 'roofs' ? 0.1 : 0))
 				break
 			}
 		}
