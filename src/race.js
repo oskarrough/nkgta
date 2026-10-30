@@ -62,6 +62,7 @@ export function stepRun(run, from, to, dt, pose) {
 	const best = (run.race.rival ?? run.race.best)?.splits[i - 1]
 	run.next++
 	run.done = run.next >= run.race.gates.length
+	if (run.done) run.t = time
 	return { gate: i, time, delta: best === undefined ? null : time - best, finish: run.done }
 }
 

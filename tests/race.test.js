@@ -63,6 +63,18 @@ test('splits land between frames, and the second run is timed against the best',
 	expect(r.best.time).toBeCloseTo(2, 1)
 })
 
+test('the finish split, stopwatch and saved time use the line crossing', () => {
+	const r = { gates: [makeGate(0, 0, 0), makeGate(10, 0, 0)] }
+	const run = startRun(r, 'bike')
+	const event = stepRun(run, { x: 9, y: 0 }, { x: 11, y: 0 }, 0.2, pose(11))
+	expect(event.finish).toBe(true)
+	expect(event.time).toBeCloseTo(0.1)
+	expect(run.t).toBe(event.time)
+	submit(r, run)
+	expect(r.best.time).toBe(0.1)
+	expect(r.times[0].time).toBe(0.1)
+})
+
 test('the ghost records at 10 Hz and plays back where you were at that time', () => {
 	const r = race()
 	const run = startRun(r, 'bike')
