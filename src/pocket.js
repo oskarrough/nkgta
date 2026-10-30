@@ -5,7 +5,7 @@ import { sound } from './sound.js'
 
 const TURN = 270 // degrees of knob from silent to full
 const HOLD = 350 // ms a finger holds the body still before it drags the device
-const MUTE = 600 // ms the knob is held down before it mutes
+const TRAVEL = 160 // px a thumb slides along the side panel from silent to full
 const MOVED = 5 // px a pointer moves before it's a drag or a turn, not a tap
 const EDGE = 8 // px from the screen's edge
 const CORNER = 0.2 // this close to a second edge, it goes in the corner
@@ -13,29 +13,32 @@ const STORE = 'nk-pocket'
 const SAY = 2.5 // seconds a note from the device itself stays on its top line
 
 // The one piece of interface: a scuffed handheld. Its screen shows the map
-// unless something else needs it; the knob is the radio; two rubber keys open
-// the races and the post. It never changes size: it's in your hand, not a window.
-export function createPocket({ turnStation, toggleMute }) {
+// unless something else needs it; the side panel is the radio; two rubber keys
+// open the races and the post. It never changes size: it's in your hand, not a window.
+export function createPocket({ turnStation }) {
 	const el = document.createElement('div')
 	el.id = 'pocket'
 	// Hidden until its first frame is drawn, so it appears once, settled.
 	el.className = 'asleep'
 	el.innerHTML = `
 		<i class="led"></i>
-		<div class="screen"><div class="top"><div class="ticker"><span></span></div><b class="tags"></b></div></div>
+		<div class="screen"><div class="top"><div class="ticker"><span></span></div><b class="tags"></b><time></time></div></div>
 		<div class="lower">
 			<div class="keys"></div>
-			<div class="dial"><button type="button" class="knob" aria-label="Lautstärke" title="Drehen: Lautstärke · Tippen: Sender (R) · Halten: Ton aus (L)"><i></i></button></div>
+			<div class="side">
+				<div class="dial"><button type="button" class="knob" aria-label="Lautstärke" title="Hoch und runter ziehen: Lautstärke · Tippen: Sender (R)"><i></i></button></div>
+			</div>
 		</div>
 		<span class="sticker">NK 44</span>`
 	document.body.append(el)
 	const knob = el.querySelector('.knob')
-	const dial = el.querySelector('.dial')
+	const side = el.querySelector('.side')
 	const screen = el.querySelector('.screen')
 	const keys = el.querySelector('.keys')
 	const ticker = el.querySelector('.ticker')
 	const tickerText = ticker.querySelector('span')
 	const tags = el.querySelector('.tags')
+	const time = el.querySelector('time')
 	const apps = []
 	const tagOf = {}
 	let home = null
@@ -82,11 +85,20 @@ export function createPocket({ turnStation, toggleMute }) {
 		back = null
 		show(current?.id === id ? home.id : id)
 	}
+	// A tag with a level is a battery: cells that drain, the exact figure on hover.
 	function showTags() {
-		tags.textContent = Object.entries(tagOf)
-			.filter(([id, tag]) => tag?.text && id !== current?.id)
-			.map(([, tag]) => tag.text)
-			.join(' ')
+		tags.replaceChildren(
+			...Object.entries(tagOf)
+				.filter(([id, tag]) => tag?.text && id !== current?.id)
+				.map(([, tag]) => {
+					if (tag.level === undefined) return tag.text
+					const cells = document.createElement('i')
+					cells.className = 'battery'
+					cells.title = tag.text
+					cells.style.setProperty('--level', String(Math.ceil(tag.level * 4) / 4))
+					return cells
+				}),
+		)
 		tags.classList.toggle(
 			'urgent',
 			Object.values(tagOf).some((tag) => tag?.urgent),
@@ -130,9 +142,12 @@ export function createPocket({ turnStation, toggleMute }) {
 	place()
 	addEventListener('resize', place)
 
+	// Down to zero is mute; a tick in the hand at every tenth on the way.
 	function setVolume(value) {
+		const before = sound.isMuted() ? 0 : Math.round(sound.volume() * 10)
 		sound.start()
 		sound.setVolume(value)
+		if ((sound.isMuted() ? 0 : Math.round(sound.volume() * 10)) !== before) haptic(sound.isMuted() ? 20 : 4)
 	}
 	// A slide switch on the casing: it shows its own state, and says nothing else.
 	const switches = new Map()
@@ -149,7 +164,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	}
 
 	// What's on the screen of an app you type or tap in is its own; the rest of
-	// the device is hardware: drag it, turn the knob, press it.
+	// the device is hardware: drag it, slide a thumb up the side panel, press it.
 	const onScreen = (target) => !!current?.live && screen.contains(target)
 
 	let gesture = null
@@ -157,9 +172,7 @@ export function createPocket({ turnStation, toggleMute }) {
 		if (e.button > 0) return
 		sound.start()
 		if (onScreen(e.target) || e.target.closest('.screen button')) return
-		const onKnob = !!e.target.closest('.knob')
 		const r = el.getBoundingClientRect()
-		const k = knob.getBoundingClientRect()
 		gesture = {
 			id: e.pointerId,
 			// Captured, the pointer's later events all land on the device itself.
@@ -167,26 +180,18 @@ export function createPocket({ turnStation, toggleMute }) {
 			x: e.clientX,
 			y: e.clientY,
 			grab: { x: e.clientX - r.left, y: e.clientY - r.top },
-			knob: onKnob && { x: k.left + k.width / 2, y: k.top + k.height / 2 },
-			angle: null,
+			// Above or on the side panel, sliding sets the volume.
+			fader: e.clientX >= side.getBoundingClientRect().left && !e.target.closest('.keys'),
 			mode: null,
-			// Held still, the knob mutes; a finger on the body drags, so taps
-			// still work. A mouse drags the body straight away.
-			hold: onKnob
-				? setTimeout(() => {
-						if (!gesture || gesture.mode) return
-						gesture.mode = 'mute'
-						dial.classList.remove('pressing')
-						toggleMute()
-						haptic(20)
-					}, MUTE)
-				: e.pointerType === 'mouse'
+			// A finger held still drags the body, so taps still work. A mouse
+			// drags the body straight away, unless it's on the fader.
+			hold:
+				e.pointerType === 'mouse'
 					? 0
 					: setTimeout(() => {
 							if (gesture && !gesture.mode) startDrag()
 						}, HOLD),
 		}
-		if (onKnob) dial.classList.add('pressing')
 		el.setPointerCapture(e.pointerId)
 	})
 	function startDrag() {
@@ -199,31 +204,27 @@ export function createPocket({ turnStation, toggleMute }) {
 		const far = Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > MOVED
 		if (!gesture.mode && far) {
 			clearTimeout(gesture.hold)
-			dial.classList.remove('pressing')
-			if (gesture.knob) gesture.mode = 'turn'
-			else if (gesture.hold === 0) startDrag()
+			if (gesture.fader) {
+				gesture.mode = 'turn'
+				// From where the thumb is now, so the knob doesn't jump by the dead zone.
+				gesture.y = e.clientY
+				gesture.from = sound.isMuted() ? 0 : sound.volume()
+				el.classList.add('turning')
+			} else if (gesture.hold === 0) startDrag()
 			else gesture.mode = 'none'
 		}
 		if (gesture.mode === 'drag') {
 			el.style.left = `${e.clientX - gesture.grab.x}px`
 			el.style.top = `${e.clientY - gesture.grab.y}px`
 			el.style.right = el.style.bottom = 'auto'
-		} else if (gesture.mode === 'turn') {
-			const angle = (Math.atan2(e.clientY - gesture.knob.y, e.clientX - gesture.knob.x) * 180) / Math.PI
-			if (gesture.angle !== null) {
-				const step = ((angle - gesture.angle + 540) % 360) - 180
-				setVolume((sound.isMuted() ? 0 : sound.volume()) + step / TURN)
-			}
-			gesture.angle = angle
-		}
+		} else if (gesture.mode === 'turn') setVolume(gesture.from + (gesture.y - e.clientY) / TRAVEL)
 	})
 	function end(e) {
 		if (!gesture || e.pointerId !== gesture.id) return
 		clearTimeout(gesture.hold)
-		dial.classList.remove('pressing')
 		const { mode, target } = gesture
 		gesture = null
-		el.classList.remove('held')
+		el.classList.remove('held', 'turning')
 		if (mode === 'drag') {
 			const free = room()
 			const x = (parseFloat(el.style.left) - EDGE) / free.w
@@ -277,7 +278,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			button.className = 'slide'
 			button.role = 'switch'
 			button.ariaLabel = label
-			button.innerHTML = `<i></i><span>${label}</span>`
+			button.innerHTML = `<span>${label}</span><i></i>`
 			const slide = {
 				on,
 				change,
@@ -289,7 +290,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			}
 			slide.set(on)
 			switches.set(button, slide)
-			el.append(button)
+			side.append(button)
 			return slide
 		},
 		// A note from the device itself on the top line.
@@ -309,16 +310,17 @@ export function createPocket({ turnStation, toggleMute }) {
 			if (current?.id === id) show((back ?? home).id)
 			back = null
 		},
-		// A few characters on the top line, while another app has the screen.
-		tag(id, text, urgent = false) {
+		// A few characters on the top line, while another app has the screen;
+		// with a `level` from 0 to 1, a battery instead, `text` on hover.
+		tag(id, text, urgent = false, level = undefined) {
 			const tag = tagOf[id]
-			if (tag?.text === text && tag?.urgent === urgent) return
-			tagOf[id] = { text, urgent }
+			if (tag?.text === text && tag?.urgent === urgent && tag?.level === level) return
+			tagOf[id] = { text, urgent, level }
 			showTags()
 		},
 		// `radio`: the car radio's { name, title }, or null out of a car;
-		// `hearing`: the loudest song around, or null.
-		update({ radio, hearing, car }, dt) {
+		// `hearing`: the loudest song around, or null; `hour`: the time of day.
+		update({ radio, hearing, car, hour }, dt) {
 			const muted = sound.isMuted()
 			const volume = sound.volume()
 			if (said && (said.t -= dt) <= 0) said = null
@@ -328,6 +330,8 @@ export function createPocket({ turnStation, toggleMute }) {
 			el.classList.toggle('car', car)
 			el.classList.toggle('muted', muted)
 			knob.style.setProperty('--turn', `${(muted ? 0 : volume) * TURN - TURN / 2}deg`)
+			const clock = `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor((hour % 1) * 60)).padStart(2, '0')}`
+			if (time.textContent !== clock) time.textContent = clock
 			knob.ariaLabel = car ? 'Lautstärke, tippen: Sender (R)' : 'Lautstärke'
 			current?.update?.(dt)
 			if (first) el.classList.remove('asleep')

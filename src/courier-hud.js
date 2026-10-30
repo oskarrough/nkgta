@@ -76,7 +76,12 @@ export function createCourierHud({ accept, pocket }) {
 					beep(n <= 3 ? 1320 : 990, 0.06)
 				}
 			}
-			pocket.tag('job', mode === 'deliver' ? mmss(left) : mode === 'pickup' ? mmss(job.limit) : '', mode === 'deliver' && left < 15)
+			pocket.tag(
+				'job',
+				mode === 'deliver' ? mmss(left) : mode === 'pickup' ? mmss(job.limit) : '',
+				mode === 'deliver' && left < 15,
+				mode === 'deliver' ? Math.max(0, left / job.limit) : 1,
+			)
 			if (slipFor > 0 && (slipFor -= dt) <= 0) {
 				slip.hidden = true
 				pocket.release('job')

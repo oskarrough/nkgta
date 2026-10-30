@@ -80,7 +80,6 @@ const pocket = createPocket({
 		if (turned) sound.tick()
 		return turned
 	},
-	toggleMute,
 })
 const pocketMap = createPocketMap({ world, pocket })
 const draw = createRenderer(canvas, world, shops)
@@ -441,7 +440,7 @@ function frame(now) {
 		gate: racing.target(),
 		job: courier.target(),
 	})
-	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car }, dt)
+	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car, hour: clock.hour }, dt)
 	courier.update(dt, { inside: visit.busy() || quiz.active(), busy: !!racing.target(), down: wasted.active() })
 	hud.update(
 		{
