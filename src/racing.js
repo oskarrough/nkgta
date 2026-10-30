@@ -38,7 +38,7 @@ function setName(name) {
 	}
 }
 
-export function createRacing({ world, player, scene, gradient, area, say, snapCamera }) {
+export function createRacing({ world, player, scene, gradient, area, say, snapCamera, pocket }) {
 	const races = loadRaces(storage, area)
 	const gates3d = createRaceGates(scene, gradient, world.heightAt)
 	let draft = null // gates being dropped, before the race is saved
@@ -51,6 +51,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 
 	const hud = createRaceHud({ placeGate, finish, restart, share: () => race && share(race) })
 	const list = createRaceList({
+		pocket,
 		world,
 		player,
 		races: () => races,
@@ -100,7 +101,10 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		begin(r)
 	}
 	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
-	const save = () => saveRaces(storage, area, races)
+	const save = () => {
+		saveRaces(storage, area, races)
+		list.render()
+	}
 
 	const vehicleOf = () =>
 		player.car ? (Object.keys(MODELS).find((k) => MODELS[k] === player.car.model) ?? 'car') : player.onBike ? 'bike' : 'foot'
@@ -234,8 +238,6 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		restart,
 		startDaily,
 		dailyBest: (date) => races.find((x) => x.id === dailyId(date))?.best ?? null,
-		openList: list.open,
-		listOpen: list.isOpen,
 		// Called going down, so a run doesn't carry on from under a car.
 		abort() {
 			if (phase === 'countdown' || phase === 'running') phase = 'done'

@@ -1,3 +1,4 @@
+import './race-list.css'
 import { MODELS } from './models.js'
 import { isDaily } from './daily.js'
 import { clock } from './race.js'
@@ -5,13 +6,14 @@ import { clock } from './race.js'
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
 const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
 
-export function createRaceList({ world, player, races, start, remove, create, share, name }) {
-	const el = document.createElement('div')
-	el.id = 'races'
-	el.className = 'panel'
-	el.hidden = true
-	document.body.append(el)
+// The race app on the pocket device: every race here, tap one for Teilen and
+// the cross, Los takes you to its start.
+export function createRaceList({ world, player, races, start, remove, create, share, name, pocket }) {
+	const page = document.createElement('div')
+	page.className = 'app-races scroll'
+	let picked = null // the race whose row is open
 	let armed = null // the race whose cross was tapped once
+	pocket.add({ id: 'race', icon: 'race-finish', label: 'Rennen', page, live: true, shown: render })
 
 	const where = (g) => world.streetAt(g.x, g.y) || '?'
 	function route(r, i) {
@@ -26,82 +28,61 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 	}
 
 	function render() {
-		const list = races()
-		const rows = list
+		const rows = races()
 			.map((r, i) => {
 				const best = r.best
-					? `<img class="icon" src="/icons/${vehicleIcon(r.best.vehicle)}.png" alt="${vehicleName(r.best.vehicle)}" title="${vehicleName(r.best.vehicle)}"><b>${clock(r.best.time)}</b>`
-					: '<b class="none">–</b>'
-				return `<li>
-					<span class="route"><strong>${route(r, i)}</strong><small>${r.gates.length} Tore · ${away(r.gates[0])}${r.rival ? ` · ${r.rival.name || 'Geist'} ${clock(r.rival.time)}` : ''}</small></span>
-					<span class="best">${best}</span>
-					<button type="button" class="go" data-i="${i}" title="Zum Start">Los</button>
-					<button type="button" class="share" data-i="${i}" title="Link teilen, mit deinem Geist" aria-label="Link teilen">Teilen</button>
-					<button type="button" class="del ${armed === r ? 'armed' : ''}" data-i="${i}" title="Löschen" aria-label="Löschen">${armed === r ? 'Weg?' : '✕'}</button>
+					? `<img src="/icons/${vehicleIcon(r.best.vehicle)}.png" alt="${vehicleName(r.best.vehicle)}" title="${vehicleName(r.best.vehicle)}">${clock(r.best.time)}`
+					: '–'
+				const more =
+					picked === r
+						? `<span class="more"><button type="button" class="share" data-i="${i}" title="Link teilen, mit deinem Geist">Teilen</button><button type="button" class="del ${armed === r ? 'armed' : ''}" data-i="${i}" title="Löschen" aria-label="Löschen">${armed === r ? 'Weg?' : '✕'}</button></span>`
+						: ''
+				return `<li class="${picked === r ? 'picked' : ''}">
+					<span class="route" data-i="${i}"><strong>${route(r, i)}</strong><small>${away(r.gates[0])} · ${best}${r.rival ? ` · ${r.rival.name || 'Geist'} ${clock(r.rival.time)}` : ''}</small></span>
+					<button type="button" class="go" data-i="${i}" title="Zum Start">Los</button>${more}
 				</li>`
 			})
 			.join('')
-		el.innerHTML = `
-			<h2><img class="icon" src="/icons/race-finish.png" alt="">Rennen</h2>
+		page.innerHTML = `
 			${rows ? `<ol>${rows}</ol>` : '<p class="empty">Noch keine Rennen hier.</p>'}
-			<button type="button" class="new"><img class="icon" src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>
-			<label class="name">Dein Name auf geteilten Geistern <input maxlength="24" value="${name.get()}" spellcheck="false" autocomplete="off"></label>
-			<p class="how"><span><kbd>G</kbd> Tor setzen, wo du stehst</span><span><kbd>F</kbd> letztes Tor ist das Ziel, los</span><span><kbd>Q</kbd> nochmal von vorn</span></p>`
+			<button type="button" class="new"><img src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>
+			<p class="how"><kbd>G</kbd> Tor <kbd>F</kbd> Ziel, los <kbd>Q</kbd> nochmal</p>
+			<label class="name">Dein Name für Geister <input maxlength="24" value="${name.get()}" spellcheck="false" autocomplete="off"></label>`
 	}
 
-	function open() {
-		armed = null
-		render()
-		el.hidden = false
-	}
-	const close = () => (el.hidden = true)
-
-	el.addEventListener('click', (e) => {
-		const button = e.target.closest('button')
-		if (!button) return
-		const r = races()[Number(button.dataset.i)]
-		if (button.classList.contains('new')) {
-			close()
-			create()
-		} else if (button.classList.contains('share') && r) {
-			share(r)
-		} else if (button.classList.contains('go') && r) {
-			close()
-			start(r)
-		} else if (button.classList.contains('del') && r) {
+	page.addEventListener('click', (e) => {
+		const target = e.target.closest('button, .route')
+		if (!target) return
+		const r = races()[Number(target.dataset.i)]
+		if (target.classList.contains('new')) create()
+		else if (target.classList.contains('route') && r) {
+			picked = picked === r ? null : r
+			armed = null
+			render()
+		} else if (target.classList.contains('share') && r) share(r)
+		else if (target.classList.contains('go') && r) start(r)
+		else if (target.classList.contains('del') && r) {
 			if (armed === r) {
 				remove(r)
-				armed = null
+				armed = picked = null
 			} else armed = r
 			render()
 		}
+		target.blur?.()
 	})
-	// Typing a name is not playing: keys stop at the box.
-	el.addEventListener('change', (e) => {
+	page.addEventListener('change', (e) => {
 		if (e.target.matches('.name input')) {
 			name.set(e.target.value)
 			e.target.value = name.get()
 		}
 	})
-	for (const type of ['keydown', 'keyup']) el.addEventListener(type, (e) => e.target.matches('input') && e.stopPropagation())
-	addEventListener('pointerdown', (e) => {
-		if (!el.hidden && !e.target.closest('#races, #menu')) close()
-	})
-	// Registered before the game's own key handling, so it can keep keys from it.
-	addEventListener(
-		'keydown',
-		(e) => {
-			if (el.hidden) return
-			if (e.target.matches?.('input')) return
-			e.stopImmediatePropagation()
-			if (e.key === 'Escape') close()
-			else if (e.key.toLowerCase() === 'g') {
-				close()
-				create()
-			}
-		},
-		{ capture: true },
-	)
+	// Typing a name is not playing: keys stop at the box.
+	for (const type of ['keydown', 'keyup'])
+		page.addEventListener(type, (e) => {
+			if (!e.target.matches('input')) return
+			e.stopPropagation()
+			if (e.key === 'Escape' || e.key === 'Enter') e.target.blur()
+		})
 
-	return { open, close, isOpen: () => !el.hidden }
+	return { render }
 }

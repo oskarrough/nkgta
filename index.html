@@ -216,57 +216,6 @@
 					sans-serif;
 				hyphens: manual;
 			}
-			/* Feedback: a text box, send and cancel. */
-			#feedback {
-				inset: 0;
-				margin: auto;
-				width: min(24rem, calc(100vw - 2rem));
-				color: #fff;
-			}
-			#feedback::backdrop {
-				background: rgba(0, 0, 0, 0.3);
-			}
-			#feedback form {
-				display: grid;
-				gap: 0.6rem;
-				margin: 0;
-			}
-			#feedback textarea {
-				box-sizing: border-box;
-				width: 100%;
-				padding: 0.5rem 0.6rem;
-				border: 2px solid rgba(255, 255, 255, 0.4);
-				border-radius: 0.8rem;
-				background: rgba(0, 0, 0, 0.35);
-				color: #fff;
-				font:
-					1rem / 1.3 system-ui,
-					sans-serif;
-				resize: none;
-			}
-			#feedback textarea:focus-visible {
-				outline: 2px solid #e8c21a;
-			}
-			#feedback form div {
-				display: flex;
-				justify-content: flex-end;
-				gap: 0.6rem;
-			}
-			#feedback button {
-				padding: 0.5rem 1rem;
-				border: 2px solid rgba(255, 255, 255, 0.4);
-				border-radius: 1.2rem;
-				background: rgba(0, 0, 0, 0.35);
-				color: #fff;
-				font:
-					700 0.9rem system-ui,
-					sans-serif;
-				cursor: pointer;
-			}
-			#feedback button[type='submit'] {
-				background: rgba(232, 194, 26, 0.45);
-				border-color: rgba(232, 194, 26, 0.9);
-			}
 			.panel kbd {
 				position: absolute;
 				right: 0.2rem;
@@ -535,11 +484,6 @@
 					</button>
 				</li>
 				<li>
-					<button type="button" data-action="race" aria-label="Rennen" title="Rennen (G)">
-						<img class="icon" src="/icons/race-gate.png" alt="" /><span>Rennen</span><kbd>G</kbd>
-					</button>
-				</li>
-				<li>
 					<button type="button" data-action="jobs" aria-label="Kurierjobs" title="Kurierjobs (C nimmt einen an)">
 						<img class="icon" src="/icons/job-bag.png" alt="" /><span>Kurier</span><kbd>C</kbd>
 					</button>
@@ -549,22 +493,8 @@
 						<img class="icon" src="/icons/menu-area.png" alt="" /><span>Gegend</span><kbd>M</kbd>
 					</button>
 				</li>
-				<li>
-					<button type="button" data-action="feedback" aria-label="Feedback" title="Feedback (B)">
-						<img class="icon" src="/icons/menu-feedback.png" alt="" /><span>Feedback</span><kbd>B</kbd>
-					</button>
-				</li>
 			</menu>
 		</div>
-		<dialog id="feedback" class="panel">
-			<form method="dialog">
-				<textarea maxlength="2000" rows="5" placeholder="Was fällt dir auf? Was fehlt, was nervt?" aria-label="Feedback"></textarea>
-				<div>
-					<button type="button" data-cancel>Abbrechen</button>
-					<button type="submit">Senden</button>
-				</div>
-			</form>
-		</dialog>
 		<div id="debug" class="panel" hidden>
 			<menu aria-label="Debug">
 				<li>

@@ -18,6 +18,26 @@ function radarPoint(point, player, rotation) {
 	return { x: (x * Math.cos(rotation) - y * Math.sin(rotation)) * k, y: (x * Math.sin(rotation) + y * Math.cos(rotation)) * k }
 }
 
+// The whole map painted small, once, for the radar and the pocket's map.
+const images = new WeakMap()
+export function mapImage(world) {
+	if (images.has(world)) return images.get(world)
+	const painted = { image: null, px: 1 }
+	images.set(world, painted)
+	const worker = new Worker(new URL('./minimap-worker.js', import.meta.url), { type: 'module' })
+	worker.onmessage = ({ data }) => {
+		painted.image = data.bitmap
+		painted.px = data.px
+		worker.terminate()
+	}
+	worker.onerror = (error) => {
+		console.error('Could not paint radar', error.message)
+		worker.terminate()
+	}
+	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: world.buildings })
+	return painted
+}
+
 export function createMinimap(world) {
 	const canvas = document.createElement('canvas')
 	canvas.id = 'minimap'
@@ -28,23 +48,12 @@ export function createMinimap(world) {
 	document.body.append(canvas)
 	const ctx = canvas.getContext('2d')
 	ctx.imageSmoothingEnabled = false
-	const worker = new Worker(new URL('./minimap-worker.js', import.meta.url), { type: 'module' })
-	let image = null
-	let px = 1
-	worker.onmessage = ({ data }) => {
-		image = data.bitmap
-		px = data.px
-		worker.terminate()
-	}
-	worker.onerror = (error) => {
-		console.error('Could not paint radar', error.message)
-		worker.terminate()
-	}
-	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: world.buildings })
+	const painted = mapImage(world)
 	let next = 0
 	// `gate` is the race's next gate, { x, y, label }, or null; `job` the
 	// courier's kitchen or door, { x, y, job, hint }, or null.
 	return function update(player, chase, inside, gate, job) {
+		const { image, px } = painted
 		const hidden = !!inside || !image
 		if (canvas.hidden !== hidden) canvas.hidden = hidden
 		const now = performance.now()

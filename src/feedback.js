@@ -27,34 +27,42 @@ export function feedbackText(text, c) {
 	return `${text.trim().slice(0, MAX_TEXT)}\n\n${lines.join('\n')}`
 }
 
-export function createFeedback({ context, thank }) {
-	const box = document.getElementById('feedback')
-	const field = box.querySelector('textarea')
-	// Typing here is not playing: keys and taps stop at the box.
-	for (const type of ['keydown', 'keyup', 'pointerdown', 'pointermove', 'pointerup', 'wheel']) {
-		box.addEventListener(type, (e) => e.stopPropagation())
-	}
-	const close = () => box.open && box.close()
-	box.querySelector('[data-cancel]').addEventListener('click', close)
-	box.addEventListener('submit', (e) => {
+// The post app on the pocket device: type, Senden. Ctrl+Enter sends too.
+export function createFeedback({ context, thank, pocket }) {
+	const page = document.createElement('form')
+	page.className = 'app-post'
+	page.innerHTML = `
+		<textarea maxlength="${MAX_TEXT}" placeholder="Was fällt dir auf? Was fehlt, was nervt?" aria-label="Feedback"></textarea>
+		<div><small></small><button type="submit">Senden</button></div>`
+	const field = page.querySelector('textarea')
+	const note = page.querySelector('small')
+	pocket.add({ id: 'post', icon: 'menu-feedback', label: 'Feedback (B)', page, live: true })
+	// Typing here is not playing: keys stop at the box.
+	for (const type of ['keydown', 'keyup']) page.addEventListener(type, (e) => e.stopPropagation())
+	page.addEventListener('submit', (e) => {
 		e.preventDefault()
 		const text = field.value.trim()
-		if (!text) return
+		if (!text) return field.focus()
 		const body = feedbackText(text, context())
 		field.value = ''
-		close()
+		field.blur()
+		note.textContent = 'gesendet…'
 		fetch(INKAST, { method: 'POST', body })
-			.then((res) => res.ok && thank())
-			.catch(() => {})
+			.then((res) => {
+				note.textContent = res.ok ? 'Danke!' : 'ging nicht'
+				if (res.ok) thank()
+			})
+			.catch(() => (note.textContent = 'ging nicht'))
 	})
+	field.addEventListener('input', () => (note.textContent = ''))
 	field.addEventListener('keydown', (e) => {
-		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.requestSubmit()
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) page.requestSubmit()
+		if (e.key === 'Escape') field.blur()
 	})
 	return {
-		isOpen: () => box.open,
+		isOpen: () => document.activeElement === field,
 		open() {
-			if (box.open) return
-			box.showModal()
+			pocket.show('post')
 			field.focus()
 		},
 	}

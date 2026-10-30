@@ -24,6 +24,7 @@ import { createActors } from './actors.js'
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createPocket } from './pocket.js'
+import { createPocketMap } from './pocket-map.js'
 import { createRacing } from './racing.js'
 import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
@@ -100,7 +101,10 @@ const police = createPolice({
 	},
 	onBust: () => racing.abort(),
 })
+// Courier jobs keep coming until they're turned off in the menu, and stay off.
+const courier = createCourier({ world, shops, player, scene: city3d.scene, pfand, pocket, on: remembered('nk-jobs') !== 'false' })
 const racing = createRacing({
+	pocket,
 	world,
 	player,
 	scene: city3d.scene,
@@ -109,8 +113,7 @@ const racing = createRacing({
 	say: hud.say,
 	snapCamera: () => camera.snap(player),
 })
-// Courier jobs keep coming until they're turned off in the menu, and stay off.
-const courier = createCourier({ world, shops, player, scene: city3d.scene, pfand, on: remembered('nk-jobs') !== 'false' })
+createPocketMap({ world, player, pocket, targets: () => ({ gate: racing.target(), job: courier.target() }) })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
@@ -161,13 +164,14 @@ const actions = {
 		showWalls = city3d.showsWalls()
 	},
 	nextStation: () => music.nextStation(!!player.car),
-	menuOpen: () => !menu.hidden || racing.listOpen() || dailyPanel.isOpen(),
+	menuOpen: () => !menu.hidden || dailyPanel.isOpen(),
 	toggleMenu: () => showMenu(menu.hidden),
 	toggleDebug: () => showDebug(debug.hidden),
 	placeGate: () => racing.placeGate(),
 	finishRace: () => racing.finish(),
 	restartRace: () => racing.restart(),
 	acceptJob: () => courier.accept(),
+	nextApp: () => pocket.next(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 	openFeedback() {
 		showMenu(false)
@@ -182,6 +186,7 @@ const dailyPanel = createDailyPanel({
 	startRace: (date) => racing.startDaily(date),
 })
 const feedback = createFeedback({
+	pocket,
 	thank: () => hud.say('Danke fürs Feedback!'),
 	context: () => ({
 		url: location.href,
@@ -251,13 +256,6 @@ const menuItems = {
 	camera: [actions.toggleCamera, () => camera.selected()],
 	music: [actions.toggleMusicDebug, () => showMusic],
 	sound: [toggleMute, () => !sound.isMuted()],
-	race: [
-		() => {
-			showMenu(false)
-			racing.openList()
-		},
-		() => null,
-	],
 	jobs: [
 		() => {
 			courier.toggle()
@@ -270,7 +268,6 @@ const menuItems = {
 		() => courier.on(),
 	],
 	area: [actions.pickArea, () => null],
-	feedback: [actions.openFeedback, () => null],
 }
 function showMenuState() {
 	for (const button of document.querySelectorAll('.panel button[data-action]')) {
@@ -328,7 +325,7 @@ const GAME_KEYS = new Set([
 addEventListener(
 	'keydown',
 	(e) => {
-		if (feedback.isOpen() || quiz.active()) return
+		if (feedback.isOpen() || quiz.active() || e.target.matches?.('input, textarea')) return
 		if (e.key === 'Escape') {
 			showMenu(menu.hidden)
 		} else if (!menu.hidden && GAME_KEYS.has(e.key.length === 1 ? e.key.toLowerCase() : e.key)) e.stopPropagation()

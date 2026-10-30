@@ -1,0 +1,119 @@
+/* The race app, in the pocket device's LCD ink. */
+#pocket .app-races {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: none;
+	font-size: 0.68rem;
+	font-weight: 700;
+	touch-action: pan-y;
+	user-select: text;
+}
+#pocket .app-races ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+#pocket .app-races li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.1rem 0.3rem;
+	padding: 0.15rem 0;
+	border-bottom: 1px dashed var(--lcd-dim);
+}
+#pocket .app-races .route {
+	flex: 1;
+	min-width: 0;
+	cursor: pointer;
+}
+#pocket .app-races .route strong,
+#pocket .app-races .route small {
+	display: block;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+#pocket .app-races .route small {
+	font-size: 0.6rem;
+	font-family: ui-monospace, monospace;
+}
+#pocket .app-races .route img {
+	width: 12px;
+	height: 12px;
+	margin-right: 0.15rem;
+	vertical-align: -2px;
+	image-rendering: pixelated;
+}
+#pocket .app-races button {
+	padding: 0.05rem 0.35rem;
+	border: 1px solid var(--lcd-ink);
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--lcd-ink);
+	font:
+		800 0.62rem / 1.3 system-ui,
+		sans-serif;
+}
+#pocket .app-races button.go,
+#pocket .app-races button.armed {
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+}
+#pocket .app-races .more {
+	display: flex;
+	gap: 0.3rem;
+	width: 100%;
+	justify-content: flex-end;
+}
+#pocket .app-races button.new {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	width: 100%;
+	margin-top: 0.25rem;
+}
+#pocket .app-races button.new img {
+	width: 16px;
+	height: 16px;
+	image-rendering: pixelated;
+}
+#pocket .app-races kbd {
+	padding: 0 0.25em;
+	border-radius: 0.2em;
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+	font:
+		800 0.55rem / 1.3 system-ui,
+		sans-serif;
+}
+#pocket .app-races button.new kbd {
+	margin-left: auto;
+}
+#pocket .app-races .empty,
+#pocket .app-races .how {
+	margin: 0.2rem 0;
+}
+#pocket .app-races .how {
+	font-size: 0.6rem;
+}
+body.touch #pocket .app-races kbd,
+body.touch #pocket .app-races .how {
+	display: none;
+}
+#pocket .app-races .name {
+	display: block;
+	margin-top: 0.2rem;
+	font-size: 0.6rem;
+}
+#pocket .app-races .name input {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0.1rem 0.3rem;
+	border: 1px solid var(--lcd-ink);
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--lcd-ink);
+	font:
+		800 0.7rem system-ui,
+		sans-serif;
+}

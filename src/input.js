@@ -47,6 +47,7 @@ export function createInput(actions) {
 		if (key === 'f') actions.finishRace()
 		if (key === 'q' || key === 'Backspace') actions.restartRace()
 		if (key === 'c') actions.acceptJob()
+		if (key === 'h') actions.nextApp()
 		if (e.code === 'Backquote' || key === '`') actions.toggleDebug()
 	})
 	addEventListener('blur', () => keys.clear())

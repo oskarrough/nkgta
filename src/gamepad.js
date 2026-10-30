@@ -99,7 +99,7 @@ export function createGamepad(actions, blocked = () => false) {
 			return null
 		}
 		if (fired(A)) actions.use()
-		if (fired(LEFT)) actions.shiftChoice(-1)
+		if (fired(LEFT) && !actions.shiftChoice(-1)) actions.nextApp?.()
 		if (fired(RIGHT)) {
 			if (!actions.acceptJob?.()) actions.shiftChoice(1)
 		}

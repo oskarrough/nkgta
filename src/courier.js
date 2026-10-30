@@ -11,11 +11,11 @@ const AT = { reach: 1.1, car: 2.4, slow: 1.4 } // tiles and tiles a second: stop
 const KNOCK = { drop: 1.8, rate: 24, calm: 1 }
 const HINT = { off: 7, r: 13 } // tiles: the radar's ring round the door, off centre by up to `off`
 
-export function createCourier({ world, shops, player, scene, pfand, on = true }) {
+export function createCourier({ world, shops, player, scene, pfand, pocket, on = true }) {
 	const named = new Set(world.streets)
 	const doors = addressesOf(world).filter((d) => named.has(d.street))
 	const marks = createCourierMarks(scene, world.heightAt)
-	const hud = createCourierHud({ accept })
+	const hud = createCourierHud({ accept, pocket })
 	let mode = on ? 'idle' : 'off' // 'offer', 'pickup', 'deliver'
 	let wait = FIRST
 	let job = null
