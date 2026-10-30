@@ -137,6 +137,13 @@ export function createPocket({ turnStation, toggleMute }) {
 		sound.start()
 		sound.setVolume(value)
 	}
+	// A slide switch on the casing: it shows its own state, and says nothing else.
+	const switches = new Map()
+	function flip(button) {
+		const slide = switches.get(button)
+		slide.set(!slide.on)
+		slide.change(slide.on)
+	}
 	function nextStation() {
 		said = turnStation(1) ? null : { text: 'Radio gibt’s im Auto', t: SAY }
 		knob.blur()
@@ -237,6 +244,7 @@ export function createPocket({ turnStation, toggleMute }) {
 		const appKey = target.closest('.keys [data-app]')
 		if (appKey) press(appKey.dataset.app)
 		else if (target.closest('.knob')) nextStation()
+		else if (target.closest('.slide')) flip(target.closest('.slide'))
 		else if (screen.contains(target)) current.tap?.()
 	}
 	// Taps are handled above; keyboard presses still click.
@@ -245,6 +253,7 @@ export function createPocket({ turnStation, toggleMute }) {
 		const button = e.target.closest('button')
 		if (button === knob) nextStation()
 		else if (button?.dataset.app) press(button.dataset.app)
+		else if (button?.classList.contains('slide')) flip(button)
 		else return
 		button.blur()
 	})
@@ -266,6 +275,32 @@ export function createPocket({ turnStation, toggleMute }) {
 			show(id)
 		},
 		current: () => current?.id,
+		// A slide switch printed with `label`; `change(on)` runs when it's flipped by hand.
+		slide({ label, on, change }) {
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.className = 'slide'
+			button.role = 'switch'
+			button.ariaLabel = label
+			button.innerHTML = `<i></i><span>${label}</span>`
+			const slide = {
+				on,
+				change,
+				set(value) {
+					slide.on = value
+					button.ariaChecked = String(value)
+					button.classList.toggle('on', value)
+				},
+			}
+			slide.set(on)
+			switches.set(button, slide)
+			el.append(button)
+			return slide
+		},
+		// A note from the device itself on the top line.
+		say(text, t = SAY) {
+			said = { text, t }
+		},
 		// App `id` takes the screen and lights it; `release` hands it back.
 		alert(id) {
 			if (alerting !== id && current?.id !== id) back = current
@@ -293,7 +328,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			const volume = sound.volume()
 			if (said && (said.t -= dt) <= 0) said = null
 			const now = radio ? { name: radio.name ?? 'Radio aus', title: radio.title } : hearing
-			setTicker(said?.text ?? (muted ? 'Ton aus' : now ? [now.name, now.title].filter(Boolean).join(' · ') : 'Straße'))
+			setTicker(said?.text ?? (muted ? '' : now ? [now.name, now.title].filter(Boolean).join(' · ') : 'Straße'))
 			volumeBars.style.setProperty('--level', String(muted ? 0 : Math.round(volume * 10)))
 			el.classList.toggle('lit', !!alerting && current?.id === alerting)
 			el.classList.toggle('car', car)

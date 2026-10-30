@@ -106,8 +106,24 @@ const police = createPolice({
 	},
 	onBust: () => racing.abort(),
 })
-// Courier jobs keep coming until they're turned off in the menu, and stay off.
-const courier = createCourier({ world, shops, player, scene: city3d.scene, pfand, pocket, on: remembered('nk-jobs') !== 'false' })
+// Courier jobs only come while the Kurier switch on the device is on; it starts off and stays where you left it.
+const courier = createCourier({
+	world,
+	shops,
+	player,
+	scene: city3d.scene,
+	pfand,
+	pocket,
+	online: remembered('nk-kurier') === 'true',
+	hinted: remembered('nk-kurier-hint') === 'true',
+	remember(key, value) {
+		try {
+			localStorage.setItem(key === 'online' ? 'nk-kurier' : 'nk-kurier-hint', String(value))
+		} catch {
+			// Fine, it just won't be remembered.
+		}
+	},
+})
 const racing = createRacing({
 	pocket,
 	world,
@@ -259,17 +275,6 @@ const menuItems = {
 	camera: [actions.toggleCamera, () => camera.selected()],
 	music: [actions.toggleMusicDebug, () => showMusic],
 	sound: [toggleMute, () => !sound.isMuted()],
-	jobs: [
-		() => {
-			courier.toggle()
-			try {
-				localStorage.setItem('nk-jobs', String(courier.on()))
-			} catch {
-				// Fine, it just won't be remembered.
-			}
-		},
-		() => courier.on(),
-	],
 	area: [actions.pickArea, () => null],
 }
 function showMenuState() {

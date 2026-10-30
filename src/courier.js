@@ -4,19 +4,24 @@ import { createCourierHud } from './courier-hud.js'
 import { createCourierMarks } from './courier-marks.js'
 
 const OFFER = 14 // seconds an offer stands
-const WAIT = [6, 14] // seconds between offers, least and most
-const FIRST = 8 // seconds before the first one
+const WAIT = [45, 90] // seconds between offers, least and most
+const FIRST = 8 // seconds from going online to the first one
+const GIVE_UP = 2 // offers ignored in a row before the app takes you offline
 const AT = { reach: 1.1, car: 2.4, slow: 1.4 } // tiles and tiles a second: stopped at a door
 
 const KNOCK = { drop: 1.8, rate: 24, calm: 1 }
 const HINT = { off: 7, r: 13 } // tiles: the radar's ring round the door, off centre by up to `off`
 
-export function createCourier({ world, shops, player, scene, pfand, pocket, on = true }) {
+export function createCourier({ world, shops, player, scene, pfand, pocket, online = false, hinted = true, remember = () => {} }) {
 	const named = new Set(world.streets)
 	const doors = addressesOf(world).filter((d) => named.has(d.street))
 	const marks = createCourierMarks(scene, world.heightAt)
+	let mode = 'idle' // 'offer', 'pickup', 'deliver'
+	let ignored = 0
+	let hintIn = hinted ? Infinity : 20 // seconds of play before the switch is mentioned, once
+	// Offline, no offers. A job already on the go is finished first.
+	const kurier = pocket.slide({ label: 'Kurier', on: online, change: (on) => setOnline(on) })
 	const hud = createCourierHud({ accept, pocket })
-	let mode = on ? 'idle' : 'off' // 'offer', 'pickup', 'deliver'
 	let wait = FIRST
 	let job = null
 	let fuse = 0
@@ -26,8 +31,19 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, on =
 	let lastSpeed = 0
 	let street = [] // doors along the drop-off's street
 
+	function setOnline(on) {
+		kurier.set(on)
+		remember('online', on)
+		hintIn = Infinity
+		if (on) {
+			ignored = 0
+			wait = Math.min(wait, FIRST)
+		} else if (mode === 'offer') next()
+	}
+
 	function accept() {
 		if (mode !== 'offer') return false
+		ignored = 0
 		mode = 'pickup'
 		hud.took()
 		return true
@@ -45,15 +61,6 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, on =
 
 	return {
 		accept,
-		on: () => mode !== 'off',
-		toggle() {
-			if (mode === 'off') next()
-			else {
-				job = null
-				street = []
-				mode = 'off'
-			}
-		},
 
 		lose() {
 			if (mode !== 'pickup' && mode !== 'deliver') return
@@ -62,15 +69,25 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, on =
 		},
 
 		update(dt, { inside = false, busy = false, down = false } = {}) {
-			if (mode === 'idle' && !inside && !busy && !down && (wait -= dt) <= 0) {
+			if ((hintIn -= dt) <= 0) {
+				hintIn = Infinity
+				remember('hinted', true)
+				pocket.say('Schalter „Kurier“ an: Jobs', 5)
+			}
+			if (mode === 'idle' && kurier.on && !inside && !busy && !down && (wait -= dt) <= 0) {
 				job = offerJob(shops, doors, player.x, player.y)
 				if (job) {
 					mode = 'offer'
 					fuse = OFFER
 					hud.ping()
 				} else wait = WAIT[1]
-			} else if (mode === 'offer' && (fuse -= dt) <= 0) next()
-			else if (mode === 'pickup' && !inside && stoppedAt(job.from)) {
+			} else if (mode === 'offer' && (fuse -= dt) <= 0) {
+				next()
+				if (++ignored >= GIVE_UP) {
+					setOnline(false)
+					pocket.say('Kurier: offline, du warst nicht da', 4)
+				}
+			} else if (mode === 'pickup' && !inside && stoppedAt(job.from)) {
 				mode = 'deliver'
 				t = 0
 				bumps = 0

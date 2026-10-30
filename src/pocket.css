@@ -143,9 +143,6 @@ body.touch #pocket {
 		translate: var(--over, 0);
 	}
 }
-#pocket.muted .ticker {
-	text-decoration: line-through;
-}
 #pocket .tags:empty {
 	display: none;
 }
@@ -325,6 +322,49 @@ body.touch #pocket {
 #pocket.muted .knob i {
 	background: #77705f;
 }
+/* A slide switch in the casing, its name printed beside it. */
+#pocket .slide {
+	position: absolute;
+	bottom: 0.4rem;
+	left: 3.3rem;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	background: none;
+	color: #5a5244;
+	font:
+		900 0.5rem / 1 system-ui,
+		sans-serif;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+#pocket .slide i {
+	position: relative;
+	width: 1.4rem;
+	height: 0.6rem;
+	border: 2px solid #1a1e1b;
+	border-radius: 0.3rem;
+	background: #2b2a26;
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+#pocket .slide i::after {
+	content: '';
+	position: absolute;
+	top: -2px;
+	left: -2px;
+	width: 0.7rem;
+	height: 0.6rem;
+	border: 2px solid #1a1e1b;
+	border-radius: 0.25rem;
+	background: linear-gradient(#8d8878, #5a5850);
+	transition: translate 0.08s;
+}
+#pocket .slide.on i {
+	background: #3f8f3a;
+}
+#pocket .slide.on i::after {
+	translate: 0.7rem 0;
+}
 #pocket .sticker {
 	position: absolute;
 	bottom: 0.45rem;
@@ -368,6 +408,13 @@ body.touch #pocket {
 #pocket .app-post textarea:focus {
 	outline: none;
 	background: rgba(255, 255, 255, 0.2);
+}
+#pocket .app-post .public {
+	margin: 0;
+	font:
+		700 0.5rem / 1.15 system-ui,
+		sans-serif;
+	opacity: 0.8;
 }
 #pocket .app-post div {
 	display: flex;

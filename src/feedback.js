@@ -33,6 +33,7 @@ export function createFeedback({ context, thank, pocket }) {
 	page.className = 'app-post'
 	page.innerHTML = `
 		<textarea maxlength="${MAX_TEXT}" placeholder="Was fällt dir auf? Was fehlt, was nervt?" aria-label="Feedback"></textarea>
+		<p class="public">Ist ne Postkarte: jeder kann mitlesen. Nix Privates drauf. Landet öffentlich auf GitHub.</p>
 		<div><small></small><button type="submit">Senden</button></div>`
 	const field = page.querySelector('textarea')
 	const note = page.querySelector('small')
