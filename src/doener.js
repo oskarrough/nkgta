@@ -50,7 +50,7 @@ export function createDoener(bag, say) {
 				count++
 				carried.textContent = count === 1 ? '🥙 Döner' : `🥙 Döner ×${count}`
 				sound.till()
-				say(`Mit ${salad.toLowerCase()}, ${options[i].toLowerCase()}. Bitte schön! −${euro(PRICE)}`)
+				say(`${salad}, mit ${options[i]}. Bitte schön! −${euro(PRICE)}`)
 			}
 		}
 		draw()
