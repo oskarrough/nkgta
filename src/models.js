@@ -232,7 +232,7 @@ export const MODELS = {
 	},
 	police: {
 		name: 'Polizei',
-		noun: 'Wanne',
+		noun: 'Dienstwagen',
 		pace: 1.6,
 		driver: { a: 1.4, b: 1.6, T: 0.7, s0: 0.5 },
 		length: 1.8,
