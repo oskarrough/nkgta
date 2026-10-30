@@ -2,18 +2,36 @@ import './race-list.css'
 import { MODELS } from './models.js'
 import { isDaily } from './daily.js'
 import { clock } from './race.js'
+import { nickname } from './race-share.js'
 
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
 const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
 
-// The race app on the pocket device: every race here, tap one for Teilen and
-// the cross, Los takes you to its start.
+// Pixel symbols on a 7×7 grid, drawn in the screen's ink.
+const PIXELS = {
+	play: ['X......', 'XXX....', 'XXXXX..', 'XXXXXXX', 'XXXXX..', 'XXX....', 'X......'],
+	bin: ['..XXX..', 'XXXXXXX', '.X...X.', '.X.X.X.', '.X.X.X.', '.X.X.X.', '.XXXXX.'],
+	share: ['...X...', '..XXX..', '.X.X.X.', '...X...', 'X.....X', 'X.....X', 'XXXXXXX'],
+}
+const pixels = (name) =>
+	`<svg viewBox="0 0 7 7" shape-rendering="crispEdges" aria-hidden="true">${PIXELS[name]
+		.flatMap((row, y) => [...row].map((c, x) => (c === 'X' ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : '')))
+		.join('')}</svg>`
+
+// The race app on the pocket device: every race here, ▶ takes you to its
+// start, tap one for sharing it (under your ghost name) and the bin.
 export function createRaceList({ world, player, races, start, remove, create, share, name, pocket }) {
 	const page = document.createElement('div')
 	page.className = 'app-races scroll'
 	let picked = null // the race whose row is open
 	let armed = null // the race whose cross was tapped once
-	pocket.add({ id: 'race', key: { icon: 'race-finish', label: 'Rennen' }, page, live: true, shown: render })
+	pocket.add({
+		id: 'race',
+		key: { icon: 'race-finish', label: 'Rennen' },
+		page,
+		live: true,
+		shown: render,
+	})
 
 	const where = (g) => world.streetAt(g.x, g.y) || '?'
 	function route(r, i) {
@@ -35,19 +53,21 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 					: '–'
 				const more =
 					picked === r
-						? `<span class="more"><button type="button" class="share" data-i="${i}" title="Link teilen, mit deinem Geist">Teilen</button><button type="button" class="del ${armed === r ? 'armed' : ''}" data-i="${i}" title="Löschen" aria-label="Löschen">${armed === r ? 'Weg?' : '✕'}</button></span>`
+						? `<span class="more"><button type="button" class="share" data-i="${i}" title="Link teilen, mit deinem Geist" aria-label="Teilen">${pixels('share')}</button><button type="button" class="alias" title="Der Name auf deinem Geist, antippen für einen neuen">als ${name.get()}</button></span>`
+						: ''
+				const del =
+					picked === r
+						? `<button type="button" class="del ${armed === r ? 'armed' : ''}" data-i="${i}" title="Löschen" aria-label="${armed === r ? 'Wirklich löschen' : 'Löschen'}">${pixels('bin')}</button>`
 						: ''
 				return `<li class="${picked === r ? 'picked' : ''}">
 					<span class="route" data-i="${i}"><strong>${route(r, i)}</strong><small>${away(r.gates[0])} · ${best}${r.rival ? ` · ${r.rival.name || 'Geist'} ${clock(r.rival.time)}` : ''}</small></span>
-					<button type="button" class="go" data-i="${i}" title="Zum Start">Los</button>${more}
+					${del}<button type="button" class="go" data-i="${i}" title="Zum Start" aria-label="Zum Start">${pixels('play')}</button>${more}
 				</li>`
 			})
 			.join('')
 		page.innerHTML = `
 			${rows ? `<ol>${rows}</ol>` : '<p class="empty">Noch keine Rennen hier.</p>'}
-			<button type="button" class="new"><img src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>
-			<p class="how"><kbd>G</kbd> Tor <kbd>F</kbd> Ziel, los <kbd>Q</kbd> nochmal</p>
-			<label class="name">Dein Name für Geister <input maxlength="24" value="${name.get()}" spellcheck="false" autocomplete="off"></label>`
+			<button type="button" class="new"><img src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>`
 	}
 
 	page.addEventListener('click', (e) => {
@@ -60,7 +80,10 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 			armed = null
 			render()
 		} else if (target.classList.contains('share') && r) share(r)
-		else if (target.classList.contains('go') && r) start(r)
+		else if (target.classList.contains('alias')) {
+			name.set(nickname())
+			render()
+		} else if (target.classList.contains('go') && r) start(r)
 		else if (target.classList.contains('del') && r) {
 			if (armed === r) {
 				remove(r)
@@ -70,19 +93,5 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 		}
 		target.blur?.()
 	})
-	page.addEventListener('change', (e) => {
-		if (e.target.matches('.name input')) {
-			name.set(e.target.value)
-			e.target.value = name.get()
-		}
-	})
-	// Typing a name is not playing: keys stop at the box.
-	for (const type of ['keydown', 'keyup'])
-		page.addEventListener(type, (e) => {
-			if (!e.target.matches('input')) return
-			e.stopPropagation()
-			if (e.key === 'Escape' || e.key === 'Enter') e.target.blur()
-		})
-
 	return { render }
 }
