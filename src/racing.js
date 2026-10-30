@@ -104,21 +104,23 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		phase = 'idle'
 		draft ??= []
 		draft.push(makeGate(player.x, player.y, player.car?.angle ?? player.dir, solid))
-		say(`Tor ${letter(draft.length - 1)}`)
+		say(
+			draft.length === 1
+				? 'Start gesetzt. Weiterfahren, G: nächstes Tor.'
+				: `Tor ${letter(draft.length - 1)} gesetzt. F: letztes Tor als Ziel.`,
+		)
 		hud.placed()
 	}
 
 	function finish() {
 		if (draft) {
 			if (draft.length < 2) return void say('Erst weiterfahren und mit G ein zweites Tor setzen.')
-			if (draft.length >= 2) {
-				race = { id: Date.now().toString(36), gates: draft, times: [], best: null }
-				races.push(race)
-				save()
-				say(`Rennen gespeichert: ${draft.length} Tore`)
-				hud.saved()
-				begin(race)
-			}
+			race = { id: Date.now().toString(36), gates: draft, times: [], best: null }
+			races.push(race)
+			save()
+			say(`Rennen gespeichert: ${draft.length} Tore`)
+			hud.saved()
+			begin(race)
 			draft = null
 		} else if (phase === 'countdown' || phase === 'running' || phase === 'done') {
 			phase = 'idle'

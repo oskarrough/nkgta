@@ -102,7 +102,7 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 				nextStep.innerHTML =
 					s === 'gate'
 						? '<img class="icon" src="/icons/race-gate.png" alt=""><span>Nächstes Tor</span><kbd>G</kbd>'
-						: '<img class="icon" src="/icons/race-finish.png" alt=""><span>Ziel &amp; los</span><kbd>F</kbd>'
+						: '<img class="icon" src="/icons/race-finish.png" alt=""><span>Letztes Tor = Ziel</span><kbd>F</kbd>'
 			})
 			const t = mode === 'draft' ? '' : clock(view.t)
 			set('time', t, (v) => (time.textContent = v))

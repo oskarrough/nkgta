@@ -13,6 +13,7 @@ See README.md for what the game is and where the code lives.
 Oskar values speed over certainty. Verify once and stop: one check that the change works, one before/after if you're measuring. Never re-run a check to firm up a result, re-check views you didn't change, or chase noise. Rough numbers are fine. If you catch yourself verifying a second time, stop and report what you have.
 
 - In restricted worktrees, use `BUN_TMPDIR=/tmp bun install` if Bun cannot write its default temporary directory.
+- If that still reports EROFS, also set `BUN_INSTALL_CACHE_DIR` to a writable directory under `/tmp`.
 - `bun run check` lints and checks formatting; `bun run format` fixes formatting. The deploy runs it first, so a file that fails it (even in docs/) stops the site updating.
 - Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
 - When moving the start, leave pavement 1.2 tiles east of the player too: that is where `createPlayer` puts the bike.
