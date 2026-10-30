@@ -148,3 +148,12 @@ try {
 } finally {
 	await cleanup()
 }
+
+// Release this browser before the phone pass so the measurements don't compete.
+const phone = Bun.spawn(['bun', new URL('./memory.js', import.meta.url).pathname, ...(base ? ['--url', base] : [])], {
+	stdout: 'inherit',
+	stderr: 'inherit',
+})
+process.removeAllListeners('SIGINT')
+process.on('SIGINT', () => phone.kill('SIGINT'))
+if (await phone.exited) process.exit(1)

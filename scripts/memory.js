@@ -11,7 +11,9 @@ const flag = (name, fallback) => {
 	return i < 0 ? fallback : args.splice(i, 2)[1]
 }
 const root = flag('root', process.cwd())
-const output = flag('out', '/tmp/nkgta-memory')
+const output = flag('out', join(tmpdir(), `nkgta-memory-${process.pid}`))
+const MiB = 2 ** 20
+const BUDGET = { cpu: 450 * MiB, gpu: 256 * MiB, total: 650 * MiB }
 const base = flag('url')
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
@@ -85,7 +87,15 @@ try {
 	}
 	const send = (method, params, sessionId) =>
 		new Promise((done) => {
-			waiting.set(++id, done)
+			const request = ++id
+			const timeout = setTimeout(() => {
+				waiting.delete(request)
+				done({ error: { message: `${method} timed out; the tab may have crashed` } })
+			}, 20000)
+			waiting.set(request, (message) => {
+				clearTimeout(timeout)
+				done(message)
+			})
 			socket.send(JSON.stringify({ id, method, params, sessionId }))
 		}).then((msg) => {
 			if (msg.error) throw new Error(`${method}: ${msg.error.message}`)
@@ -152,8 +162,7 @@ try {
 		await sleep(500)
 	}
 	if (!loaded) throw new Error('Never loaded')
-	console.log('loaded', JSON.stringify(loaded))
-	await send('Page.captureScreenshot', { format: 'png' }).then((r) => writeFileSync(`${output}.png`, Buffer.from(r.data, 'base64')))
+	console.log('phone    390×844 @ DPR 3, sampling a 60-second ride…')
 	// A fixed 60-second bicycle-speed route along Karl-Marx-Strasse. The
 	// position is driven so random traffic cannot change texture coverage.
 	await run(`(() => {
@@ -172,6 +181,8 @@ try {
 	}
 	await run('clearInterval(memoryRide)')
 	const end = samples.at(-1)
+	const cpuBytes = (s) =>
+		s.heap.usedSize + (s.heap.backingStorageSize ?? 0) + s.workers.reduce((n, w) => n + w.usedSize + (w.backingStorageSize ?? 0), 0)
 	const summary = {
 		gpu,
 		loaded,
@@ -179,16 +190,24 @@ try {
 		peakMain: Math.max(...samples.map((s) => s.heap.usedSize)),
 		peakMainBacking: Math.max(...samples.map((s) => s.heap.backingStorageSize ?? 0)),
 		peakWorkers: Math.max(...samples.map((s) => s.workers.reduce((n, w) => n + w.usedSize + (w.backingStorageSize ?? 0), 0))),
-		peakCombined: Math.max(
-			...samples.map(
-				(s) =>
-					s.heap.usedSize + (s.heap.backingStorageSize ?? 0) + s.workers.reduce((n, w) => n + w.usedSize + (w.backingStorageSize ?? 0), 0),
-			),
-		),
+		peakCombined: Math.max(...samples.map(cpuBytes)),
+		peakTotal: Math.max(...samples.map((s) => cpuBytes(s) + (s.gpu?.total ?? 0))),
 		peakGpu: Math.max(...samples.map((s) => s.gpu?.total ?? 0)),
 	}
+	if (!end.touch || end.dpr !== 3 || !end.workers.some((w) => w.url.includes('/paint-worker.js')) || !Number.isFinite(summary.peakTotal))
+		throw new Error('Incomplete phone memory measurement')
 	writeFileSync(`${output}.json`, JSON.stringify({ summary, samples }, null, 2))
-	console.log('summary', JSON.stringify(summary))
+	const mb = (n) => (n / MiB).toFixed(1)
+	console.log(
+		`          peak main JS ${mb(summary.peakMain)} MiB; main backing ${mb(summary.peakMainBacking)}; workers ${mb(summary.peakWorkers)}`,
+	)
+	console.log(
+		`          CPU ${mb(summary.peakCombined)} / ${mb(BUDGET.cpu)} MiB; WebGL estimate ${mb(summary.peakGpu)} / ${mb(BUDGET.gpu)}; combined ${mb(summary.peakTotal)} / ${mb(BUDGET.total)}`,
+	)
+	console.log(`          samples: ${output}.json`)
+	if (summary.peakCombined > BUDGET.cpu || summary.peakGpu > BUDGET.gpu || summary.peakTotal > BUDGET.total)
+		throw new Error('PHONE MEMORY BUDGET EXCEEDED')
+	console.log('          phone memory budget PASS')
 } finally {
 	await cleanup()
 }
