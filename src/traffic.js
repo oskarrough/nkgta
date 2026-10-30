@@ -11,7 +11,7 @@ import { noParking, parkingSpots, spotHash, standsClear } from './kerbs.js'
 
 const LOOKAHEAD = 1.6 // tiles, plus a bit more per tile/s, and for longer vehicles
 const SIGHT = 25 // tiles up the lane a driver watches the car ahead
-const PER_CAR = 15 // tiles of lane per moving car
+const PER_CAR = 20 // tiles of lane per moving car
 const PARK_REACH = 60 // tiles round the player that parked cars fill, at most
 const MAX_PARKED = 160 // the nearest this many spots, at most
 const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein {}! Spinnst du?', 'Na toll.']
@@ -388,7 +388,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 		}
 		const moving = cars.filter((c) => c.ai).length
 		if (near.length) {
-			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(80, laneLength / PER_CAR); i++) spawn(near, ring, view)
+			for (let i = 0, n = started ? 2 : 999; i < n && moving + i < Math.min(60, laneLength / PER_CAR); i++) spawn(near, ring, view)
 		}
 		park(ring, view, reach)
 		if (near.length && !cars.some((c) => c.convoy) && (convoyIn -= dt) < 0)

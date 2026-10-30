@@ -32,7 +32,7 @@ import { dailyQuizResult, dateKey, saveDailyQuiz } from './daily.js'
 import { createQuiz } from './quiz.js'
 import { areaFromUrl } from './area-url.js'
 
-const START = { lat: 52.4764, lon: 13.4397 } // U Karl-Marx-Straße
+const START = { lat: 52.47751, lon: 13.43874, dir: -1.98 } // Pavement at Brot und Brötchen, Karl-Marx-Straße 131
 
 const loading = document.getElementById('loading')
 const map = await loadMap((text) => (loading.textContent = text)).catch((err) => {

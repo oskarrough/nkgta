@@ -26,7 +26,7 @@ export function createWorld(map) {
 
 	function startPoint(preferred) {
 		const at = contains(preferred) ? fromLatLon(preferred) : { x: W / 2, y: H / 2 }
-		return nearestOf(T.SIDEWALK, at)
+		return { ...nearestOf(T.SIDEWALK, at), dir: contains(preferred) ? (preferred.dir ?? 0) : 0 }
 	}
 
 	// Ground height in tiles, and its rise per tile along x and y.
