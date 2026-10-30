@@ -78,7 +78,7 @@ export function createCourierHud({ accept, pocket }) {
 			}
 			pocket.tag(
 				'job',
-				mode === 'deliver' ? mmss(left) : mode === 'pickup' ? mmss(job.limit) : '',
+				mode === 'deliver' ? mmss(left) : mode === 'pickup' ? 'Abholen' : '',
 				mode === 'deliver' && left < 15,
 				mode === 'deliver' ? Math.max(0, left / job.limit) : 1,
 			)
