@@ -1,7 +1,8 @@
 import { splitRoofWalls } from './measured-roofs.js'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { roofOf } from './map-image.js'
+import { roofHatches, roofOf, roofSpots } from './map-image.js'
+import { DETAIL_PX } from './chunks.js'
 import { roofHeight, roofShape, roofTriangles } from './roofs.js'
 import { pulse } from './scene-shader.js'
 
@@ -237,3 +238,26 @@ const tarPaper = `
 	vec2 vd = uv - (vcell + 0.25 + 0.5 * vec2(tarHash(vcell + 3.3), tarHash(vcell + 4.4))) * ${TAR.ventCell.toFixed(1)};
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
+
+// As a chunk feature: the chimneys and hatches on the chunk's houses, which go when the view is far enough out.
+export function build({ world, houses, gradient }) {
+	const byIndex = []
+	const spots = []
+	const lids = []
+	for (const h of houses) {
+		byIndex[h.n] = h
+		spots.push(...roofSpots(world.buildings[h.n], h.n).filter((s) => s.chimney))
+		lids.push(...roofHatches(world.buildings[h.n], h.n, h.roof))
+	}
+	const meshes = [spots.length && chimneys(spots, byIndex, gradient), lids.length && hatches(lids, byIndex, gradient)].filter(Boolean)
+	for (const mesh of meshes) {
+		mesh.frustumCulled = true
+		mesh.computeBoundingSphere()
+	}
+	return {
+		meshes,
+		zoom(scale) {
+			for (const mesh of meshes) mesh.visible = scale >= DETAIL_PX
+		},
+	}
+}

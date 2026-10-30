@@ -11,6 +11,8 @@ import { COLORS, T } from './tiles.js'
 import { note, PERF } from './perf.js'
 
 export const CHUNK = 128 // tiles a side
+// Below this many screen pixels a tile, small things go: trees turn to blobs, chimneys and hatches hide.
+export const DETAIL_PX = 3
 // Texture pixels per tile, finest first. Every chunk keeps the last one.
 const LEVELS = [12, 6, 3, 1.5]
 const FAR = LEVELS.at(-1)

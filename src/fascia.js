@@ -327,3 +327,10 @@ function hash(s) {
 	for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
 	return h
 }
+
+// As a chunk feature: the names on the walls above the windows.
+export function build({ world, chunk, gradient, sky, opening }) {
+	const group = createFascia(world, chunk, gradient, sky.night, opening)
+	group.traverse((mesh) => mesh.layers.set(1))
+	return { meshes: [group] }
+}

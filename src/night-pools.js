@@ -67,3 +67,9 @@ export function createNightPools(world, chunk, shops, night, opening) {
 	})
 	return new THREE.Mesh(geometry, material)
 }
+
+// As a chunk feature: the light on the pavement outside open shops.
+export function build({ world, chunk, shops, sky, opening }) {
+	const pools = createNightPools(world, chunk, shops, sky.night, opening)
+	return pools && { meshes: [pools] }
+}

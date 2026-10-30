@@ -3,6 +3,7 @@
 // here touches the tile grid, so you walk and drive straight through them.
 import * as THREE from 'three'
 import { pointsGrid } from './kerbs.js'
+import { DETAIL_PX } from './chunks.js'
 
 const CROWNS = ['#4c6f32', '#5e8636', '#365b25']
 const BOTTOM = 3 // metres from the ground to the underside of the crown
@@ -152,4 +153,32 @@ export function createTrunks(world, gradient, pick = (world.trees ?? []).keys())
 	})
 	mesh.instanceMatrix.needsUpdate = true
 	return mesh
+}
+
+// Trees go in cells this many tiles a side, so the view only draws those near it.
+const CELL = 32
+
+// As a chunk feature: the trees in cells, or one plain blob each across the
+// chunk once they're too small on screen for lumps.
+export function build({ world, chunk, gradient }) {
+	const cells = new Map()
+	for (const i of chunk.trees) {
+		const t = world.trees[i]
+		const key = Math.floor(t.x / CELL) * 4096 + Math.floor(t.y / CELL)
+		cells.set(key, [...(cells.get(key) ?? []), i])
+	}
+	const near = [...cells.values()].flatMap((pick) => [createTrees(world, gradient, pick), createTrunks(world, gradient, pick)])
+	const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
+	const meshes = [...near, ...far]
+	for (const mesh of meshes) {
+		mesh.frustumCulled = true
+		mesh.computeBoundingSphere()
+	}
+	return {
+		meshes,
+		zoom(scale) {
+			for (const mesh of near) mesh.visible = scale >= DETAIL_PX
+			for (const mesh of far) mesh.visible = scale < DETAIL_PX
+		},
+	}
 }

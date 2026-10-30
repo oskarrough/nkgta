@@ -135,3 +135,10 @@ export function createFurniture(world, gradient, chunk, night) {
 		},
 	}
 }
+
+// As a chunk feature: lamps and bollards, and the rain told where the lamps are so it can shine under them.
+export function build({ world, chunk, gradient, sky, weather, ground }) {
+	const furniture = createFurniture(world, gradient, chunk, sky.night)
+	weather.ground(ground, chunk, furniture.lamps)
+	return { meshes: furniture.meshes, zoom: furniture.zoom }
+}

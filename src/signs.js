@@ -5,6 +5,7 @@ import { openAttribute } from './front-panels.js'
 import * as THREE from 'three'
 import { posterText, posterWidth } from './poster.js'
 import { alongFacade } from './shops.js'
+import { SHOP_GLOW } from './scene-walls.js'
 
 const CLOTH = ['#C8302A', '#3D5E82', '#3FA34D', '#B5603F', '#E8C21A', '#2D333D']
 export const DEPTH = 1.05 // how far the awning reaches out over the pavement, tiles
@@ -132,4 +133,38 @@ function hash(s) {
 	let h = 7
 	for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
 	return h
+}
+
+// At night a material glows this much of its own colour, lit from inside.
+function glowAtNight(material, strength, night) {
+	material.onBeforeCompile = (shader) => {
+		shader.uniforms.night = night
+		shader.vertexShader =
+			'attribute float isOpen; varying float vOpen;\n' +
+			shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvOpen = isOpen;')
+		shader.fragmentShader =
+			'uniform float night; varying float vOpen;\n' +
+			shader.fragmentShader.replace(
+				'#include <emissivemap_fragment>',
+				`#include <emissivemap_fragment>
+			totalEmissiveRadiance += diffuseColor.rgb * vOpen * night * ${strength.toFixed(2)};`,
+			)
+	}
+}
+
+const PER_ATLAS = 24
+const inChunk = (c, { x, y }) => x >= c.x && y >= c.y && x < c.x + c.w && y < c.y + c.h
+
+// As a chunk feature: awnings over the chunk's shop doors, a few atlases' worth between frames.
+export function* build({ world, chunk, shops, gradient, sky, opening }) {
+	const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
+	const meshes = []
+	for (let k = 0; k < mine.length; k += PER_ATLAS) {
+		const signs = createSigns(shops, gradient, mine.slice(k, k + PER_ATLAS), world.heightAt, opening)
+		glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
+		signs.layers.set(1)
+		meshes.push(signs)
+		yield
+	}
+	return { meshes }
 }

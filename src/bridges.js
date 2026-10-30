@@ -153,3 +153,9 @@ export function createBridges(world, area, gradient) {
 	mesh.receiveShadow = true
 	return mesh
 }
+
+// As a chunk feature: the parapets in the chunk.
+export function build({ world, chunk, gradient }) {
+	const group = createBridges(world, chunk, gradient)
+	return group && { meshes: [group] }
+}

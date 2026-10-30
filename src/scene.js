@@ -3,25 +3,24 @@
 // walls lean outwards towards the screen edges.
 import * as THREE from 'three'
 import { groundGeometry, groundMaterial } from './scene-ground.js'
-import { SHOP_GLOW, wallGeometry, wallMaterial } from './scene-walls.js'
-import { house, chimneys, hatches, roofGeometry, roofMaterial } from './scene-roofs.js'
+import { wallGeometry, wallMaterial } from './scene-walls.js'
+import * as roofs from './scene-roofs.js'
 import { createSkyLighting } from './scene-sky.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { roofHatches, roofSpots } from './map-image.js'
 import { createInk } from './ink.js'
 import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
-import { createBridges } from './bridges.js'
-import { createTrees, createTrunks } from './trees.js'
-import { createFurniture } from './street-furniture.js'
-import { createNightPools } from './night-pools.js'
+import * as bridges from './bridges.js'
+import * as trees from './trees.js'
+import * as furniture from './street-furniture.js'
+import * as nightPools from './night-pools.js'
 import { createClouds, DECK } from './clouds.js'
 import { createWeather } from './weather.js'
 import { MODELS } from './models.js'
 import { timePasses } from './perf.js'
 import { BLANK, createChunks } from './chunks.js'
-import { createSigns } from './signs.js'
-import { createFascia } from './fascia.js'
-import { createFrontPanels } from './front-panels.js'
+import * as signs from './signs.js'
+import * as fascia from './fascia.js'
+import * as frontPanels from './front-panels.js'
 import { createOpening } from './opening.js'
 import { createLandmarks } from './landmarks.js'
 import { START_HOUR } from './daylight.js'
@@ -32,13 +31,11 @@ import { createMurals } from './murals.js'
 // away from the sun get none at all, so they can't flicker in and out of shadow.
 const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
 
-// Trees go in cells this many tiles a side, so the view only draws those
-// near it. Below DETAIL_PX screen pixels a tile they turn into simple
-// blobs and chimneys, a pixel wide by then, go.
-const TREE_CELL = 32
-const DETAIL_PX = 3
-const SIGNS_PER_ATLAS = 24
-const inChunk = (c, { x, y }) => x >= c.x && y >= c.y && x < c.x + c.w && y < c.y + c.h
+// What dresses a chunk once its ground and houses stand, in build order. Each
+// is a module whose build(ctx) returns { meshes, zoom?(scale), dispose?() },
+// or nothing, and may be a generator that yields between frames. To add
+// something to the city, write such a module and put it in this list.
+const FEATURES = [bridges, roofs, signs, fascia, frontPanels, trees, nightPools, furniture]
 
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
@@ -246,20 +243,16 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const houses = []
 		const wallParts = []
 		const roofParts = []
-		const spots = []
-		const lids = []
 		for (const n of chunk.buildings) {
-			const h = house(world.buildings[n], n, world)
+			const h = roofs.house(world.buildings[n], n, world)
 			houses.push(h)
 			wallParts.push(wallGeometry([h], world, firewalls))
-			const roof = roofGeometry([h])
+			const roof = roofs.roofGeometry([h])
 			if (roof) roofParts.push(roof)
-			spots.push(...roofSpots(world.buildings[n], n).filter((s) => s.chimney))
-			lids.push(...roofHatches(world.buildings[n], n, h.roof))
 			yield
 		}
 		const roofRect = new THREE.Vector4()
-		const top = roofParts.length ? new THREE.Mesh(mergeGeometries(roofParts), roofMaterial(roofRect, gradient, BLANK.roofs)) : null
+		const top = roofParts.length ? new THREE.Mesh(mergeGeometries(roofParts), roofs.roofMaterial(roofRect, gradient, BLANK.roofs)) : null
 		const sides = houses.length ? new THREE.Mesh(mergeGeometries(wallParts), wallLook) : null
 		for (const mesh of [sides, top]) {
 			if (!mesh) continue
@@ -270,60 +263,22 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const paintings = murals.decals(houses)
 		if (paintings) group.add(paintings)
 		yield
-		const bridges = createBridges(world, chunk, gradient)
-		if (bridges) group.add(bridges)
-		yield
-		const byIndex = []
-		for (const h of houses) byIndex[h.n] = h
-		const stacks = spots.length && chimneys(spots, byIndex, gradient)
-		const hatchMesh = lids.length && hatches(lids, byIndex, gradient)
-		yield
-		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
-		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
-		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt, chunkOpening)
-			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
-			signs.layers.set(1)
-			group.add(signs)
+		const ctx = { world, chunk, shops, gradient, sky, weather, opening: chunkOpening, houses, ground: plane.material }
+		const parts = []
+		for (const feature of FEATURES) {
+			let part = feature.build(ctx)
+			if (typeof part?.next === 'function') part = yield* part
+			if (!part) continue
+			parts.push(part)
+			group.add(...part.meshes)
 			yield
 		}
-		// Their names on the wall above the windows, and every other shop's.
-		const fascia = createFascia(world, chunk, gradient, sky.night, chunkOpening)
-		fascia.traverse((mesh) => mesh.layers.set(1))
-		group.add(fascia)
-		const panels = createFrontPanels(world, chunk, chunkOpening, sky.night)
-		if (panels) {
-			panels.layers.set(1)
-			group.add(panels)
-		}
-		yield
-		// Trees in cells, so the view skips most of them, or one plain blob
-		// each across the chunk once they're too small on screen for lumps.
-		const cells = new Map()
-		for (const i of chunk.trees) {
-			const t = world.trees[i]
-			const key = Math.floor(t.x / TREE_CELL) * 4096 + Math.floor(t.y / TREE_CELL)
-			cells.set(key, [...(cells.get(key) ?? []), i])
-		}
-		const near = [...cells.values()].flatMap((pick) => [createTrees(world, gradient, pick), createTrunks(world, gradient, pick)])
-		const far = chunk.trees.length ? [createTrees(world, gradient, chunk.trees, true)] : []
-		for (const mesh of [stacks, hatchMesh, ...near, ...far]) {
-			if (!mesh) continue
-			mesh.frustumCulled = true
-			mesh.computeBoundingSphere()
-			group.add(mesh)
-		}
-		yield
-		const pools = createNightPools(world, chunk, shops, sky.night, chunkOpening)
-		if (pools) group.add(pools)
-		const furniture = createFurniture(world, gradient, chunk, sky.night)
-		weather.ground(plane.material, chunk, furniture.lamps)
-		for (const mesh of furniture.meshes) group.add(mesh)
 		const uv = plane.geometry.attributes.uv
 		return {
 			group,
 			dispose() {
 				for (const stop of unwatch) stop?.()
+				for (const part of parts) part.dispose?.()
 				group.traverse((mesh) => {
 					mesh.geometry?.dispose()
 					if (mesh.isInstancedMesh) mesh.dispose()
@@ -336,11 +291,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 			},
 			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
 			zoom(scale) {
-				for (const mesh of near) mesh.visible = scale >= DETAIL_PX
-				for (const mesh of far) mesh.visible = scale < DETAIL_PX
-				if (stacks) stacks.visible = scale >= DETAIL_PX
-				if (hatchMesh) hatchMesh.visible = scale >= DETAIL_PX
-				furniture.zoom(scale)
+				for (const part of parts) part.zoom?.(scale)
 			},
 			// Point the ground's corners, or the roofs' world positions, at
 			// where the chunk sits in the texture.
@@ -358,23 +309,6 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 			},
 		}
 	})
-}
-
-// At night a material glows this much of its own colour, lit from inside.
-function glowAtNight(material, strength, night) {
-	material.onBeforeCompile = (shader) => {
-		shader.uniforms.night = night
-		shader.vertexShader =
-			'attribute float isOpen; varying float vOpen;\n' +
-			shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvOpen = isOpen;')
-		shader.fragmentShader =
-			'uniform float night; varying float vOpen;\n' +
-			shader.fragmentShader.replace(
-				'#include <emissivemap_fragment>',
-				`#include <emissivemap_fragment>
-			totalEmissiveRadiance += diffuseColor.rgb * vOpen * night * ${strength.toFixed(2)};`,
-			)
-	}
 }
 
 // Paint, glass and tyres take the same flat bands as the walls; lamps stay
