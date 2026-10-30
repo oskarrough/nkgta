@@ -107,7 +107,7 @@ export function createCourierHud({ accept, pocket }) {
 				tip ? `<li><span>Trinkgeld</span><b>+${euro(tip)}</b></li>` : '',
 				knocks ? `<li><span>verschüttet</span><b>−${euro(knocks)}</b></li>` : '',
 			]
-			slip.innerHTML = `<b class="total">+${euro(total)}</b>${late ? '<em>zu spät</em>' : ''}<ol>${rows.join('')}</ol>`
+			slip.innerHTML = `<b class="total">+${euro(total)}</b>${late ? '<em>zu spät, halbe Fahrt</em>' : ''}<ol>${rows.join('')}</ol>`
 			showSlip()
 			sound.till()
 			chime(tip && !knocks ? [880, 1109, 1319, 1760] : [880, 1109, 1319])
