@@ -110,7 +110,7 @@ body.touch #pocket {
 		inset 0 2px 0 rgba(0, 0, 0, 0.12),
 		0 0 0.6rem rgba(214, 238, 156, 0.8);
 }
-/* What you hear runs along the top line, with the job's clock and the volume. */
+/* What you hear runs along the top line, with the job's clock. */
 #pocket .top {
 	display: flex;
 	align-items: center;
@@ -160,20 +160,6 @@ body.touch #pocket {
 		background: transparent;
 		color: var(--lcd-ink);
 	}
-}
-#pocket .volume {
-	position: relative;
-	flex: none;
-	width: 2.2rem;
-	height: 0.3rem;
-	background: repeating-linear-gradient(to right, var(--lcd-dim) 0 8%, transparent 8% 10%);
-}
-#pocket .volume::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	background: repeating-linear-gradient(to right, var(--lcd-ink) 0 8%, transparent 8% 10%);
-	clip-path: inset(0 calc(100% - var(--level, 0) * 10%) 0 0);
 }
 #pocket .page {
 	flex: 1;

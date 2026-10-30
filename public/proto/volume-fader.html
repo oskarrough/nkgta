@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+		<title>Volume: fader · NK 44</title>
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				overflow: hidden;
+				overscroll-behavior: none;
+			}
+			body {
+				background:
+					linear-gradient(90deg, transparent 46%, #e9e3cf 46% 47%, transparent 47% 53%, #e9e3cf 53% 54%, transparent 54%),
+					radial-gradient(circle at 30% 70%, #4b5a43, transparent 40%), #3c403b;
+				color: #efe5cc;
+				font-family: system-ui, sans-serif;
+				touch-action: manipulation;
+				-webkit-text-size-adjust: 100%;
+			}
+			.hint {
+				position: fixed;
+				left: calc(0.75rem + env(safe-area-inset-left));
+				bottom: calc(0.75rem + env(safe-area-inset-bottom));
+				max-width: 20rem;
+				margin: 0;
+				padding: 0.5rem 0.7rem;
+				border-radius: 0.5rem;
+				background: rgba(0, 0, 0, 0.6);
+				font-size: 0.85rem;
+				line-height: 1.4;
+			}
+			.hint a {
+				color: #f2d32a;
+			}
+
+			#pocket {
+				--lcd: #b9cfa4;
+				--lcd-ink: #1f2d1b;
+				--lcd-dim: rgba(31, 45, 27, 0.2);
+				--screen-h: 9rem;
+				position: fixed;
+				top: calc(5rem + env(safe-area-inset-top));
+				right: calc(0.75rem + env(safe-area-inset-right));
+				width: 13rem;
+				padding: 0.55rem 0.55rem 0.6rem;
+				box-sizing: border-box;
+				border: 2px solid #1a1e1b;
+				border-radius: 0.8rem 0.8rem 1.6rem 1.6rem;
+				background:
+					radial-gradient(ellipse 0.5rem 0.3rem at 14% 94%, rgba(70, 55, 35, 0.22), transparent),
+					radial-gradient(ellipse 0.3rem 0.2rem at 92% 60%, rgba(70, 55, 35, 0.18), transparent), linear-gradient(165deg, #efe5cc, #c8b994);
+				box-shadow:
+					0 3px 0 #000,
+					inset 0 2px 0 rgba(255, 255, 255, 0.7),
+					inset 0 -4px 0 rgba(0, 0, 0, 0.16);
+				touch-action: none;
+				user-select: none;
+				-webkit-user-select: none;
+				-webkit-touch-callout: none;
+			}
+			@media (pointer: coarse), (max-width: 600px) {
+				#pocket {
+					--screen-h: 7.2rem;
+					width: 10.6rem;
+				}
+			}
+			#pocket::before {
+				content: '';
+				position: absolute;
+				top: -0.75rem;
+				right: 0.9rem;
+				width: 0.55rem;
+				height: 0.75rem;
+				border: 2px solid #1a1e1b;
+				border-bottom: 0;
+				border-radius: 0.3rem 0.3rem 0 0;
+				background: #3b3a35;
+			}
+			/* The volume strip: the right third, top to bottom. */
+			#pocket .strip {
+				position: absolute;
+				top: -0.5rem;
+				right: -0.5rem;
+				bottom: -0.5rem;
+				width: calc(33% + 0.5rem);
+				border-radius: 0 1rem 1.8rem 0;
+				z-index: 2;
+			}
+			#pocket.turning .strip {
+				background: linear-gradient(to left, rgba(255, 106, 26, 0.18), transparent);
+			}
+			#pocket .led {
+				position: absolute;
+				top: 0.2rem;
+				left: 50%;
+				width: 0.3rem;
+				height: 0.3rem;
+				margin-left: -0.15rem;
+				border-radius: 50%;
+				background: #6b604c;
+			}
+			#pocket button {
+				padding: 0;
+				border: 0;
+				cursor: pointer;
+				-webkit-tap-highlight-color: transparent;
+			}
+			#pocket .screen {
+				display: flex;
+				flex-direction: column;
+				height: var(--screen-h);
+				padding: 0.2rem 0.35rem 0.3rem;
+				box-sizing: border-box;
+				overflow: hidden;
+				border: 2px solid #3b4a36;
+				border-radius: 0.35rem;
+				background: var(--lcd);
+				box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.18);
+				color: var(--lcd-ink);
+				line-height: 1.2;
+			}
+			#pocket .top {
+				height: 0.8rem;
+				margin-bottom: 0.15rem;
+				overflow: hidden;
+				font:
+					800 0.6rem / 1 ui-monospace,
+					monospace;
+				white-space: nowrap;
+			}
+			#pocket .playing {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				gap: 0.3rem;
+				font-weight: 800;
+			}
+			#pocket .playing b {
+				font-size: 1rem;
+				line-height: 1.05;
+			}
+			#pocket .playing small {
+				font-size: 0.65rem;
+				opacity: 0.8;
+			}
+			#pocket .eq {
+				display: flex;
+				align-items: flex-end;
+				gap: 2px;
+				height: 1.2rem;
+			}
+			#pocket .eq i {
+				width: 0.35rem;
+				height: 100%;
+				background: var(--lcd-ink);
+				transform-origin: bottom;
+				animation: eq 0.5s ease-in-out infinite alternate;
+			}
+			#pocket .eq i:nth-child(2n) {
+				animation-duration: 0.37s;
+			}
+			#pocket .eq i:nth-child(3n) {
+				animation-duration: 0.61s;
+			}
+			@keyframes eq {
+				from {
+					transform: scaleY(0.15);
+				}
+			}
+			#pocket.muted .eq i {
+				animation: none;
+				transform: scaleY(0.08);
+			}
+			#pocket .lower {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				margin-top: 0.5rem;
+				padding-bottom: 0.7rem;
+			}
+			#pocket .keys {
+				display: flex;
+				gap: 0.45rem;
+				margin-left: 0.15rem;
+			}
+			#pocket .keys button {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 0.3rem;
+				background: none;
+			}
+			#pocket .keys img {
+				box-sizing: content-box;
+				width: 16px;
+				height: 16px;
+				padding: 0.3rem 0.55rem;
+				border: 2px solid #1a1e1b;
+				border-radius: 0.55rem;
+				background: linear-gradient(#5a5850, #3b3a35);
+				box-shadow:
+					0 2px 0 #000,
+					inset 0 1px 0 rgba(255, 255, 255, 0.25);
+				image-rendering: pixelated;
+			}
+			#pocket .keys button:active img {
+				translate: 0 2px;
+				box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+			#pocket .keys span,
+			#pocket .slide {
+				color: #5a5244;
+				font:
+					900 0.5rem / 1 system-ui,
+					sans-serif;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+			}
+			#pocket .dial {
+				position: relative;
+				width: 3rem;
+				height: 3rem;
+				margin-right: 0.3rem;
+			}
+			#pocket .dial::after {
+				content: '';
+				position: absolute;
+				inset: -0.3rem;
+				border-radius: 50%;
+				background: conic-gradient(#d8352a calc(var(--fill, 0) * 1turn), transparent 0);
+				mask: radial-gradient(circle, transparent 62%, #000 64%);
+				opacity: 0;
+				pointer-events: none;
+			}
+			#pocket .dial.pressing::after {
+				animation: fill 0.6s linear forwards;
+			}
+			@property --fill {
+				syntax: '<number>';
+				inherits: false;
+				initial-value: 0;
+			}
+			@keyframes fill {
+				from {
+					--fill: 0;
+					opacity: 0;
+				}
+				30% {
+					opacity: 1;
+				}
+				to {
+					--fill: 1;
+					opacity: 1;
+				}
+			}
+			#pocket .knob {
+				position: absolute;
+				inset: 0;
+				border: 2px solid #1a1e1b;
+				border-radius: 50%;
+				background:
+					radial-gradient(circle, #4a4842 0 52%, #2b2a26 54% 58%, transparent 60%),
+					repeating-conic-gradient(#2b2a26 0 7deg, #46443e 7deg 14deg);
+				box-shadow: 0 2px 0 #000;
+				transform: rotate(var(--turn, 0deg));
+			}
+			#pocket .knob i {
+				position: absolute;
+				top: 0.22rem;
+				left: 50%;
+				width: 0.26rem;
+				height: 0.75rem;
+				margin-left: -0.13rem;
+				border-radius: 0.13rem;
+				background: #ff6a1a;
+			}
+			#pocket.muted .knob {
+				box-shadow:
+					0 2px 0 #000,
+					0 0 0 2px #d8352a;
+			}
+			#pocket.muted .knob i {
+				background: #77705f;
+			}
+			#pocket .slide {
+				position: absolute;
+				bottom: 0.4rem;
+				left: 3.3rem;
+				display: flex;
+				align-items: center;
+				gap: 0.3rem;
+				background: none;
+			}
+			#pocket .slide i {
+				position: relative;
+				width: 1.4rem;
+				height: 0.6rem;
+				border: 2px solid #1a1e1b;
+				border-radius: 0.3rem;
+				background: #2b2a26;
+				box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+			}
+			#pocket .slide i::after {
+				content: '';
+				position: absolute;
+				top: -2px;
+				left: -2px;
+				width: 0.7rem;
+				height: 0.6rem;
+				border: 2px solid #1a1e1b;
+				border-radius: 0.25rem;
+				background: linear-gradient(#8d8878, #5a5850);
+				transition: translate 0.08s;
+			}
+			#pocket .slide.on i {
+				background: #3f8f3a;
+			}
+			#pocket .slide.on i::after {
+				translate: 0.7rem 0;
+			}
+			#pocket .sticker {
+				position: absolute;
+				bottom: 0.45rem;
+				left: 0.6rem;
+				padding: 0.1rem 0.2rem;
+				border-radius: 0.2rem;
+				background: #f2d32a;
+				box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+				color: #1a1e1b;
+				font-size: 0.5rem;
+				font-weight: 900;
+				transform: rotate(-8deg);
+				pointer-events: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="pocket">
+			<i class="led"></i>
+			<div class="screen">
+				<div class="top"></div>
+				<div class="playing">
+					<b></b>
+					<small></small>
+					<div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+				</div>
+			</div>
+			<div class="lower">
+				<div class="keys">
+					<button type="button"><img src="/icons/race-finish.png" alt="" /><span>Rennen</span></button>
+					<button type="button"><img src="/icons/menu-feedback.png" alt="" /><span>Post</span></button>
+				</div>
+				<div class="dial">
+					<button type="button" class="knob" aria-label="Lautstärke"><i></i></button>
+				</div>
+			</div>
+			<button type="button" class="slide" role="switch"><i></i><span>Kurier</span></button>
+			<span class="sticker">NK 44</span>
+			<div class="strip"></div>
+		</div>
+		<p class="hint">
+			<b>Fader.</b> Drag up/down anywhere on the device’s right third: volume. Tap there: next station. Hold still 0.6 s: mute. Tap first to
+			start the sound. <a href="./">Both prototypes</a>
+		</p>
+		<script>
+			const TURN = 270
+			const MUTE = 600
+			const MOVED = 6
+			const TRAVEL = 160 // px of drag from silent to full
+
+			const STATIONS = [
+				{ name: 'Radio Hermannplatz', title: 'Späti bis vier', wave: 'square', notes: [57, 60, 64, 67, 64, 60, 62, 55], tempo: 0.18 },
+				{ name: 'Sonnenallee FM', title: 'Wasserpfeife Dub', wave: 'sawtooth', notes: [45, 45, 52, 45, 48, 45, 52, 50], tempo: 0.22 },
+				{ name: 'Kanal 44', title: 'Maybachufer Morgen', wave: 'triangle', notes: [72, 76, 79, 76, 74, 71, 67, 71], tempo: 0.15 },
+				{ name: 'Rixdorf Klassik', title: 'Böhmisches Dorf', wave: 'sine', notes: [64, 62, 60, 62, 64, 64, 64, 0], tempo: 0.3 },
+			]
+
+			const pocket = document.querySelector('#pocket')
+			const knob = pocket.querySelector('.knob')
+			const dial = pocket.querySelector('.dial')
+			const strip = pocket.querySelector('.strip')
+			const ticker = pocket.querySelector('.top')
+			const stationName = pocket.querySelector('.playing b')
+			const songTitle = pocket.querySelector('.playing small')
+			const slide = pocket.querySelector('.slide')
+
+			let volume = 0.5
+			let muted = false
+			let station = 0
+
+			let ctx = null
+			let master = null
+			let step = 0
+			let next = 0
+			function start() {
+				if (ctx) return ctx.resume()
+				ctx = new AudioContext()
+				master = ctx.createGain()
+				master.connect(ctx.destination)
+				next = ctx.currentTime + 0.05
+				setInterval(schedule, 25)
+				render()
+			}
+			function schedule() {
+				const s = STATIONS[station]
+				while (next < ctx.currentTime + 0.1) {
+					const note = s.notes[step++ % s.notes.length]
+					if (note) blip(note, s.wave, next, s.tempo)
+					next += s.tempo
+				}
+			}
+			function blip(note, wave, at, length) {
+				const osc = ctx.createOscillator()
+				const env = ctx.createGain()
+				osc.type = wave
+				osc.frequency.value = 440 * 2 ** ((note - 69) / 12)
+				env.gain.setValueAtTime(0, at)
+				env.gain.linearRampToValueAtTime(wave === 'sine' || wave === 'triangle' ? 0.5 : 0.18, at + 0.01)
+				env.gain.exponentialRampToValueAtTime(0.001, at + length * 0.9)
+				osc.connect(env).connect(master)
+				osc.start(at)
+				osc.stop(at + length)
+			}
+
+			function render() {
+				const s = STATIONS[station]
+				ticker.textContent = muted ? '' : `${s.name} · ${s.title}`
+				stationName.textContent = s.name
+				songTitle.textContent = s.title
+				pocket.classList.toggle('muted', muted)
+				knob.style.setProperty('--turn', `${(muted ? 0 : volume) * TURN - TURN / 2}deg`)
+				if (master) master.gain.setTargetAtTime(muted ? 0 : volume ** 2 * 0.6, ctx.currentTime, 0.02)
+			}
+			function setVolume(value) {
+				const before = Math.round(volume * 10)
+				volume = Math.min(1, Math.max(0, value))
+				muted = false
+				// A detent every tenth, so a thumb feels where it is.
+				if (Math.round(volume * 10) !== before) navigator.vibrate?.(4)
+				render()
+			}
+			function nextStation() {
+				station = (station + 1) % STATIONS.length
+				step = 0
+				navigator.vibrate?.(10)
+				render()
+			}
+
+			let gesture = null
+			strip.addEventListener('pointerdown', (e) => {
+				if (e.button > 0) return
+				start()
+				strip.setPointerCapture(e.pointerId)
+				gesture = {
+					id: e.pointerId,
+					y: e.clientY,
+					from: muted ? 0 : volume,
+					mode: null,
+					hold: setTimeout(() => {
+						if (!gesture || gesture.mode) return
+						gesture.mode = 'mute'
+						dial.classList.remove('pressing')
+						muted = !muted
+						navigator.vibrate?.(20)
+						render()
+					}, MUTE),
+				}
+				dial.classList.add('pressing')
+			})
+			strip.addEventListener('pointermove', (e) => {
+				if (!gesture || e.pointerId !== gesture.id) return
+				const dy = gesture.y - e.clientY
+				if (!gesture.mode && Math.abs(dy) > MOVED) {
+					clearTimeout(gesture.hold)
+					dial.classList.remove('pressing')
+					gesture.mode = 'turn'
+					// Start from where the thumb is now, so the knob doesn't jump by the dead zone.
+					gesture.y = e.clientY
+					pocket.classList.add('turning')
+				}
+				if (gesture.mode === 'turn') setVolume(gesture.from + (gesture.y - e.clientY) / TRAVEL)
+			})
+			function end(e) {
+				if (!gesture || e.pointerId !== gesture.id) return
+				clearTimeout(gesture.hold)
+				dial.classList.remove('pressing')
+				pocket.classList.remove('turning')
+				if (!gesture.mode && e.type === 'pointerup') nextStation()
+				gesture = null
+			}
+			strip.addEventListener('pointerup', end)
+			strip.addEventListener('pointercancel', end)
+			pocket.addEventListener(
+				'wheel',
+				(e) => {
+					e.preventDefault()
+					start()
+					setVolume((muted ? 0 : volume) + (e.deltaY < 0 ? 0.05 : -0.05))
+				},
+				{ passive: false },
+			)
+			pocket.addEventListener('pointerdown', start)
+			slide.addEventListener('click', () => {
+				slide.classList.toggle('on')
+				navigator.vibrate?.(10)
+			})
+			document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false })
+			render()
+		</script>
+	</body>
+</html>

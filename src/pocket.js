@@ -21,7 +21,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	el.className = 'asleep'
 	el.innerHTML = `
 		<i class="led"></i>
-		<div class="screen"><div class="top"><div class="ticker"><span></span></div><b class="tags"></b><i class="volume"></i></div></div>
+		<div class="screen"><div class="top"><div class="ticker"><span></span></div><b class="tags"></b></div></div>
 		<div class="lower">
 			<div class="keys"></div>
 			<div class="dial"><button type="button" class="knob" aria-label="Lautstärke" title="Drehen: Lautstärke · Tippen: Sender (R) · Halten: Ton aus (L)"><i></i></button></div>
@@ -35,7 +35,6 @@ export function createPocket({ turnStation, toggleMute }) {
 	const ticker = el.querySelector('.ticker')
 	const tickerText = ticker.querySelector('span')
 	const tags = el.querySelector('.tags')
-	const volumeBars = el.querySelector('.volume')
 	const apps = []
 	const tagOf = {}
 	let home = null
@@ -321,7 +320,6 @@ export function createPocket({ turnStation, toggleMute }) {
 			if (said && (said.t -= dt) <= 0) said = null
 			const now = radio ? { name: radio.name ?? 'Radio aus', title: radio.title } : hearing
 			setTicker(said?.text ?? (muted ? '' : now ? [now.name, now.title].filter(Boolean).join(' · ') : 'Straße'))
-			volumeBars.style.setProperty('--level', String(muted ? 0 : Math.round(volume * 10)))
 			el.classList.toggle('lit', !!alerting && current?.id === alerting)
 			el.classList.toggle('car', car)
 			el.classList.toggle('muted', muted)
