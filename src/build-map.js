@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping'
 import { T } from './tiles.js'
 import { createWorld } from './world.js'
 import { findShops, packShops } from './shops.js'
+import { findAddresses, packAddresses } from './addresses.js'
 import { hospitalDoor } from './hospital.js'
 import { findFronts, storefronts } from './fronts.js'
 import { carriageway, isSett, kerbGaps, kerbLines, kerbOf } from './kerbs.js'
@@ -404,12 +405,31 @@ export function buildMap(osm, bbox, tileM) {
 		kerbGaps: gaps,
 		lamps,
 		shops: packShops(findShops(world), pois),
+		addresses: packAddresses(findAddresses(world, addressesIn(osm, areas, toTile, W, H))),
 		fronts: findFronts(world, storefronts(osm, toTile, W, H)),
 		frontsVersion: 2,
 	}
 }
 
 const round = (n) => Math.round(n * 10) / 10
+
+// Street and house number from OSM's address points and addressed buildings,
+// those on the map. "12;14" is two doors; the first will do.
+function addressesIn(osm, areas, toTile, W, H) {
+	const on = (p) => p.x >= 0 && p.y >= 0 && p.x < W && p.y < H
+	const of = (t) =>
+		t?.['addr:street'] && t['addr:housenumber'] && { street: t['addr:street'], number: t['addr:housenumber'].split(';')[0].trim() }
+	const raw = []
+	for (const e of osm.elements) {
+		const a = e.type === 'node' && of(e.tags)
+		if (a && on(toTile(e))) raw.push({ ...a, ...toTile(e) })
+	}
+	for (const area of areas) {
+		const a = area.tags.building && of(area.tags)
+		if (a && area.rings[0].some(on)) raw.push({ ...a, ring: area.rings[0] })
+	}
+	return raw
+}
 
 // Stable noise per tree, so sizes and shapes don't change between loads.
 const treeHash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007

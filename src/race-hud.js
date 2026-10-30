@@ -160,11 +160,12 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 	}
 }
 
-function chime(notes) {
+// Rising notes, struck like a bell.
+export function chime(notes) {
 	notes.forEach((hz, i) => beep(hz, 0.5, i * 0.09))
 }
 
-function beep(hz, length, delay = 0) {
+export function beep(hz, length, delay = 0) {
 	const audio = sound.audio()
 	if (!audio || audio.muted) return
 	const { context, master } = audio

@@ -65,8 +65,8 @@ export function createHud(world) {
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door.
 		// `wasted` is the big word across the screen, WASTED or BUSTED, if any.
-		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate, heat = 0 }, dt) {
-			minimap(player, !!cam.third, inside, gate)
+		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate, job, heat = 0 }, dt) {
+			minimap(player, !!cam.third, inside, gate, job)
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
 			const shopName = door && !door.startsWith('E: ') ? door.split(' · ').pop() : null

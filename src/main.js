@@ -25,6 +25,7 @@ import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createPocket } from './pocket.js'
 import { createRacing } from './racing.js'
+import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
 import { createDailyPanel } from './daily-panel.js'
 import { dailyQuizResult, dateKey, saveDailyQuiz } from './daily.js'
@@ -81,6 +82,7 @@ const wasted = createWasted({
 		pfand.spill(player.x, player.y)
 		racing.abort()
 		police.clear()
+		courier.lose()
 	},
 	respawn: () => Object.assign(player, createPlayer(hospitalWake(world.pois, player.x, player.y, world.tileAt) ?? world.startPoint(START))),
 	fade: (a) => {
@@ -107,11 +109,20 @@ const racing = createRacing({
 	say: hud.say,
 	snapCamera: () => camera.snap(player),
 })
+// Courier jobs keep coming until they're turned off in the menu, and stay off.
+const courier = createCourier({ world, shops, player, scene: city3d.scene, pfand, on: remembered('nk-jobs') !== 'false' })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
 let showMusic = false
+function remembered(key) {
+	try {
+		return localStorage.getItem(key)
+	} catch {
+		return null
+	}
+}
 try {
 	showMusic = localStorage.getItem('nk-musik-debug') === 'true'
 } catch {
@@ -156,6 +167,7 @@ const actions = {
 	placeGate: () => racing.placeGate(),
 	finishRace: () => racing.finish(),
 	restartRace: () => racing.restart(),
+	acceptJob: () => courier.accept(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 	openFeedback() {
 		showMenu(false)
@@ -246,6 +258,17 @@ const menuItems = {
 		},
 		() => null,
 	],
+	jobs: [
+		() => {
+			courier.toggle()
+			try {
+				localStorage.setItem('nk-jobs', String(courier.on()))
+			} catch {
+				// Fine, it just won't be remembered.
+			}
+		},
+		() => courier.on(),
+	],
 	area: [actions.pickArea, () => null],
 	feedback: [actions.openFeedback, () => null],
 }
@@ -299,6 +322,7 @@ const GAME_KEYS = new Set([
 	'g',
 	'f',
 	'q',
+	'c',
 	'Backspace',
 ])
 addEventListener(
@@ -424,6 +448,7 @@ function frame(now) {
 	input.setDriving(!!player.car)
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
 	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car }, dt)
+	courier.update(dt, { inside: visit.busy() || quiz.active(), busy: !!racing.target(), down: wasted.active() })
 	hud.update(
 		{
 			player,
@@ -436,6 +461,7 @@ function frame(now) {
 			door,
 			action,
 			gate: racing.target(),
+			job: courier.target(),
 		},
 		dt,
 	)
@@ -470,5 +496,6 @@ if (import.meta.env.DEV)
 		weather: city3d.weather,
 		racing,
 		police,
+		courier,
 		city3d,
 	}

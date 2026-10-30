@@ -6,7 +6,7 @@ import { phase } from './perf.js'
 import { applyMeasuredRoofs } from './measured-roofs.js'
 
 // Bump when build-map.js or map-codec.js changes, so cached areas get rebuilt.
-const BUILD_VERSION = 16
+const BUILD_VERSION = 17
 
 export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()

@@ -21,6 +21,7 @@ function overpassQuery({ south, west, north, east }) {
   relation["natural"~"water|wood|scrub|grassland"]["type"="multipolygon"](${b});
   way["waterway"](${b});
   node["shop"](${b});
+  node["addr:housenumber"]["addr:street"](${b});
   node["amenity"](${b});
   way["amenity"="hospital"](${b});
   relation["amenity"="hospital"]["type"="multipolygon"](${b});

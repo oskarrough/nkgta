@@ -100,7 +100,9 @@ export function createGamepad(actions, blocked = () => false) {
 		}
 		if (fired(A)) actions.use()
 		if (fired(LEFT)) actions.shiftChoice(-1)
-		if (fired(RIGHT)) actions.shiftChoice(1)
+		if (fired(RIGHT)) {
+			if (!actions.acceptJob?.()) actions.shiftChoice(1)
+		}
 		if (fired(X)) actions.toggleCamera()
 		if (fired(Y)) actions.nextStation()
 		if (fired(LB)) actions.placeGate()

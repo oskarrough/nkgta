@@ -1,0 +1,221 @@
+/* The courier job: a phone-like offer, the ride's clock and the pay slip, in the race watch's ink and cream. */
+#job {
+	--ink: #1a1e1b;
+	--cream: #e7e7e5;
+	--yellow: #e8c21a;
+	--green: #5ce079;
+	--red: #ec4335;
+	position: fixed;
+	z-index: 11;
+	top: calc(1rem + env(safe-area-inset-top));
+	left: calc(1rem + env(safe-area-inset-left));
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.6rem;
+	font-family: system-ui, sans-serif;
+	color: var(--cream);
+	pointer-events: none;
+}
+#job [hidden] {
+	display: none !important;
+}
+#job .offer,
+#job .ride,
+#job .slip {
+	position: relative;
+	box-sizing: border-box;
+	min-width: 12rem;
+	max-width: 17rem;
+	padding: 0.5rem 0.7rem 0.6rem;
+	border: 2px solid var(--cream);
+	border-radius: 0.9rem;
+	background: var(--ink);
+	box-shadow: 0 3px 0 #000;
+	color: var(--cream);
+	text-align: left;
+	font: inherit;
+}
+#job .offer {
+	overflow: hidden;
+	border-color: var(--yellow);
+	cursor: pointer;
+	pointer-events: auto;
+	touch-action: none;
+}
+#job .offer.ping {
+	animation: job-ping 0.5s ease-out;
+}
+@keyframes job-ping {
+	0%,
+	40% {
+		transform: translateX(-0.25rem) rotate(-1deg);
+	}
+	20%,
+	60% {
+		transform: translateX(0.25rem) rotate(1deg);
+	}
+	100% {
+		transform: none;
+	}
+}
+/* How long the offer still stands, burning down along the bottom. */
+#job .fuse {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	height: 0.25rem;
+	width: calc(var(--fuse, 1) * 100%);
+	background: var(--yellow);
+}
+#job .route,
+#job .goal {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: 0.15rem 0.4rem;
+	font-weight: 800;
+	line-height: 1.15;
+}
+#job .kitchen {
+	width: 28px;
+	height: 28px;
+}
+#job .icon {
+	margin: 0;
+	width: 28px;
+	height: 28px;
+}
+#job .to,
+#job .where {
+	font-size: 1.15rem;
+}
+#job .deal {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	margin-top: 0.4rem;
+	font:
+		800 1.1rem / 1 ui-monospace,
+		monospace;
+}
+#job .pay {
+	color: var(--green);
+}
+#job .limit::before {
+	content: '⏱ ';
+}
+#job kbd {
+	margin-left: auto;
+	padding: 0 0.25em;
+	border-radius: 0.25em;
+	background: var(--cream);
+	box-shadow: 0 2px 0 #9a9a98;
+	color: var(--ink);
+	font:
+		800 0.6rem / 1.3 system-ui,
+		sans-serif;
+}
+/* On the way to the kitchen only the kitchen shows; with the bag on, the door. */
+#job .ride[data-leg='pickup'] .door,
+#job .ride[data-leg='deliver'] .kitchen {
+	display: none;
+}
+#job .left {
+	display: block;
+	margin-top: 0.2rem;
+	font:
+		800 2rem / 1.05 ui-monospace,
+		monospace;
+	font-variant-numeric: tabular-nums;
+}
+#job .ride[data-leg='pickup'] .left {
+	opacity: 0.45;
+}
+#job .ride.late .left {
+	color: var(--red);
+}
+#job .items {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2rem;
+	margin-top: 0.3rem;
+}
+#job .items span {
+	padding: 0 0.35rem;
+	border-radius: 0.3rem;
+	background: var(--cream);
+	color: var(--ink);
+	font:
+		800 0.75rem / 1.4 system-ui,
+		sans-serif;
+}
+#job .items span.spilt {
+	background: var(--red);
+	color: #fff;
+	text-decoration: line-through;
+}
+#job .slip {
+	text-align: center;
+	animation: job-slip 0.25s ease-out;
+}
+@keyframes job-slip {
+	from {
+		transform: translateY(-1rem);
+		opacity: 0;
+	}
+}
+#job .total {
+	display: block;
+	font:
+		800 2.6rem / 1 ui-monospace,
+		monospace;
+	color: var(--green);
+}
+#job .total.gone {
+	color: var(--red);
+}
+#job .slip em {
+	display: inline-block;
+	margin-top: 0.3rem;
+	padding: 0 0.4rem;
+	border-radius: 0.3rem;
+	background: var(--red);
+	color: #fff;
+	font:
+		900 0.9rem / 1.4 system-ui,
+		sans-serif;
+	font-style: normal;
+	text-transform: uppercase;
+}
+#job .slip ol {
+	margin: 0.4rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+#job .slip li {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-weight: 800;
+}
+#job .slip li b {
+	margin-left: auto;
+	font-family: ui-monospace, monospace;
+}
+#job .slip li.tip b {
+	color: var(--green);
+}
+#job .slip li.knocks b {
+	color: var(--red);
+}
+/* A race's watch has the corner while it runs. */
+body:has(#race .watch:not([hidden])) #job {
+	top: calc(10rem + env(safe-area-inset-top));
+}
+body.touch #job {
+	top: calc(5.5rem + min(128px, 25dvh) + env(safe-area-inset-top));
+}
+body.touch #job kbd {
+	display: none;
+}

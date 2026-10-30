@@ -42,7 +42,9 @@ export function createMinimap(world) {
 	}
 	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: world.buildings })
 	let next = 0
-	return function update(player, chase, inside, gate) {
+	// `gate` is the race's next gate, { x, y, label }, or null; `job` the
+	// courier's kitchen or door, { x, y, job, hint }, or null.
+	return function update(player, chase, inside, gate, job) {
 		const hidden = !!inside || !image
 		if (canvas.hidden !== hidden) canvas.hidden = hidden
 		const now = performance.now()
@@ -101,6 +103,8 @@ export function createMinimap(world) {
 			ctx.fillStyle = INK
 			ctx.fillText(gate.label, point.x, point.y + 0.5)
 		}
+		if (job) courierMark(ctx, job, player, rotation)
+		// North moves round the rim when the map turns.
 		ctx.font = 'bold 8px monospace'
 		ctx.textAlign = 'center'
 		ctx.textBaseline = 'middle'
@@ -123,5 +127,49 @@ export function createMinimap(world) {
 		ctx.fill()
 		ctx.restore()
 		note('minimap', performance.now() - now)
+	}
+}
+
+// The courier's way: the kitchen as a yellow badge with a bag on it, like
+// the race gate's, pinned to the rim when it's far. The door too, until you
+// get near; then it's a ring round its stretch of street, somewhere in there.
+function courierMark(ctx, job, player, rotation) {
+	const near = job.hint && Math.hypot(job.hint.x - player.x, job.hint.y - player.y) < RANGE - job.hint.r * 0.5
+	ctx.lineWidth = 2
+	ctx.strokeStyle = INK
+	if (near) {
+		const point = radarPoint(job.hint, player, rotation)
+		ctx.beginPath()
+		ctx.arc(point.x, point.y, job.hint.r * SCALE, 0, Math.PI * 2)
+		ctx.fillStyle = 'rgba(232, 194, 26, 0.35)'
+		ctx.fill()
+		ctx.setLineDash([3, 2])
+		ctx.strokeStyle = '#b0890a'
+		ctx.stroke()
+		ctx.setLineDash([])
+		return
+	}
+	const { x, y } = radarPoint(job, player, rotation)
+	ctx.beginPath()
+	ctx.arc(x, y, 6.5, 0, Math.PI * 2)
+	ctx.fillStyle = '#e8c21a'
+	ctx.fill()
+	ctx.stroke()
+	ctx.fillStyle = INK
+	if (job.job === 'pickup') {
+		ctx.fillRect(x - 3, y - 1.5, 6, 4.5)
+		ctx.lineWidth = 1.2
+		ctx.beginPath()
+		ctx.arc(x, y - 1.5, 1.8, Math.PI, 0)
+		ctx.stroke()
+	} else {
+		ctx.beginPath()
+		ctx.moveTo(x, y - 4)
+		ctx.lineTo(x + 3.5, y - 0.5)
+		ctx.lineTo(x + 3.5, y + 3)
+		ctx.lineTo(x - 3.5, y + 3)
+		ctx.lineTo(x - 3.5, y - 0.5)
+		ctx.closePath()
+		ctx.fill()
 	}
 }
