@@ -15,8 +15,14 @@ test('a job goes from a kitchen near you to a door a fair ride away', () => {
 	expect(job.items.length).toBeGreaterThan(1)
 })
 
-test('no kitchen nearby, no job', () => {
+test('no kitchen at all, no job', () => {
 	expect(offerJob([shop('bakery', 50, 0)], [door('1', 200, 0)], 0, 0)).toBeNull()
+})
+
+test('ridden out of the Kiez, the job comes from the nearest kitchen', () => {
+	const far = shop('doener', 1000, 0)
+	const job = offerJob([far, shop('doener', 3000, 0)], [door('1', 1200, 0)], 0, 0, () => 0)
+	expect(job.from).toBe(far)
 })
 
 test('quick pays a tip, late pays half, knocks cost', () => {

@@ -33,7 +33,9 @@ const ORDERS = {
 }
 
 export function offerJob(shops, doors, x, y, random = Math.random) {
-	const kitchens = shops.filter((s) => KITCHENS.has(s.kind) && within(s.stand, x, y, PICKUP))
+	const all = shops.filter((s) => KITCHENS.has(s.kind))
+	let kitchens = all.filter((s) => within(s.stand, x, y, PICKUP))
+	if (!kitchens.length) kitchens = nearest(all, x, y, 3)
 	if (!kitchens.length || !doors.length) return null
 	for (let tries = 0; tries < 8; tries++) {
 		const from = kitchens[Math.floor(random() * kitchens.length)]
@@ -45,6 +47,13 @@ export function offerJob(shops, doors, x, y, random = Math.random) {
 	}
 	return null
 }
+
+const nearest = (shops, x, y, n) =>
+	shops
+		.map((s) => [Math.hypot(s.stand.x - x, s.stand.y - y), s])
+		.sort((a, b) => a[0] - b[0])
+		.slice(0, n)
+		.map(([, s]) => s)
 
 export const timeFor = (tiles) => Math.round((tiles * DETOUR) / BIKE + FIND)
 
