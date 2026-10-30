@@ -1,9 +1,11 @@
 import * as THREE from 'three'
-import { INK, POSTER_FONT } from './poster.js'
+import { INK } from './poster.js'
 
 const BADGE = { size: 2.2, lift: 2.2 }
-const PLATE = { width: 1.25, lift: 1.1, near: 40 } // tiles; plates show within `near` of you
-const ENAMEL = '#173b7a'
+const PLATE = { width: 1.14, lift: 1.2, near: 40 } // tiles; plates show within `near` of you
+const FACE = 160 // enamel plate texture, wider than tall like the ones on Berlin doorways
+const FACE_H = 136
+const FACE_PAPER = '#f2eee0'
 
 function canvasMaterial(draw, w, h) {
 	const canvas = document.createElement('canvas')
@@ -45,26 +47,68 @@ function plate(number) {
 	if (plates.has(number)) return plates.get(number)
 	const material = canvasMaterial(
 		(g, w, h) => {
+			const edge = 7
+			const rim = 10
+			const enamel = g.createLinearGradient(0, edge, 0, h - edge)
+			enamel.addColorStop(0, '#fbf8ee')
+			enamel.addColorStop(0.45, FACE_PAPER)
+			enamel.addColorStop(1, '#dcd7c5')
+			g.save()
+			g.shadowColor = 'rgba(0, 0, 0, .35)'
+			g.shadowBlur = 9
+			g.shadowOffsetY = 4
+			g.fillStyle = enamel
 			g.beginPath()
-			g.roundRect(4, 4, w - 8, h - 8, 14)
-			g.fillStyle = ENAMEL
+			g.roundRect(edge, edge, w - edge * 2, h - edge * 2, rim)
 			g.fill()
-			g.lineWidth = 6
-			g.strokeStyle = '#f4f2ea'
-			g.stroke()
-			g.lineWidth = 4
+			g.restore()
+			g.lineWidth = 5
 			g.strokeStyle = INK
 			g.beginPath()
-			g.roundRect(1, 1, w - 2, h - 2, 16)
+			g.roundRect(edge, edge, w - edge * 2, h - edge * 2, rim)
 			g.stroke()
-			g.fillStyle = '#f4f2ea'
-			g.font = `900 ${number.length > 3 ? 46 : 60}px ${POSTER_FONT}`
+			g.lineWidth = 2
+			g.strokeStyle = 'rgba(26, 30, 27, .45)'
+			g.beginPath()
+			g.roundRect(edge + 7, edge + 7, w - (edge + 7) * 2, h - (edge + 7) * 2, rim - 5)
+			g.stroke()
+			// The glaze catches the light along the top, like old enamel.
+			g.save()
+			g.beginPath()
+			g.roundRect(edge, edge, w - edge * 2, h - edge * 2, rim)
+			g.clip()
+			const gloss = g.createLinearGradient(0, edge, 0, h * 0.55)
+			gloss.addColorStop(0, 'rgba(255, 255, 255, .5)')
+			gloss.addColorStop(1, 'rgba(255, 255, 255, 0)')
+			g.fillStyle = gloss
+			g.fillRect(edge, edge, w - edge * 2, h)
+			g.restore()
+			for (const [x, y] of [
+				[edge + 10, edge + 10],
+				[w - edge - 10, edge + 10],
+				[edge + 10, h - edge - 10],
+				[w - edge - 10, h - edge - 10],
+			]) {
+				g.fillStyle = 'rgba(26, 30, 27, .5)'
+				g.beginPath()
+				g.arc(x, y, 2, 0, Math.PI * 2)
+				g.fill()
+			}
+			const text = number.toUpperCase()
+			const room = w - edge * 2 - 34
+			let size = Math.round(h * 0.58)
+			for (;;) {
+				g.font = `800 ${size}px Arial, "Helvetica Neue", sans-serif`
+				if (g.measureText(text).width <= room || size <= 22) break
+				size--
+			}
+			g.fillStyle = INK
 			g.textAlign = 'center'
 			g.textBaseline = 'middle'
-			g.fillText(number, w / 2, h / 2 + 3)
+			g.fillText(text, w / 2, h / 2 + size * 0.03)
 		},
-		128,
-		84,
+		FACE,
+		FACE_H,
 	)
 	plates.set(number, material)
 	return material
@@ -120,7 +164,7 @@ export function createCourierMarks(scene, heightAt = () => 0) {
 				const x = d.x + d.nx * 0.35
 				const y = d.y + d.ny * 0.35
 				sprite.position.set(x, -y, heightAt(x, y) + PLATE.lift)
-				sprite.scale.set(PLATE.width, (PLATE.width * 84) / 128, 1)
+				sprite.scale.set(PLATE.width, (PLATE.width * FACE_H) / FACE, 1)
 			})
 		},
 	}
