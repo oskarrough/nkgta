@@ -103,7 +103,7 @@ export function createCourierHud({ accept, pocket }) {
 
 		paid({ base, tip, knocks, total, late }) {
 			const rows = [
-				`<li><img class="icon" src="/icons/job-bag.png" alt="Fahrt"><b>${euro(base)}</b></li>`,
+				`<li><img class="icon" src="/icons/job-bag.png" alt=""><span>Fahrt</span><b>${euro(base)}</b></li>`,
 				tip ? `<li><span>Trinkgeld</span><b>+${euro(tip)}</b></li>` : '',
 				knocks ? `<li><span>verschüttet</span><b>−${euro(knocks)}</b></li>` : '',
 			]
