@@ -20,7 +20,7 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 		<div class="watch" hidden><div class="gates"></div><b class="time"></b><span class="split"></span><button type="button" class="next-step"></button></div>
 		<div class="race-buttons">
 			<button type="button" class="restart" aria-label="Neustart (Q)" title="Neustart (Q)"><img class="icon" src="/icons/race-restart.png" alt=""><kbd>Q</kbd></button>
-			<button type="button" class="finish" aria-label="Rennen fertig (F)" title="Rennen fertig (F)"><img class="icon" src="/icons/race-finish.png" alt=""><kbd>F</kbd></button>
+			<button type="button" class="finish" aria-label="Rennen beenden (F)" title="Rennen beenden (F)"><img class="icon" src="/icons/race-finish.png" alt=""><kbd>F</kbd></button>
 		</div>
 		<div class="card" hidden></div>
 		</div>
