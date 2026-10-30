@@ -65,7 +65,7 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 		} catch {
 			if (ticket !== generation) return
 			close()
-			say('Quiz konnte nicht laden. Versuch es noch einmal.')
+			say('Quiz lädt nicht. Versuch’s nochmal.')
 			return
 		}
 		if (ticket !== generation) return
@@ -100,11 +100,11 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 	}
 	function reportSendFailure() {
 		sendFailed = true
-		if (!active()) say('Quiz-Antwort konnte nicht gesendet werden.')
+		if (!active()) say('Antwort ging nicht raus.')
 		else if (phase === 'done' && !root.querySelector('[role=status]')) {
 			const notice = document.createElement('p')
 			notice.setAttribute('role', 'status')
-			notice.textContent = 'Nicht alle Antworten konnten gesendet werden.'
+			notice.textContent = 'Ein paar Antworten gingen nicht raus.'
 			root.append(notice)
 		}
 	}
@@ -231,7 +231,7 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 			const streets = streetSpots(world)
 			rounds = quizRounds(streets, date ? seeded(`quiz|${area}|${date}`) : Math.random)
 			if (!rounds.length) {
-				say('Für das Quiz braucht die Gegend mindestens fünf Straßen.')
+				say('Zu wenig Straßen hier fürs Quiz: es braucht fünf.')
 				return
 			}
 			saved = { player: { ...player }, camera: camera.selected() }
