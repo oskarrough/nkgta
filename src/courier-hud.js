@@ -97,7 +97,7 @@ export function createCourierHud({ accept, pocket }) {
 		picked: () => chime([880, 1320]),
 		bump: () => sound.spill(1),
 		lost() {
-			slip.innerHTML = '<b class="total">€0,00</b><em>Essen weg</em>'
+			slip.innerHTML = '<b class="total">0,00&nbsp;€</b><em>Essen weg</em>'
 			showSlip()
 		},
 

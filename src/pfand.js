@@ -4,7 +4,7 @@ import { T } from './tiles.js'
 const BAG_SIZE = 30
 const RESPAWN_MS = 20000
 
-export const euro = (c) => `€${(c / 100).toFixed(2).replace('.', ',')}`
+export const euro = (c) => `${(c / 100).toFixed(2).replace('.', ',')}\u00a0€`
 
 export function createPfand(world) {
 	const bottles = []
