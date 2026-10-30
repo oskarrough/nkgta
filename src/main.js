@@ -70,10 +70,13 @@ const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
 const pocket = createPocket({
 	turnStation(step) {
-		if (music.nextStation(!!player.car, step)) sound.tick()
+		const turned = music.nextStation(!!player.car, step)
+		if (turned) sound.tick()
+		return turned
 	},
 	toggleMute,
 })
+const pocketMap = createPocketMap({ world, pocket })
 const draw = createRenderer(canvas, world, shops)
 const visit = createVisit({ city3d, shops, player, pfand, say: hud.say, heightAt: world.heightAt, opening })
 const veil = document.getElementById('veil')
@@ -113,7 +116,6 @@ const racing = createRacing({
 	say: hud.say,
 	snapCamera: () => camera.snap(player),
 })
-createPocketMap({ world, player, pocket, targets: () => ({ gate: racing.target(), job: courier.target() }) })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
@@ -171,7 +173,6 @@ const actions = {
 	finishRace: () => racing.finish(),
 	restartRace: () => racing.restart(),
 	acceptJob: () => courier.accept(),
-	nextApp: () => pocket.next(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 	openFeedback() {
 		showMenu(false)
@@ -444,12 +445,18 @@ function frame(now) {
 	input.setUse(action)
 	input.setDriving(!!player.car)
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
+	pocketMap.follow({
+		at: street,
+		heading: player.car?.angle ?? player.dir,
+		chase: !!cam.third,
+		gate: racing.target(),
+		job: courier.target(),
+	})
 	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car }, dt)
 	courier.update(dt, { inside: visit.busy() || quiz.active(), busy: !!racing.target(), down: wasted.active() })
 	hud.update(
 		{
 			player,
-			cam,
 			bag: pfand.bag,
 			showTransit,
 			wasted: wasted.shown() ? 'WASTED' : police.shown() ? 'BUSTED' : '',
@@ -457,8 +464,6 @@ function frame(now) {
 			inside: visit.shop(),
 			door,
 			action,
-			gate: racing.target(),
-			job: courier.target(),
 		},
 		dt,
 	)

@@ -1,14 +1,14 @@
 #pocket {
-	--s: 0.62;
 	--lcd: #b9cfa4;
 	--lcd-lit: #d6ee9c;
 	--lcd-ink: #1f2d1b;
 	--lcd-dim: rgba(31, 45, 27, 0.2);
+	--screen-h: 9rem;
 	position: fixed;
 	z-index: 11;
-	top: calc(6rem + env(safe-area-inset-top));
+	top: calc(5rem + env(safe-area-inset-top));
 	right: calc(0.75rem + env(safe-area-inset-right));
-	width: 10.4rem;
+	width: 13rem;
 	padding: 0.55rem 0.55rem 0.6rem;
 	box-sizing: border-box;
 	border: 2px solid #1a1e1b;
@@ -20,11 +20,7 @@
 		0 3px 0 #000,
 		inset 0 2px 0 rgba(255, 255, 255, 0.7),
 		inset 0 -4px 0 rgba(0, 0, 0, 0.16);
-	transform: scale(var(--s));
-	transform-origin: 100% 0;
-	transition:
-		transform 0.18s ease-out,
-		opacity 0.25s ease-out;
+	transition: opacity 0.25s ease-out;
 	font-family: system-ui, sans-serif;
 	touch-action: none;
 	user-select: none;
@@ -32,43 +28,27 @@
 	-webkit-touch-callout: none;
 	cursor: grab;
 }
+body.touch #pocket {
+	--screen-h: 7.2rem;
+	width: 10.6rem;
+}
+@media (max-width: 600px) {
+	#pocket {
+		--screen-h: 7.2rem;
+		width: 10.6rem;
+	}
+}
 #pocket.asleep {
 	opacity: 0;
 	visibility: hidden;
 	transition: none;
 }
-#pocket.open,
-#pocket:focus-within {
-	--s: 1;
-}
 #pocket.held {
-	--s: 1.05;
-	transition: none;
 	cursor: grabbing;
 	box-shadow:
 		0 8px 0 rgba(0, 0, 0, 0.45),
 		inset 0 2px 0 rgba(255, 255, 255, 0.7),
 		inset 0 -4px 0 rgba(0, 0, 0, 0.16);
-}
-/* Something wants you: it buzzes on the table. */
-#pocket.ring {
-	animation: pocket-ring 0.5s ease-out;
-}
-@keyframes pocket-ring {
-	0%,
-	40% {
-		translate: -0.2rem 0;
-		rotate: -2deg;
-	}
-	20%,
-	60% {
-		translate: 0.2rem 0;
-		rotate: 2deg;
-	}
-	100% {
-		translate: none;
-		rotate: none;
-	}
 }
 #pocket::before {
 	content: '';
@@ -93,13 +73,8 @@
 	background: #6b604c;
 }
 #pocket.lit .led {
-	animation: pocket-led 0.6s steps(1) infinite;
-}
-@keyframes pocket-led {
-	50% {
-		background: #ffd21a;
-		box-shadow: 0 0 0.4rem #ffd21a;
-	}
+	background: #ffd21a;
+	box-shadow: 0 0 0.4rem #ffd21a;
 }
 #pocket button {
 	padding: 0;
@@ -110,39 +85,11 @@
 #pocket button:focus-visible {
 	outline: 2px solid #e8c21a;
 }
-#pocket .switch {
-	position: absolute;
-	top: 1.1rem;
-	left: -0.6rem;
-	width: 0.55rem;
-	height: 1.6rem;
-	border: 2px solid #1a1e1b;
-	border-right: 0;
-	border-radius: 0.3rem 0 0 0.3rem;
-	background: #3b3a35;
-}
-#pocket .switch::after {
-	content: '';
-	position: absolute;
-	left: 0.05rem;
-	right: 0;
-	top: 0.1rem;
-	height: 0.65rem;
-	border-radius: 0.15rem 0 0 0.15rem;
-	background: linear-gradient(#a59c88, #77705f);
-	transition: top 0.1s;
-}
-#pocket.muted .switch {
-	background: #d8352a;
-}
-#pocket.muted .switch::after {
-	top: 0.75rem;
-}
 #pocket .screen {
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	height: 6.4rem;
+	height: var(--screen-h);
 	padding: 0.2rem 0.35rem 0.3rem;
 	box-sizing: border-box;
 	overflow: hidden;
@@ -157,32 +104,69 @@
 	transition: background 0.2s;
 	isolation: isolate;
 }
-#pocket.muted .screen {
-	background: #a5b394;
-}
 #pocket.lit .screen {
 	background: var(--lcd-lit);
 	box-shadow:
 		inset 0 2px 0 rgba(0, 0, 0, 0.12),
 		0 0 0.6rem rgba(214, 238, 156, 0.8);
 }
-#pocket .status {
+/* What you hear runs along the top line, with the job's clock and the volume. */
+#pocket .top {
 	display: flex;
 	align-items: center;
 	gap: 0.3rem;
-	height: 0.7rem;
+	height: 0.8rem;
 	margin-bottom: 0.15rem;
 	font:
-		800 0.55rem / 1 ui-monospace,
+		800 0.6rem / 1 ui-monospace,
 		monospace;
+	white-space: nowrap;
+}
+#pocket .ticker {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+#pocket .ticker span {
+	display: inline-block;
+}
+#pocket .ticker.run span {
+	animation: pocket-ticker var(--run, 6s) linear infinite alternate;
+}
+@keyframes pocket-ticker {
+	0%,
+	15% {
+		translate: 0;
+	}
+	85%,
+	100% {
+		translate: var(--over, 0);
+	}
+}
+#pocket.muted .ticker {
+	text-decoration: line-through;
+}
+#pocket .tags:empty {
+	display: none;
 }
 #pocket .tags {
-	flex: 1;
-	overflow: hidden;
-	white-space: nowrap;
+	padding: 0.05rem 0.2rem;
+	background: var(--lcd-ink);
+	color: var(--lcd);
+	font-variant-numeric: tabular-nums;
+}
+#pocket .tags.urgent {
+	animation: pocket-late 1s steps(1) infinite;
+}
+@keyframes pocket-late {
+	50% {
+		background: transparent;
+		color: var(--lcd-ink);
+	}
 }
 #pocket .volume {
 	position: relative;
+	flex: none;
 	width: 2.2rem;
 	height: 0.3rem;
 	background: repeating-linear-gradient(to right, var(--lcd-dim) 0 8%, transparent 8% 10%);
@@ -198,14 +182,12 @@
 	flex: 1;
 	min-height: 0;
 	overflow: hidden;
+	animation: pocket-page 0.15s steps(3, jump-start);
 }
 #pocket .page[hidden] {
 	display: none;
 }
-/* A new app comes up the way an LCD redraws: in a couple of grey steps. */
-#pocket .page {
-	animation: pocket-page 0.15s steps(3, jump-start);
-}
+/* A new screen comes up the way an LCD redraws: in a couple of grey steps. */
 @keyframes pocket-page {
 	from {
 		opacity: 0.2;
@@ -216,124 +198,101 @@
 	filter: grayscale(1) contrast(1.4);
 	mix-blend-mode: multiply;
 }
-#pocket .app-sound {
+#pocket .lower {
 	display: flex;
-	flex-direction: column;
-	justify-content: center;
+	align-items: flex-start;
+	justify-content: space-between;
+	margin-top: 0.5rem;
+	padding-bottom: 0.7rem;
 }
-#pocket .app-sound b,
-#pocket .app-sound span {
-	display: block;
-	overflow: hidden;
-	white-space: nowrap;
-	text-overflow: ellipsis;
-}
-#pocket .app-sound b {
-	font-size: 0.85rem;
-	font-weight: 800;
-	text-transform: uppercase;
-	letter-spacing: 0.03em;
-}
-#pocket .app-sound span {
-	min-height: 0.9rem;
-	font-size: 0.75rem;
-	font-weight: 700;
-}
-/* The rubber keys, one per app; the one on is pressed in with its light on. */
+/* Rubber keys with their names printed on the case under them. */
 #pocket .keys {
 	display: flex;
-	gap: 0.25rem;
-	margin-top: 0.45rem;
+	gap: 0.45rem;
+	margin-left: 0.15rem;
 }
 #pocket .keys button {
-	position: relative;
-	flex: 1;
-	display: grid;
-	place-items: center;
-	height: 1.45rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.3rem;
+	background: none;
+}
+#pocket .keys img {
+	box-sizing: content-box;
+	width: 16px;
+	height: 16px;
+	padding: 0.3rem 0.55rem;
 	border: 2px solid #1a1e1b;
 	border-radius: 0.55rem;
 	background: linear-gradient(#5a5850, #3b3a35);
 	box-shadow:
 		0 2px 0 #000,
 		inset 0 1px 0 rgba(255, 255, 255, 0.25);
-}
-#pocket .keys img {
-	width: 16px;
-	height: 16px;
 	image-rendering: pixelated;
-	pointer-events: none;
-}
-#pocket .keys button {
 	transition:
 		translate 0.06s,
 		background 0.1s;
 }
-#pocket .keys button:active {
-	translate: 0 2px;
-}
-#pocket .keys button.on {
+#pocket .keys button:active img,
+#pocket .keys button.on img {
 	translate: 0 2px;
 	background: linear-gradient(#3b3a35, #2b2a26);
 	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
 }
-#pocket .keys button::after {
-	content: '';
-	position: absolute;
-	top: -0.35rem;
-	left: 50%;
-	width: 0.2rem;
-	height: 0.2rem;
-	margin-left: -0.1rem;
-	border-radius: 50%;
-	background: transparent;
-}
-#pocket .keys button.on::after {
-	top: calc(-0.35rem - 2px);
-	background: #ff6a1a;
-}
-#pocket .keys button.flag {
-	animation: pocket-key 0.6s steps(1) infinite;
-}
-@keyframes pocket-key {
-	50% {
-		background: #e8c21a;
-	}
-}
-#pocket .lower {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-top: 0.45rem;
-}
-#pocket .grille {
-	width: 3.6rem;
-	height: 1.6rem;
-	margin-left: 0.3rem;
-	background: radial-gradient(circle, #3b3a35 0 0.1rem, transparent 0.12rem) 0 0 / 0.4rem 0.4rem;
-	opacity: 0.7;
+#pocket .keys span {
+	color: #5a5244;
+	font:
+		900 0.5rem / 1 system-ui,
+		sans-serif;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 }
 #pocket .dial {
 	position: relative;
-	width: 2.7rem;
-	height: 2.7rem;
-	margin-right: 0.6rem;
+	width: 3rem;
+	height: 3rem;
+	margin-right: 0.3rem;
 }
-#pocket.car .dial::before,
-#pocket.car .dial::after {
+/* Holding the knob down fills a ring round it; full, it mutes. */
+#pocket .dial::after {
+	content: '';
+	position: absolute;
+	inset: -0.3rem;
+	border-radius: 50%;
+	background: conic-gradient(#d8352a calc(var(--fill, 0) * 1turn), transparent 0);
+	mask: radial-gradient(circle, transparent 62%, #000 64%);
+	opacity: 0;
+	pointer-events: none;
+}
+#pocket .dial.pressing::after {
+	animation: pocket-fill 0.6s linear forwards;
+}
+@property --fill {
+	syntax: '<number>';
+	inherits: false;
+	initial-value: 0;
+}
+@keyframes pocket-fill {
+	from {
+		--fill: 0;
+		opacity: 0;
+	}
+	30% {
+		opacity: 1;
+	}
+	to {
+		--fill: 1;
+		opacity: 1;
+	}
+}
+#pocket.car .dial::before {
 	content: '';
 	position: absolute;
 	top: 50%;
+	right: -0.55rem;
 	margin-top: -0.25rem;
 	border: 0.25rem solid transparent;
-}
-#pocket.car .dial::before {
-	left: -0.6rem;
-	border-right: 0.35rem solid #6b604c;
-	border-left: 0;
-}
-#pocket.car .dial::after {
-	right: -0.6rem;
 	border-left: 0.35rem solid #6b604c;
 	border-right: 0;
 }
@@ -353,15 +312,23 @@
 	top: 0.22rem;
 	left: 50%;
 	width: 0.26rem;
-	height: 0.7rem;
+	height: 0.75rem;
 	margin-left: -0.13rem;
 	border-radius: 0.13rem;
 	background: #ff6a1a;
 }
+#pocket.muted .knob {
+	box-shadow:
+		0 2px 0 #000,
+		0 0 0 2px #d8352a;
+}
+#pocket.muted .knob i {
+	background: #77705f;
+}
 #pocket .sticker {
 	position: absolute;
-	bottom: 0.7rem;
-	left: 0.5rem;
+	bottom: 0.45rem;
+	left: 0.6rem;
 	padding: 0.1rem 0.2rem;
 	border-radius: 0.2rem;
 	background: #f2d32a;
@@ -370,7 +337,7 @@
 	font-size: 0.5rem;
 	font-weight: 900;
 	letter-spacing: 0.02em;
-	transform: rotate(-14deg);
+	transform: rotate(-8deg);
 	pointer-events: none;
 }
 #pocket .app-post {
@@ -431,11 +398,44 @@
 }
 #pocket .app-map small {
 	position: absolute;
-	left: 0.1rem;
+	right: 0.1rem;
 	bottom: 0;
 	padding: 0 0.2rem;
 	background: var(--lcd);
 	font:
 		800 0.55rem / 1.3 ui-monospace,
 		monospace;
+}
+/* During a job: where you're headed, along the map's bottom edge. */
+#pocket .app-map .goal {
+	position: absolute;
+	left: 0.1rem;
+	right: 0.1rem;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.05rem 0.25rem;
+	background: var(--lcd-ink);
+	color: var(--lcd);
+	font:
+		800 0.68rem / 1.2 system-ui,
+		sans-serif;
+}
+#pocket .app-map .goal[hidden] {
+	display: none;
+}
+#pocket .app-map:has(.goal:not([hidden])) small {
+	display: none;
+}
+#pocket .app-map .goal b {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+#pocket .app-map .goal em {
+	flex: none;
+	margin-left: auto;
+	font-style: normal;
+	opacity: 0.8;
 }

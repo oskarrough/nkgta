@@ -3,8 +3,6 @@ import { bottleIcon } from './sprites.js'
 import { nearBike } from './player.js'
 import { euro } from './pfand.js'
 import { T } from './tiles.js'
-import { createMinimap } from './minimap.js'
-import './minimap.css'
 
 export function useHint(player, car) {
 	if (player.car) return 'aussteigen'
@@ -29,7 +27,6 @@ const STOP_DOT = { ubahn: '#115d91', bus: '#f5d000' }
 const PRIVATE_DOT = '#9d9484'
 
 export function createHud(world) {
-	const minimap = createMinimap(world)
 	// Only touch the DOM when text changes; writing it every frame costs a layout.
 	const shown = {}
 	function set(id, text) {
@@ -65,8 +62,7 @@ export function createHud(world) {
 
 		// `inside` is the shop you're in; `door` is what E does at a shop door.
 		// `wasted` is the big word across the screen, WASTED or BUSTED, if any.
-		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate, job, heat = 0 }, dt) {
-			minimap(player, !!cam.third, inside, gate, job)
+		update({ player, bag, showTransit, wasted, inside, door, action, heat = 0 }, dt) {
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
 			const shopName = door && !door.startsWith('E: ') ? door.split(' · ').pop() : null

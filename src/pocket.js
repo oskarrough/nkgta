@@ -1,108 +1,107 @@
 import './pocket.css'
 import { sound } from './sound.js'
 
-const OPEN = 4 // seconds it stays big after a change
 const TURN = 270 // degrees of knob from silent to full
-const HOLD = 350 // ms a touch holds still before it drags the device
-const MOVED = 5 // px a pointer moves before it's a drag, not a tap
+const HOLD = 350 // ms a finger holds the body still before it drags the device
+const MUTE = 600 // ms the knob is held down before it mutes
+const MOVED = 5 // px a pointer moves before it's a drag or a turn, not a tap
 const EDGE = 8 // px from the screen's edge
 const CORNER = 0.2 // this close to a second edge, it goes in the corner
 const STORE = 'nk-pocket'
-const SETTLE = 3 // seconds after it first shows when a new song doesn't make it jump
+const SAY = 2.5 // seconds a note from the device itself stays on its top line
 
-function soundApp() {
-	const page = document.createElement('div')
-	page.className = 'app-sound'
-	page.innerHTML = '<b></b><span></span>'
-	const [name, title] = page.children
-	return {
-		id: 'sound',
-		icon: 'speaker',
-		label: 'Musik',
-		page,
-		draw({ radio, hearing, muted }) {
-			const now = muted ? { name: 'Ton aus', title: '' } : radio ? { name: radio.name ?? 'Radio aus', title: radio.title ?? '' } : hearing
-			name.textContent = now?.name ?? 'Straße'
-			title.textContent = now?.title ?? ''
-			return `${name.textContent}:${title.textContent}`
-		},
-	}
-}
-
-// The one piece of interface: a scuffed handheld whose screen runs one app at a
-// time, picked with the rubber keys under it. Apps bring their own page; one
-// that needs you `alert`s and takes the screen, and `release` hands it back.
+// The one piece of interface: a scuffed handheld. Its screen shows the map
+// unless something else needs it; the knob is the radio; two rubber keys open
+// the races and the post. It never changes size: it's in your hand, not a window.
 export function createPocket({ turnStation, toggleMute }) {
 	const el = document.createElement('div')
 	el.id = 'pocket'
 	// Hidden until its first frame is drawn, so it appears once, settled.
 	el.className = 'asleep'
 	el.innerHTML = `
-		<button type="button" class="switch" aria-label="Ton aus (L)" title="Ton aus (L)"></button>
 		<i class="led"></i>
-		<div class="screen"><div class="status"><b class="tags"></b><i class="volume"></i></div></div>
-		<div class="keys"></div>
+		<div class="screen"><div class="top"><div class="ticker"><span></span></div><b class="tags"></b><i class="volume"></i></div></div>
 		<div class="lower">
-			<span class="grille"></span>
-			<div class="dial"><button type="button" class="knob" aria-label="Sender wechseln (R)" title="Drehen: Lautstärke · Tippen: Sender (R)"><i></i></button></div>
+			<div class="keys"></div>
+			<div class="dial"><button type="button" class="knob" aria-label="Lautstärke" title="Drehen: Lautstärke · Tippen: Sender (R) · Halten: Ton aus (L)"><i></i></button></div>
 		</div>
 		<span class="sticker">NK 44</span>`
 	document.body.append(el)
 	const knob = el.querySelector('.knob')
-	const muteSwitch = el.querySelector('.switch')
+	const dial = el.querySelector('.dial')
 	const screen = el.querySelector('.screen')
 	const keys = el.querySelector('.keys')
+	const ticker = el.querySelector('.ticker')
+	const tickerText = ticker.querySelector('span')
 	const tags = el.querySelector('.tags')
 	const volumeBars = el.querySelector('.volume')
 	const apps = []
 	const tagOf = {}
-	const flagged = new Set()
+	let home = null
 	let current = null
-	let back = null // the app to go back to once an alert is over
-	let key = null
-	let open = 0
-	let awake = 0
+	let back = null // where an alert hands the screen back to
+	let alerting = null
+	let said = null
+	let shownText = null
+	let first = true
 
 	function add(app) {
 		apps.push(app)
 		app.page.classList.add('page')
 		app.page.hidden = true
 		screen.append(app.page)
-		const button = document.createElement('button')
-		button.type = 'button'
-		button.dataset.app = app.id
-		button.title = button.ariaLabel = app.label
-		button.innerHTML = `<img src="/icons/${app.icon}.png" alt="">`
-		keys.append(button)
-		if (!current) show(app.id, { quiet: true })
-	}
-	function show(id, { quiet = false } = {}) {
-		const app = apps.find((a) => a.id === id)
-		if (!app) return
-		back = null
-		if (current !== app) {
-			if (current) current.page.hidden = true
-			current = app
-			app.page.hidden = false
-			el.dataset.app = id
-			for (const b of keys.children) b.classList.toggle('on', b.dataset.app === id)
-			app.shown?.()
-			showTags()
+		if (app.key) {
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.dataset.app = app.id
+			button.title = button.ariaLabel = app.key.title ?? app.key.label
+			button.innerHTML = `<img src="/icons/${app.key.icon}.png" alt=""><span>${app.key.label}</span>`
+			keys.append(button)
 		}
-		if (!quiet) open = OPEN
+		if (!home) {
+			home = app
+			show(app.id)
+		}
 	}
-	function next(step = 1) {
-		const i = apps.indexOf(current)
-		show(apps[(i + step + apps.length) % apps.length].id)
+	function show(id) {
+		const app = apps.find((a) => a.id === id)
+		if (!app || current === app) return
+		if (current) current.page.hidden = true
+		current = app
+		app.page.hidden = false
+		el.dataset.screen = id
+		for (const b of keys.children) b.classList.toggle('on', b.dataset.app === id)
+		app.shown?.()
+		showTags()
+	}
+	// A key opens its app, and pressed again goes back to the map.
+	function press(id) {
+		sound.tick()
+		back = null
+		show(current?.id === id ? home.id : id)
 	}
 	function showTags() {
 		tags.textContent = Object.entries(tagOf)
-			.filter(([id, text]) => text && id !== current?.id)
-			.map(([, text]) => text)
+			.filter(([id, tag]) => tag?.text && id !== current?.id)
+			.map(([, tag]) => tag.text)
 			.join(' ')
+		tags.classList.toggle(
+			'urgent',
+			Object.values(tagOf).some((tag) => tag?.urgent),
+		)
 	}
-	const sounds = soundApp()
-	add(sounds)
+	function setTicker(text) {
+		if (text === shownText) return
+		shownText = text
+		tickerText.textContent = text
+		ticker.classList.remove('run')
+		const over = tickerText.scrollWidth - ticker.clientWidth
+		if (over > 2) {
+			ticker.style.setProperty('--over', `${-over}px`)
+			ticker.style.setProperty('--run', `${3 + over / 25}s`)
+			ticker.classList.add('run')
+		}
+	}
 
 	// Where it sits: fractions of the free room across and down, or null for
 	// the default, top right under the money.
@@ -118,7 +117,6 @@ export function createPocket({ turnStation, toggleMute }) {
 		el.style.left = `${EDGE + spot.x * free.w}px`
 		el.style.top = `${EDGE + spot.y * free.h}px`
 		el.style.right = el.style.bottom = 'auto'
-		el.style.transformOrigin = `${spot.x * 100}% ${spot.y * 100}%`
 	}
 	function room() {
 		return { w: Math.max(1, innerWidth - el.offsetWidth - 2 * EDGE), h: Math.max(1, innerHeight - el.offsetHeight - 2 * EDGE) }
@@ -139,17 +137,20 @@ export function createPocket({ turnStation, toggleMute }) {
 		sound.start()
 		sound.setVolume(value)
 	}
+	function nextStation() {
+		said = turnStation(1) ? null : { text: 'Radio gibt’s im Auto', t: SAY }
+		knob.blur()
+	}
 
 	// What's on the screen of an app you type or tap in is its own; the rest of
-	// the device is hardware: drag it, turn it, press it.
+	// the device is hardware: drag it, turn the knob, press it.
 	const onScreen = (target) => !!current?.live && screen.contains(target)
 
 	let gesture = null
 	el.addEventListener('pointerdown', (e) => {
 		if (e.button > 0) return
 		sound.start()
-		open = OPEN
-		if (onScreen(e.target)) return
+		if (onScreen(e.target) || e.target.closest('.screen button')) return
 		const onKnob = !!e.target.closest('.knob')
 		const r = el.getBoundingClientRect()
 		const k = knob.getBoundingClientRect()
@@ -163,14 +164,23 @@ export function createPocket({ turnStation, toggleMute }) {
 			knob: onKnob && { x: k.left + k.width / 2, y: k.top + k.height / 2 },
 			angle: null,
 			mode: null,
-			// A mouse drags the body straight away; a finger holds it first, so taps still work.
-			hold:
-				e.pointerType === 'mouse'
+			// Held still, the knob mutes; a finger on the body drags, so taps
+			// still work. A mouse drags the body straight away.
+			hold: onKnob
+				? setTimeout(() => {
+						if (!gesture || gesture.mode) return
+						gesture.mode = 'mute'
+						dial.classList.remove('pressing')
+						toggleMute()
+						navigator.vibrate?.(20)
+					}, MUTE)
+				: e.pointerType === 'mouse'
 					? 0
 					: setTimeout(() => {
 							if (gesture && !gesture.mode) startDrag()
 						}, HOLD),
 		}
+		if (onKnob) dial.classList.add('pressing')
 		el.setPointerCapture(e.pointerId)
 	})
 	function startDrag() {
@@ -183,6 +193,7 @@ export function createPocket({ turnStation, toggleMute }) {
 		const far = Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > MOVED
 		if (!gesture.mode && far) {
 			clearTimeout(gesture.hold)
+			dial.classList.remove('pressing')
 			if (gesture.knob) gesture.mode = 'turn'
 			else if (gesture.hold === 0) startDrag()
 			else gesture.mode = 'none'
@@ -203,6 +214,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	function end(e) {
 		if (!gesture || e.pointerId !== gesture.id) return
 		clearTimeout(gesture.hold)
+		dial.classList.remove('pressing')
 		const { mode, target } = gesture
 		gesture = null
 		el.classList.remove('held')
@@ -217,31 +229,24 @@ export function createPocket({ turnStation, toggleMute }) {
 			} catch {
 				// It just won't stay there next time.
 			}
-		} else if (!mode && e.type === 'pointerup') tap(target, e.clientX)
+		} else if (!mode && e.type === 'pointerup') tap(target)
 	}
 	el.addEventListener('pointerup', end)
 	el.addEventListener('pointercancel', end)
-	function tap(target, x) {
-		const appKey = target.closest('[data-app]')
+	function tap(target) {
+		const appKey = target.closest('.keys [data-app]')
 		if (appKey) press(appKey.dataset.app)
-		else if (target.closest('.switch')) toggleMute()
-		else if (target.closest('.knob')) {
-			const k = knob.getBoundingClientRect()
-			turnStation(x < k.left + k.width * 0.35 ? -1 : 1)
-		} else if (screen.contains(target)) current.tap?.()
-	}
-	function press(id) {
-		sound.tick()
-		show(id)
+		else if (target.closest('.knob')) nextStation()
+		else if (screen.contains(target)) current.tap?.()
 	}
 	// Taps are handled above; keyboard presses still click.
 	el.addEventListener('click', (e) => {
 		if (e.detail !== 0 || onScreen(e.target)) return
 		const button = e.target.closest('button')
-		if (button === knob) turnStation(1)
-		else if (button === muteSwitch) toggleMute()
+		if (button === knob) nextStation()
 		else if (button?.dataset.app) press(button.dataset.app)
-		button?.blur()
+		else return
+		button.blur()
 	})
 	el.addEventListener(
 		'wheel',
@@ -256,38 +261,29 @@ export function createPocket({ turnStation, toggleMute }) {
 
 	return {
 		add,
-		show,
-		next,
-		current: () => current?.id,
-		// Take the screen for app `id`, light its key and shake; `release` goes
-		// back to what was on before, unless you've moved on yourself.
-		alert(id) {
-			flagged.add(id)
-			keys.querySelector(`[data-app="${id}"]`)?.classList.add('flag')
-			const busy = current?.live && el.contains(document.activeElement) && document.activeElement !== document.body
-			if (!busy && current?.id !== id) {
-				const was = current.id
-				show(id)
-				back = was
-			}
-			open = OPEN
-			el.classList.remove('ring')
-			void el.offsetWidth
-			el.classList.add('ring')
+		show(id) {
+			back = null
+			show(id)
 		},
-		// Stop buzzing but keep the screen, as when you take the call.
-		calm(id) {
-			flagged.delete(id)
-			keys.querySelector(`[data-app="${id}"]`)?.classList.remove('flag')
+		current: () => current?.id,
+		// App `id` takes the screen and lights it; `release` hands it back.
+		alert(id) {
+			if (alerting !== id && current?.id !== id) back = current
+			alerting = id
+			const typing = current?.live && el.contains(document.activeElement)
+			if (!typing) show(id)
 		},
 		release(id) {
-			this.calm(id)
-			if (current?.id === id && back) show(back)
+			if (alerting !== id) return
+			alerting = null
+			if (current?.id === id) show((back ?? home).id)
+			back = null
 		},
-		// A few characters for the status line, shown while another app has the screen.
-		tag(id, text) {
-			if (tagOf[id] === text) return
-			tagOf[id] = text
+		// A few characters on the top line, while another app has the screen.
+		tag(id, text, urgent = false) {
+			const tag = tagOf[id]
+			if (tag?.text === text && tag?.urgent === urgent) return
+			tagOf[id] = { text, urgent }
 			showTags()
 		},
 		// `radio`: the car radio's { name, title }, or null out of a car;
@@ -295,26 +291,18 @@ export function createPocket({ turnStation, toggleMute }) {
 		update({ radio, hearing, car }, dt) {
 			const muted = sound.isMuted()
 			const volume = sound.volume()
-			const level = muted ? 0 : Math.round(volume * 10)
-			const next = `${sounds.draw({ radio, hearing, muted })}:${level}`
-			if (next !== key) {
-				if (key !== null && current === sounds && awake > SETTLE) open = OPEN
-				key = next
-			}
-			volumeBars.style.setProperty('--level', String(level))
-			open = Math.max(0, open - dt)
-			const urgent = flagged.has(current?.id)
-			const inHand = current?.live && el.contains(document.activeElement) && document.activeElement !== document.body
-			el.classList.toggle('open', open > 0 || urgent || inHand || !!gesture?.mode)
-			el.classList.toggle('lit', urgent)
+			if (said && (said.t -= dt) <= 0) said = null
+			const now = radio ? { name: radio.name ?? 'Radio aus', title: radio.title } : hearing
+			setTicker(said?.text ?? (muted ? 'Ton aus' : now ? [now.name, now.title].filter(Boolean).join(' · ') : 'Straße'))
+			volumeBars.style.setProperty('--level', String(muted ? 0 : Math.round(volume * 10)))
+			el.classList.toggle('lit', !!alerting && current?.id === alerting)
 			el.classList.toggle('car', car)
 			el.classList.toggle('muted', muted)
 			knob.style.setProperty('--turn', `${(muted ? 0 : volume) * TURN - TURN / 2}deg`)
-			knob.ariaLabel = car ? 'Sender wechseln (R)' : 'Lautstärke'
-			muteSwitch.ariaLabel = muteSwitch.title = muted ? 'Ton an (L)' : 'Ton aus (L)'
+			knob.ariaLabel = car ? 'Lautstärke, tippen: Sender (R)' : 'Lautstärke'
 			current?.update?.(dt)
-			if (!awake) el.classList.remove('asleep')
-			awake += dt
+			if (first) el.classList.remove('asleep')
+			first = false
 		},
 	}
 }

@@ -36,7 +36,7 @@ export function createFeedback({ context, thank, pocket }) {
 		<div><small></small><button type="submit">Senden</button></div>`
 	const field = page.querySelector('textarea')
 	const note = page.querySelector('small')
-	pocket.add({ id: 'post', icon: 'menu-feedback', label: 'Feedback (B)', page, live: true })
+	pocket.add({ id: 'post', key: { icon: 'menu-feedback', label: 'Post', title: 'Feedback (B)' }, page, live: true })
 	// Typing here is not playing: keys stop at the box.
 	for (const type of ['keydown', 'keyup']) page.addEventListener(type, (e) => e.stopPropagation())
 	page.addEventListener('submit', (e) => {

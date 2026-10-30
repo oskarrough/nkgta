@@ -104,8 +104,11 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, on =
 		},
 
 		target() {
-			if (mode === 'pickup') return { x: job.from.stand.x, y: job.from.stand.y, job: 'pickup' }
-			if (mode === 'deliver') return { x: job.to.stand.x, y: job.to.stand.y, job: 'drop', hint: job.hint }
+			if (mode === 'pickup') return { x: job.from.stand.x, y: job.from.stand.y, job: 'pickup', label: job.from.name, spilt: 0 }
+			if (mode === 'deliver') {
+				const spilt = Math.min(bumps, job.items.length)
+				return { x: job.to.stand.x, y: job.to.stand.y, job: 'drop', hint: job.hint, label: `${job.to.street}\u00a0${job.to.number}`, spilt }
+			}
 			return null
 		},
 	}

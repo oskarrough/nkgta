@@ -13,7 +13,7 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 	page.className = 'app-races scroll'
 	let picked = null // the race whose row is open
 	let armed = null // the race whose cross was tapped once
-	pocket.add({ id: 'race', icon: 'race-finish', label: 'Rennen', page, live: true, shown: render })
+	pocket.add({ id: 'race', key: { icon: 'race-finish', label: 'Rennen' }, page, live: true, shown: render })
 
 	const where = (g) => world.streetAt(g.x, g.y) || '?'
 	function route(r, i) {

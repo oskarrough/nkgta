@@ -17,39 +17,28 @@ const badgeOf = (kind) => {
 	return badges[kind]
 }
 
-// The courier app on the pocket device: waiting, the offer, the ride's clock
-// and the pay slip. An offer takes the screen and buzzes; the slip hands it back.
+// The courier on the pocket device. An offer takes the screen, lit, with one
+// big key to take it; the ride itself is on the map, its clock on the top
+// line; the pay slip takes the screen for a moment and hands it back.
 export function createCourierHud({ accept, pocket }) {
 	const page = document.createElement('div')
 	page.className = 'app-job'
 	page.innerHTML = `
-		<p class="wait"><img class="icon" src="/icons/job-bag.png" alt=""><span></span></p>
 		<div class="offer" hidden>
 			<div class="route"><img class="kitchen" alt=""><b class="from"></b><img class="icon door" src="/icons/job-door.png" alt="nach"><b class="to"></b></div>
-			<div class="deal"><span class="pay"></span><span class="limit"></span><kbd>C</kbd></div>
-			<i class="fuse"></i>
-		</div>
-		<div class="ride" hidden>
-			<div class="goal"><img class="kitchen" alt=""><img class="icon door" src="/icons/job-door.png" alt=""><b class="where"></b></div>
-			<b class="left"></b>
-			<div class="items"></div>
+			<p class="deal"><span class="pay"></span><span class="limit"></span></p>
+			<button type="button" class="take"><i class="fuse"></i><span>Annehmen</span><kbd>C</kbd></button>
 		</div>
 		<div class="slip" hidden></div>`
 	const $ = (s) => page.querySelector(s)
-	const wait = $('.wait')
 	const offer = $('.offer')
-	const ride = $('.ride')
 	const slip = $('.slip')
-	pocket.add({
-		id: 'job',
-		icon: 'job-bag',
-		label: 'Kurier (C nimmt an)',
-		page,
-		tap() {
-			sound.start()
-			accept()
-		},
-	})
+	pocket.add({ id: 'job', page, tap: take })
+	$('.take').addEventListener('click', take)
+	function take() {
+		sound.start()
+		accept()
+	}
 
 	const shown = {}
 	const set = (key, value, apply) => {
@@ -61,49 +50,33 @@ export function createCourierHud({ accept, pocket }) {
 	let tock = null
 
 	return {
-		update({ mode, job, fuse = 0, left = 0, spilt = 0 }, dt) {
+		update({ mode, job, fuse = 0, left = 0 }, dt) {
 			set('mode', mode, (m) => {
-				const was = page.dataset.mode
-				page.dataset.mode = m
 				offer.hidden = m !== 'offer'
-				ride.hidden = m !== 'pickup' && m !== 'deliver'
-				if (m === 'offer') pocket.alert('job')
-				else if (was === 'offer' && m === 'pickup') pocket.calm('job')
-				else if (was === 'offer') pocket.release('job')
-				wait.querySelector('span').textContent = m === 'off' ? 'Kurier aus' : 'Warte auf Fahrten…'
+				if (m === 'offer') {
+					slip.hidden = true
+					slipFor = 0
+					pocket.alert('job')
+				} else if (slip.hidden) pocket.release('job')
 			})
-			wait.hidden = !offer.hidden || !ride.hidden || !slip.hidden
 			set('job', job, (j) => {
 				if (!j) return
 				tock = null
-				for (const img of page.querySelectorAll('.kitchen')) img.src = badgeOf(j.from.kind)
+				$('.kitchen').src = badgeOf(j.from.kind)
 				$('.from').textContent = j.from.name
 				$('.to').textContent = `${j.to.street}\u00a0${j.to.number}`
 				$('.pay').textContent = euro(j.pay)
 				$('.limit').textContent = mmss(j.limit)
 			})
 			if (mode === 'offer') offer.style.setProperty('--fuse', fuse.toFixed(3))
-			const riding = mode === 'pickup' || mode === 'deliver'
-			if (riding) {
-				set('where', `${mode}:${job.from.name}:${job.to.street}:${job.to.number}`, () => {
-					$('.where').textContent = mode === 'pickup' ? job.from.name : `${job.to.street}\u00a0${job.to.number}`
-					ride.dataset.leg = mode
-				})
-				set('items', `${job.items.join()}:${spilt}`, () => {
-					const kept = job.items.length - spilt
-					$('.items').innerHTML = job.items.map((item, i) => `<span class="${i >= kept ? 'spilt' : ''}">${item}</span>`).join('')
-				})
-				const t = mode === 'deliver' ? mmss(left) : mmss(job.limit)
-				set('left', t, (v) => ($('.left').textContent = v))
-				set('late', mode === 'deliver' && left < 15, (on) => ride.classList.toggle('late', on))
-
+			if (mode === 'deliver') {
 				const n = Math.ceil(left)
-				if (mode === 'deliver' && left > 0 && n <= 10 && n !== tock) {
+				if (left > 0 && n <= 10 && n !== tock) {
 					tock = n
 					beep(n <= 3 ? 1320 : 990, 0.06)
 				}
 			}
-			pocket.tag('job', mode === 'deliver' ? `KURIER ${mmss(left)}` : mode === 'pickup' ? 'KURIER' : '')
+			pocket.tag('job', mode === 'deliver' ? mmss(left) : mode === 'pickup' ? mmss(job.limit) : '', mode === 'deliver' && left < 15)
 			if (slipFor > 0 && (slipFor -= dt) <= 0) {
 				slip.hidden = true
 				pocket.release('job')
@@ -113,20 +86,21 @@ export function createCourierHud({ accept, pocket }) {
 		ping() {
 			beep(523, 0.09)
 			beep(523, 0.09, 0.16)
+			navigator.vibrate?.([60, 80, 60])
 		},
 		took: () => chime([784, 1046]),
 		picked: () => chime([880, 1320]),
 		bump: () => sound.spill(1),
 		lost() {
-			slip.innerHTML = '<b class="total gone">€0,00</b><em>Essen weg</em>'
+			slip.innerHTML = '<b class="total">€0,00</b><em>Essen weg</em>'
 			showSlip()
 		},
 
 		paid({ base, tip, knocks, total, late }) {
 			const rows = [
 				`<li><img class="icon" src="/icons/job-bag.png" alt="Fahrt"><b>${euro(base)}</b></li>`,
-				tip ? `<li class="tip"><span>Trinkgeld</span><b>+${euro(tip)}</b></li>` : '',
-				knocks ? `<li class="knocks"><span>verschüttet</span><b>−${euro(knocks)}</b></li>` : '',
+				tip ? `<li><span>Trinkgeld</span><b>+${euro(tip)}</b></li>` : '',
+				knocks ? `<li><span>verschüttet</span><b>−${euro(knocks)}</b></li>` : '',
 			]
 			slip.innerHTML = `<b class="total">+${euro(total)}</b>${late ? '<em>zu spät</em>' : ''}<ol>${rows.join('')}</ol>`
 			showSlip()
@@ -137,7 +111,7 @@ export function createCourierHud({ accept, pocket }) {
 
 	function showSlip() {
 		slip.hidden = false
-		ride.hidden = true
+		offer.hidden = true
 		slipFor = PAID
 		pocket.alert('job')
 	}
