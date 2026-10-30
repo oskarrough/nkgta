@@ -86,7 +86,7 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 				if (++ignored >= GIVE_UP) {
 					setOnline(false)
 					pocket.say('Kurier: offline, du warst nicht da', 4)
-				}
+				} else pocket.say('Angebot verpasst', 3)
 			} else if (mode === 'pickup' && !inside && stoppedAt(job.from)) {
 				mode = 'deliver'
 				t = 0
