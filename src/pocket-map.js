@@ -59,8 +59,8 @@ function lcdMap(world) {
 		const d = image.data
 		for (let i = 0; i < d.length; i += 4) {
 			const lum = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255
-			const t = Math.min(1, Math.max(0, (lum - 0.25) * 1.5)) * (d[i + 3] / 255)
-			for (let c = 0; c < 3; c++) d[i + c] = DARK[c] + (PAPER[c] - DARK[c]) * (0.45 + 0.55 * t)
+			const t = Math.min(1, Math.max(0, (lum - 0.3) * 2.2)) * (d[i + 3] / 255)
+			for (let c = 0; c < 3; c++) d[i + c] = DARK[c] + (PAPER[c] - DARK[c]) * (0.1 + 0.9 * t)
 			d[i + 3] = 255
 		}
 		ctx.putImageData(image, 0, 0)
@@ -162,6 +162,13 @@ export function createPocketMap({ world, pocket }) {
 			const ch = Math.min(world.H, center.y + reach) - y
 			if (cw > 0 && ch > 0) ctx.drawImage(image, x * px, y * px, cw * px, ch * px, x, y, cw, ch)
 			ctx.restore()
+		} else {
+			// The worker paints the whole city once; a slow machine shows the bare screen for seconds.
+			ctx.fillStyle = INK
+			ctx.font = '8px monospace'
+			ctx.textAlign = 'center'
+			ctx.textBaseline = 'middle'
+			ctx.fillText('Karte lädt …', w / 2, h / 2 - 16)
 		}
 
 		ctx.strokeStyle = INK
