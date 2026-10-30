@@ -84,7 +84,7 @@ const overlaps = (a, b, pad = 0) => a[0] - pad < b[2] && a[2] + pad > b[0] && a[
 
 // The parapets of the decks whose middle lies in `area` ({ x, y, w, h } in
 // tiles), as one mesh, or null if there are none.
-export function createBridges(world, area, gradient) {
+function createBridges(world, area, gradient) {
 	const box = [area.x, area.y, area.x + area.w, area.y + area.h]
 	const all = sort(world.shapes)
 	const waters = all.waters.filter((s) => overlaps(boxOf(s), box, 10))

@@ -11,7 +11,7 @@ export function openAttribute(geometry, ranges, opening) {
 		})
 }
 
-export function createFrontPanels(world, chunk, opening, night) {
+function createFrontPanels(world, chunk, opening, night) {
 	const positions = [],
 		uvs = [],
 		ranges = []

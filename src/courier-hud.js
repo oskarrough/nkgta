@@ -6,7 +6,7 @@ import { sound } from './sound.js'
 
 const PAID = 6 // seconds the pay slip stays up
 
-export const mmss = (s) => {
+const mmss = (s) => {
 	const t = Math.max(0, Math.ceil(s))
 	return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
 }

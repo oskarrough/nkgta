@@ -12,7 +12,7 @@ import { sound } from './sound.js'
 import { createKnockout } from './knockout.js'
 import { SOLID, T } from './tiles.js'
 
-export const MAX_HEAT = 3
+const MAX_HEAT = 3
 const SIGHT = 30 // tiles a cop can see you from, with nothing in the way
 const LOSE = 8 // seconds out of everyone's sight before they give up
 const NEVER_FOUND = 30 // seconds without ever seeing you, and the call's dropped

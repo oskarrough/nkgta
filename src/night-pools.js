@@ -2,7 +2,7 @@ import { openAttribute } from './front-panels.js'
 import * as THREE from 'three'
 import { furnitureIn } from './kerbs.js'
 
-export function createNightPools(world, chunk, shops, night, opening) {
+function createNightPools(world, chunk, shops, night, opening) {
 	const positions = []
 	const uvs = []
 	const kinds = []

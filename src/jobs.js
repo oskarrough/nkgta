@@ -1,4 +1,4 @@
-export const KITCHENS = new Set(['doener', 'imbiss', 'spaeti', 'restaurant'])
+const KITCHENS = new Set(['doener', 'imbiss', 'spaeti', 'restaurant'])
 const PICKUP = { near: 25, far: 170 } // tiles from you to the kitchen
 const DROP = { near: 110, far: 330 } // tiles from the kitchen to the door
 
@@ -48,7 +48,7 @@ export function offerJob(shops, doors, x, y, random = Math.random) {
 
 export const timeFor = (tiles) => Math.round((tiles * DETOUR) / BIKE + FIND)
 
-export const basePay = (tiles) => Math.round((PAY.base + tiles * PAY.perTile) / 10) * 10
+const basePay = (tiles) => Math.round((PAY.base + tiles * PAY.perTile) / 10) * 10
 
 export function payout(job, t, knocked) {
 	const bumps = Math.min(knocked, job.items?.length ?? knocked)

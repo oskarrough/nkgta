@@ -127,7 +127,7 @@ const ATLAS_W = 2048
 const GLOW = 0.8 // how much of its colour a lit board shines at night
 const unpacked = new WeakMap()
 
-export function createFascia(world, chunk, gradient, night, opening) {
+function createFascia(world, chunk, gradient, night, opening) {
 	if (!unpacked.has(world)) unpacked.set(world, frontsOf(world))
 	const mine = unpacked
 		.get(world)

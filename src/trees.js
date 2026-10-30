@@ -63,7 +63,7 @@ export function pushFromTrunks(p, world, body = TRUNK_BODY) {
 // `pick` is which trees, by index, so each keeps its own looks wherever
 // it's drawn. `simple` gives each tree one plain blob in its own colour,
 // for when trees are too small on screen to show their lumps.
-export function createTrees(world, gradient, pick = (world.trees ?? []).keys(), simple = false) {
+function createTrees(world, gradient, pick = (world.trees ?? []).keys(), simple = false) {
 	const trees = world.trees ?? []
 	const list = [...pick]
 	let total = 0
@@ -128,7 +128,7 @@ function crownOf(t, tileM, world) {
 	return { half, cz: (top + bottom) / 2 + world.heightAt(t.x, t.y) }
 }
 
-export function createTrunks(world, gradient, pick = (world.trees ?? []).keys()) {
+function createTrunks(world, gradient, pick = (world.trees ?? []).keys()) {
 	const trees = world.trees ?? []
 	const list = [...pick]
 	const geometry = new THREE.CylinderGeometry(0.7, 1, 1, TRUNK_SIDES).rotateX(Math.PI / 2).translate(0, 0, 0.5)

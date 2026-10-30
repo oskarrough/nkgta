@@ -17,7 +17,7 @@ const CELL = 96 // atlas pixels across the awning's depth
 const TYPE = 54 // type size in those pixels
 const ATLAS_W = 2048
 
-export function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0, opening) {
+function createSigns(shops, gradient, pick = shops.keys(), heightAt = () => 0, opening) {
 	const list = [...pick]
 	if (!list.length) return new THREE.Group()
 	const measure = document.createElement('canvas').getContext('2d')

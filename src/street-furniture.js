@@ -97,7 +97,7 @@ function kitFor(gradient, night) {
 
 // The furniture of one chunk: its meshes, and `zoom(scale)` to hide what's
 // too small on screen. `night` is the uniform that lights the lamps.
-export function createFurniture(world, gradient, chunk, night) {
+function createFurniture(world, gradient, chunk, night) {
 	const k = kitFor(gradient, night)
 	const { lamps, bollards } = furnitureIn(world, chunk, MAIN_ROAD)
 	const m = new THREE.Matrix4()
