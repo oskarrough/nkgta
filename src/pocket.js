@@ -1,4 +1,5 @@
 import './pocket.css'
+import { haptic } from './haptic.js'
 import { recall, remember } from './remember.js'
 import { sound } from './sound.js'
 
@@ -77,6 +78,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	// A key opens its app, and pressed again goes back to the map.
 	function press(id) {
 		sound.tick()
+		haptic()
 		back = null
 		show(current?.id === id ? home.id : id)
 	}
@@ -138,8 +140,10 @@ export function createPocket({ turnStation, toggleMute }) {
 		const slide = switches.get(button)
 		slide.set(!slide.on)
 		slide.change(slide.on)
+		haptic()
 	}
 	function nextStation() {
+		haptic()
 		said = turnStation(1) ? null : { text: 'Radio gibt’s im Auto', t: SAY }
 		knob.blur()
 	}
@@ -174,7 +178,7 @@ export function createPocket({ turnStation, toggleMute }) {
 						gesture.mode = 'mute'
 						dial.classList.remove('pressing')
 						toggleMute()
-						navigator.vibrate?.(20)
+						haptic(20)
 					}, MUTE)
 				: e.pointerType === 'mouse'
 					? 0
@@ -188,7 +192,7 @@ export function createPocket({ turnStation, toggleMute }) {
 	function startDrag() {
 		gesture.mode = 'drag'
 		el.classList.add('held')
-		navigator.vibrate?.(12)
+		haptic(12)
 	}
 	el.addEventListener('pointermove', (e) => {
 		if (!gesture || e.pointerId !== gesture.id) return

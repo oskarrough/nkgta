@@ -412,6 +412,20 @@
 				{ name: 'Rixdorf Klassik', title: 'Böhmisches Dorf', wave: 'sine', notes: [64, 62, 60, 62, 64, 64, 64, 0], tempo: 0.3 },
 			]
 
+			// Android vibrates; iOS (Safari 17.4+) ticks when a switch checkbox flips, inside a user gesture.
+			let switchLabel = null
+			function haptic(ms = 10) {
+				if (navigator.vibrate) return navigator.vibrate(ms)
+				if (!matchMedia('(pointer: coarse)').matches) return
+				if (!switchLabel) {
+					switchLabel = document.createElement('label')
+					switchLabel.ariaHidden = 'true'
+					switchLabel.style.display = 'none'
+					switchLabel.innerHTML = '<input type="checkbox" switch>'
+					document.body.append(switchLabel)
+				}
+				switchLabel.click()
+			}
 			const pocket = document.querySelector('#pocket')
 			const knob = pocket.querySelector('.knob')
 			const rocker = pocket.querySelector('.rocker')
@@ -480,7 +494,7 @@
 					muted = true
 					volume = 0
 				} else volume = Math.min(1, Math.max(0, Math.round((volume + dir * STEP) * 10) / 10))
-				navigator.vibrate?.(muted ? 25 : 6)
+				haptic(muted ? 25 : 6)
 				vol.classList.add('on')
 				render()
 				return true
@@ -488,7 +502,7 @@
 			function nextStation() {
 				station = (station + 1) % STATIONS.length
 				step = 0
-				navigator.vibrate?.(10)
+				haptic(10)
 				render()
 			}
 
@@ -537,7 +551,7 @@
 			pocket.addEventListener('pointerdown', start)
 			slide.addEventListener('click', () => {
 				slide.classList.toggle('on')
-				navigator.vibrate?.(10)
+				haptic(10)
 			})
 			document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false })
 			render()
