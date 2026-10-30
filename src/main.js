@@ -20,6 +20,7 @@ import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
+import { createTrafficLights } from './traffic-lights.js'
 
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
@@ -66,6 +67,7 @@ const traffic = createTraffic(
 	(text) => hud.say(text),
 	(p) => chatter.shout(p),
 )
+const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, traffic.lights())
 const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
 const pocket = createPocket({
@@ -420,7 +422,8 @@ function frame(now) {
 	sound.listen(world, street.x, street.y, inside)
 	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside })
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
-	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
+	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
+	trafficLights.update()
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
 	city3d.weather.update(dt, player, inside)
 	city3d.setHour(clock.hour)
@@ -429,7 +432,6 @@ function frame(now) {
 	draw({
 		cam,
 		player,
-		lights: indoors ? [] : traffic.lights(),
 		bottles: indoors ? [] : pfand.bottles,
 		showStreetNames,
 		showTransit,

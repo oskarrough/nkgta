@@ -200,6 +200,7 @@ export function createScene(canvas, world, shops = [], opening) {
 		scene,
 		aim,
 		gradient,
+		night: sky.night,
 		add: (...objects) => scene.add(...objects),
 		// Another scene, such as a shop inside, in the same look.
 		draw: (other, view, target = null) => ink.render(other, view, target),

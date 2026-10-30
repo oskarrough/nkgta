@@ -235,7 +235,6 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	const street = new THREE.Group()
 	root.add(street)
 	const box = new THREE.BoxGeometry(1, 1, 1)
-	const dark = new THREE.MeshToonMaterial({ color: '#24272b', gradientMap })
 
 	function part(parent, material, x, y, z, w, d, h) {
 		const mesh = new THREE.Mesh(box, material)
@@ -282,19 +281,12 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	let bottles = new THREE.InstancedMesh(bottleGeometry, bottleMaterial, 256)
 	bottles.frustumCulled = false
 	street.add(bottles)
-	const lamps = []
-	const lampMaterials = Object.fromEntries(
-		Object.entries({ red: '#ec4335', yellow: '#f6c743', green: '#5ce079' }).map(([name, color]) => [
-			name,
-			new THREE.MeshBasicMaterial({ color }),
-		]),
-	)
 	const matrix = new THREE.Matrix4()
 	const color = new THREE.Color()
 	let stride = 0
 
 	return {
-		update(player, peds, bottleList, lights, cam, dt, room = null) {
+		update(player, peds, bottleList, cam, dt, room = null) {
 			stride += player.speed * dt * 7
 			// At a wall the camera can come inside the character's head.
 			const ground = room ? 0 : heightAt(player.x, player.y)
@@ -358,20 +350,6 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			})
 			bottles.instanceMatrix.needsUpdate = true
 			if (bottles.instanceColor) bottles.instanceColor.needsUpdate = true
-			for (let i = 0; i < Math.max(lights.length, lamps.length); i++) {
-				if (!lamps[i]) {
-					const group = new THREE.Group()
-					part(group, dark, 0, 0, 0.4, 0.04, 0.04, 0.8)
-					const lamp = part(group, lampMaterials.red, 0, 0, 0.85, 0.1, 0.1, 0.2)
-					street.add(group)
-					lamps.push({ group, lamp })
-				}
-				const light = lights[i]
-				lamps[i].group.visible = !!light
-				if (!light) continue
-				lamps[i].group.position.set(light.x, -light.y, heightAt(light.x, light.y))
-				lamps[i].lamp.material = lampMaterials[light.state] ?? lampMaterials.red
-			}
 		},
 	}
 }

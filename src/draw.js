@@ -7,8 +7,6 @@ import { drawMusicDebug } from './music-debug.js'
 // Tiles round a person, from above, that the ground layer leaves clear.
 const PERSON = 0.32
 
-const LAMPS = { red: '#ff3b2a', amber: '#ffb020', green: '#3ce36a' }
-
 // Badges, the classic map way: names when near, icons when far. A shop's
 // awning carries its name, so its badge fades in only once you've zoomed out
 // past where the awning reads (screen px per tile, before devicePixelRatio),
@@ -45,7 +43,7 @@ export function createRenderer(canvas, world, shops = []) {
 	addEventListener('resize', resize)
 	resize()
 
-	return function draw({ cam, player, lights, bottles, showStreetNames, showTransit, showWalls, inside, music, people = [], cars = [] }) {
+	return function draw({ cam, player, bottles, showStreetNames, showTransit, showWalls, inside, music, people = [], cars = [] }) {
 		const { scale } = cam
 		const toScreen = (x, y) => [x * scale - cam.x, y * scale - cam.y]
 		const onScreen = (sx, sy, pad) => sx > -pad && sy > -pad && sx < canvas.width + pad && sy < canvas.height + pad
@@ -126,18 +124,6 @@ export function createRenderer(canvas, world, shops = []) {
 			if (!onScreen(sx, sy, 20)) continue
 			ctx.fillStyle = b.can ? '#c0c4c8' : '#3d7a3a'
 			ctx.fillRect(sx - scale * 0.12, sy - scale * 0.3, scale * 0.24, scale * 0.6)
-		}
-
-		const lamp = Math.max(4 * devicePixelRatio, scale * 0.3)
-		for (const l of lights) {
-			const [sx, sy] = toScreen(l.x, l.y)
-			if (!onScreen(sx, sy, lamp * 2)) continue
-			ctx.fillStyle = '#16181a'
-			ctx.fillRect(sx - lamp, sy - lamp, lamp * 2, lamp * 2)
-			ctx.fillStyle = LAMPS[l.state]
-			ctx.beginPath()
-			ctx.arc(sx, sy, lamp * 0.7, 0, Math.PI * 2)
-			ctx.fill()
 		}
 
 		if (showStreetNames && !inside) {
