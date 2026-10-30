@@ -349,8 +349,8 @@ function use() {
 	}
 	const car = !player.onBike && traffic.enterable(player.x, player.y)
 	if (car && !(nearBike(player) && Math.hypot(player.bike.x - player.x, player.bike.y - player.y) < 0.6)) {
+		if (car.ai) police.steal(car)
 		traffic.steal(car, hud.say)
-		police.steal(car)
 		player.car = car
 		sound.door()
 	} else toggleBike(player)
