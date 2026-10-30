@@ -7,7 +7,7 @@ const OFFER = 14 // seconds an offer stands
 const WAIT = [45, 90] // seconds between offers, least and most
 const FIRST = 8 // seconds from going online to the first one
 const GIVE_UP = 2 // offers ignored in a row before the app takes you offline
-const AT = { reach: 1.1, car: 2.4, slow: 1.4 } // tiles and tiles a second: stopped at a door
+const AT = { reach: 1.6, car: 2.8, slow: 1.4 } // tiles and tiles a second: stopped at a door
 
 const KNOCK = { drop: 1.8, rate: 24, calm: 1 }
 const HINT = { off: 7, r: 13 } // tiles: the radar's ring round the door, off centre by up to `off`
