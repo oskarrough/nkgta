@@ -37,7 +37,7 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 	function route(r, i) {
 		const from = where(r.gates[0])
 		const to = where(r.gates.at(-1))
-		const line = from === to ? from : from === '?' && to === '?' ? `Rennen ${i + 1}` : `${from} → ${to}`
+		const line = from === '?' && to === '?' ? `Rennen ${i + 1}` : from === to ? from : `${from} → ${to}`
 		return isDaily(r) ? `Heute: ${line}` : line
 	}
 	const away = (g) => {
