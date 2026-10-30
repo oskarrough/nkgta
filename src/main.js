@@ -45,6 +45,7 @@ const map = await loadMap((text) => (loading.textContent = text)).catch((err) =>
 
 const world = createWorld(map)
 phase('createWorld')
+loading.textContent = 'Baue die Welt…'
 const player = createPlayer(world.startPoint(START))
 const pfand = createPfand(world)
 const camera = createCamera(world)
@@ -61,6 +62,7 @@ const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
+loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const chatter = createChatter(world, shops)
 const traffic = createTraffic(
@@ -462,10 +464,14 @@ function frame(now) {
 	requestAnimationFrame(frame)
 }
 // Hold the loading text until what's on screen is painted.
-loading.textContent = 'Male die Stadt…'
 await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
 phase('first textures')
 loading.remove()
+if (recall('nk-willkommen', false) !== true) {
+	remember('nk-willkommen', true)
+	const touch = matchMedia('(pointer: coarse)').matches
+	hud.say(touch ? 'Links ziehen: laufen · Menü oben links · Gelber Knopf: benutzen' : 'WASD: laufen · Esc: Menü · E: benutzen', 5)
+}
 requestAnimationFrame(frame)
 if (URL_PARAMS.has('quiz')) quiz.start(URL_PARAMS.get('quiz') === 'daily' ? dateKey() : null)
 
