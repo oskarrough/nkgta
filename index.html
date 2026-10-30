@@ -28,6 +28,10 @@
 				height: 100dvh;
 				touch-action: none;
 			}
+			:root {
+				--fs-s: 1.2rem;
+				--fs-m: 1.5rem;
+			}
 			.hud {
 				position: fixed;
 				pointer-events: none;
@@ -41,25 +45,25 @@
 				left: 0;
 				right: 0;
 				text-align: center;
-				font-size: 2rem;
+				font-size: var(--fs-m);
 				text-transform: uppercase;
 				letter-spacing: 0.05em;
 			}
 			#money {
 				top: calc(1rem + env(safe-area-inset-top));
 				right: calc(1.5rem + env(safe-area-inset-right));
-				font-size: 2rem;
+				font-size: var(--fs-m);
 				color: #9be86a;
 			}
 			#bag {
-				top: calc(3.5rem + env(safe-area-inset-top));
+				top: calc(3.2rem + env(safe-area-inset-top));
 				right: calc(1.5rem + env(safe-area-inset-right));
-				font-size: 1.4rem;
+				font-size: var(--fs-s);
 			}
 			#heat {
 				top: calc(1rem + env(safe-area-inset-top));
 				left: calc(1.5rem + env(safe-area-inset-left));
-				font-size: 2rem;
+				font-size: var(--fs-m);
 				color: #5cb8ff;
 				letter-spacing: 0.1em;
 			}
@@ -75,7 +79,7 @@
 			#doener-carried {
 				top: calc(5.5rem + env(safe-area-inset-top));
 				right: calc(1.5rem + env(safe-area-inset-right));
-				font-size: 1.2rem;
+				font-size: var(--fs-s);
 			}
 			#doener-dialog {
 				position: fixed;
@@ -96,7 +100,7 @@
 				display: none;
 			}
 			#doener-dialog .question {
-				font-size: 1.3rem;
+				font-size: var(--fs-s);
 				font-weight: 800;
 				margin-bottom: 0.7rem;
 			}
@@ -260,7 +264,7 @@
 				left: 0;
 				right: 0;
 				text-align: center;
-				font-size: 1.5rem;
+				font-size: var(--fs-s);
 			}
 			#place.dot::before {
 				content: '';
@@ -314,7 +318,6 @@
 				bottom: calc(8.5rem + env(safe-area-inset-bottom));
 				left: calc(1rem + env(safe-area-inset-left));
 				right: calc(6rem + env(safe-area-inset-right));
-				font-size: 1.2rem;
 				overflow-wrap: anywhere;
 			}
 			#stick {
@@ -381,9 +384,11 @@
 				border-color: rgba(232, 194, 26, 0.9);
 			}
 			.touch-button.dim {
-				opacity: 0.4;
+				opacity: 0;
+				pointer-events: none;
 			}
 			#touch-use {
+				transition: opacity 0.2s;
 				width: 92px;
 				height: 92px;
 				background: rgba(232, 194, 26, 0.22);
@@ -401,22 +406,12 @@
 				#place {
 					left: calc(1rem + env(safe-area-inset-left));
 					right: calc(1rem + env(safe-area-inset-right));
-					font-size: 1.2rem;
 					overflow-wrap: anywhere;
 				}
 				#street {
 					left: calc(1rem + env(safe-area-inset-left));
 					right: auto;
 					text-align: left;
-					font-size: 1.35rem;
-					letter-spacing: 0.03em;
-				}
-				#money {
-					font-size: 1.6rem;
-				}
-				#bag {
-					top: calc(3rem + env(safe-area-inset-top));
-					font-size: 1.2rem;
 				}
 			}
 		</style>

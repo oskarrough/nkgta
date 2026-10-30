@@ -21,7 +21,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 		<div class="race-buttons">
 			<button type="button" class="restart" aria-label="Neustart (Q)" title="Neustart (Q)"><img class="icon" src="/icons/race-restart.png" alt=""><kbd>Q</kbd></button>
 			<button type="button" class="finish" aria-label="Rennen fertig (F)" title="Rennen fertig (F)"><img class="icon" src="/icons/race-finish.png" alt=""><kbd>F</kbd></button>
-			<button type="button" class="gate" aria-label="Tor setzen (G)" title="Tor setzen (G)"><img class="icon" src="/icons/race-gate.png" alt=""><kbd>G</kbd></button>
 		</div>
 		<div class="card" hidden></div>
 		</div>
@@ -47,8 +46,8 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 		e.stopPropagation()
 		share()
 	})
-	const buttons = { gate: $('.gate'), finish: $('.finish'), restart: $('.restart') }
-	const press = { gate: placeGate, finish, restart }
+	const buttons = { finish: $('.finish'), restart: $('.restart') }
+	const press = { finish, restart }
 	for (const [name, button] of Object.entries(buttons)) {
 		button.addEventListener('pointerdown', (e) => {
 			e.preventDefault()
@@ -108,7 +107,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			const t = mode === 'draft' ? '' : clock(view.t)
 			set('time', t, (v) => (time.textContent = v))
 			set('restart', view.canRestart, (on) => buttons.restart.classList.toggle('can', on))
-			set('gate', mode !== 'countdown' && mode !== 'running', (on) => buttons.gate.classList.toggle('can', on))
 			set('finish', view.canFinish, (on) => buttons.finish.classList.toggle('can', on))
 			if (mode === 'countdown') {
 				const n = Math.ceil(view.count)

@@ -12,17 +12,19 @@
 }
 
 body.touch #minimap {
-	top: calc(4.5rem + env(safe-area-inset-top));
+	top: calc(3.9rem + env(safe-area-inset-top));
+	left: calc(0.5rem + env(safe-area-inset-left));
 	bottom: auto;
-	width: min(128px, 25dvh);
-	height: min(128px, 25dvh);
+	width: min(96px, 20dvh);
+	height: min(96px, 20dvh);
 }
 
 @media (max-width: 600px) {
 	#minimap {
-		top: calc(4.5rem + env(safe-area-inset-top));
+		top: calc(3.9rem + env(safe-area-inset-top));
+		left: calc(0.5rem + env(safe-area-inset-left));
 		bottom: auto;
-		width: min(128px, 25dvh);
-		height: min(128px, 25dvh);
+		width: min(96px, 20dvh);
+		height: min(96px, 20dvh);
 	}
 }
