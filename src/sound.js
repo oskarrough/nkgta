@@ -278,6 +278,36 @@ function horns() {
 	return { gain, pan }
 }
 
+// The Martinshorn: two notes, a fourth apart, turn and turn about. One voice
+// for the nearest Wanne; `level` is how loud, 0 when none is about.
+const SIREN = { low: 435, high: 580, beat: 0.55 }
+let sirenVoice
+function siren(level, pan) {
+	if (!context) return
+	if (level <= 0) {
+		if (sirenVoice) smooth(sirenVoice.gain.gain, 0, 0.1)
+		return
+	}
+	if (!sirenVoice) {
+		const osc = context.createOscillator()
+		osc.type = 'square'
+		const filter = context.createBiquadFilter()
+		filter.type = 'lowpass'
+		filter.frequency.value = 1400
+		const gain = context.createGain()
+		gain.gain.value = 0
+		const stereo = context.createStereoPanner()
+		osc.connect(filter).connect(gain).connect(stereo)
+		out(stereo)
+		osc.start()
+		sirenVoice = { osc, gain, pan: stereo }
+	}
+	const high = Math.floor(context.currentTime / SIREN.beat) % 2 === 1
+	smooth(sirenVoice.osc.frequency, high ? SIREN.high : SIREN.low, 0.015)
+	smooth(sirenVoice.gain.gain, (muted ? 0 : 0.045) * level, 0.08)
+	smooth(sirenVoice.pan.pan, Math.max(-1, Math.min(1, pan)), 0.1)
+}
+
 function play(buffer, name, amount, rate = 1, delay = 0) {
 	if (!buffer || muted || context.state !== 'running') return
 	const source = context.createBufferSource()
@@ -408,6 +438,7 @@ export const sound = {
 	audio: () => context && { context, master, room, noise, muted, duck: ducking },
 	engine,
 	street,
+	siren,
 	async door() {
 		if (!context || muted) return
 		const [open, close] = await Promise.all([load('door-open'), load('door-close')])
@@ -465,6 +496,7 @@ export const sound = {
 				grit: playerVoice.gritGain.gain.value,
 			},
 			squeal: squeal?.gain.gain.value ?? 0,
+			siren: sirenVoice?.gain.gain.value ?? 0,
 			traffic: [...neighbours.values()].map((v) => ({ hz: v.motor.frequency.value, gain: v.gain.gain.value, pan: v.pan.pan.value })),
 			trafficVoices: neighbours.size + spareTraffic.length,
 			city: city?.gain.gain.value ?? 0,

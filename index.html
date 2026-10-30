@@ -56,6 +56,13 @@
 				right: calc(1.5rem + env(safe-area-inset-right));
 				font-size: 1.4rem;
 			}
+			#heat {
+				top: calc(1rem + env(safe-area-inset-top));
+				left: calc(1.5rem + env(safe-area-inset-left));
+				font-size: 2rem;
+				color: #5cb8ff;
+				letter-spacing: 0.1em;
+			}
 			#bag:not(:empty)::before {
 				content: '';
 				display: inline-block;
@@ -472,6 +479,7 @@
 		<div class="hud" id="street"></div>
 		<div class="hud" id="money"></div>
 		<div class="hud" id="bag"></div>
+		<div class="hud" id="heat"></div>
 		<div class="hud" id="doener-carried"></div>
 		<div class="hud" id="place"></div>
 		<div id="doener-dialog" hidden>

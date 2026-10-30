@@ -63,13 +63,16 @@ export function createHud(world) {
 	return {
 		say: (text) => (toast = { text, t: 3 }),
 
-		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate }, dt) {
+		// `inside` is the shop you're in; `door` is what E does at a shop door.
+		// `wasted` is the big word across the screen, WASTED or BUSTED, if any.
+		update({ player, cam, bag, showTransit, wasted, inside, door, action, gate, heat = 0 }, dt) {
 			minimap(player, !!cam.third, inside, gate)
 			if (toast && (toast.t -= dt) < 0) toast = null
 			showUse(wasted ? null : action)
 			const shopName = door && !door.startsWith('E: ') ? door.split(' · ').pop() : null
 			set('money', euro(bag.cents))
 			set('bag', bag.bottles ? String(bag.bottles) : '')
+			set('heat', '★'.repeat(heat))
 			if (inside) {
 				set('street', '')
 				set('wasted', '')
@@ -81,7 +84,7 @@ export function createHud(world) {
 			const p = nearestPlace(world.pois, player.x, player.y, 2.5)
 			const stop = showTransit && nearestPlace(world.transit ?? [], player.x, player.y, 2.5)
 			set('street', street)
-			set('wasted', wasted ? 'WASTED' : '')
+			set('wasted', wasted || '')
 			const privat = !p && world.tileAt(player.x, player.y) === T.PRIVATE
 			const here = p ? placeName(p) : privat ? 'Privatweg' : ''
 			set('place', toast?.text ?? shopName ?? (stop ? stopName(stop) : here))

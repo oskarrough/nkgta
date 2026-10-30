@@ -6,6 +6,7 @@ import { createPlayer, leaveCar, nearBike, toggleBike, updatePlayer } from './pl
 import { createTraffic } from './traffic.js'
 import { createChatter } from './chatter.js'
 import { createWasted } from './wasted.js'
+import { createPolice } from './police.js'
 import { hospitalWake } from './hospital.js'
 import { createPfand } from './pfand.js'
 import { createCamera, ZOOM } from './camera.js'
@@ -79,11 +80,23 @@ const wasted = createWasted({
 	onDown: () => {
 		pfand.spill(player.x, player.y)
 		racing.abort()
+		police.clear()
 	},
 	respawn: () => Object.assign(player, createPlayer(hospitalWake(world.pois, player.x, player.y, world.tileAt) ?? world.startPoint(START))),
 	fade: (a) => {
 		veil.style.opacity = String(a)
 	},
+})
+const police = createPolice({
+	world,
+	traffic,
+	player,
+	bag: pfand.bag,
+	say: hud.say,
+	fade: (a) => {
+		veil.style.opacity = String(a)
+	},
+	onBust: () => racing.abort(),
 })
 const racing = createRacing({
 	world,
@@ -304,7 +317,7 @@ addEventListener('pointerdown', (e) => {
 })
 
 function use() {
-	if (wasted.active() || visit.use()) return
+	if (wasted.active() || police.active() || visit.use()) return
 	if (player.car) {
 		leaveCar(player, world)
 		sound.door()
@@ -313,6 +326,7 @@ function use() {
 	const car = !player.onBike && traffic.enterable(player.x, player.y)
 	if (car && !(nearBike(player) && Math.hypot(player.bike.x - player.x, player.bike.y - player.y) < 0.6)) {
 		traffic.steal(car, hud.say)
+		police.steal(car)
 		player.car = car
 		sound.door()
 	} else toggleBike(player)
@@ -364,7 +378,7 @@ function frame(now) {
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
-	if (!wasted.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
+	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
 	if (quiz.active()) quiz.tick(now, from)
 	else visit.update(dt, heading())
 	wasted.update(dt)
@@ -376,13 +390,14 @@ function frame(now) {
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
 	const hit = traffic.update(dt, street, streetView, clock.hour, clock.day)
-	if (!quiz.active() && !inside && !visit.warping()) wasted.hit(hit)
+	if (!wasted.active()) police.update(dt, streetView, inside || visit.warping() || quiz.active())
+	if (!quiz.active() && !inside && !visit.warping() && !police.active()) wasted.hit(hit)
 	if (!quiz.active() && !inside && !player.car && !wasted.active()) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
 	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside })
-	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
+	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
 	city3d.weather.update(dt, player, inside)
@@ -407,10 +422,21 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car)
-	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() })
+	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
 	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car }, dt)
 	hud.update(
-		{ player, cam, bag: pfand.bag, showTransit, wasted: wasted.shown(), inside: visit.shop(), door, action, gate: racing.target() },
+		{
+			player,
+			cam,
+			bag: pfand.bag,
+			showTransit,
+			wasted: wasted.shown() ? 'WASTED' : police.shown() ? 'BUSTED' : '',
+			heat: police.heat(),
+			inside: visit.shop(),
+			door,
+			action,
+			gate: racing.target(),
+		},
 		dt,
 	)
 	frameEnd({ x: player.x, y: player.y, interval: now - last })
@@ -443,5 +469,6 @@ if (import.meta.env.DEV)
 		clock,
 		weather: city3d.weather,
 		racing,
+		police,
 		city3d,
 	}

@@ -230,6 +230,33 @@ export const MODELS = {
 			['paint', 0.5, 0.88, 0.03, -0.06, 0.49],
 		],
 	},
+	police: {
+		name: 'Polizei',
+		noun: 'Wanne',
+		pace: 1.6,
+		driver: { a: 1.4, b: 1.6, T: 0.7, s0: 0.5 },
+		length: 1.8,
+		width: 0.72,
+		mass: 2.2,
+		engine: 7,
+		brake: 7,
+		rolling: 0.05,
+		drag: 0.024,
+		lateral: 1.7,
+		steer: 0.6,
+		steerFade: 0.14,
+		colors: ['#d8dde3'], // silver, the blue band and the light bar on top
+		look: [
+			// A VW bus: one tall box, glass all round, the blue band at waist height.
+			['paint', 1, 0.94, 0.42, 0, 0.08],
+			['tyre', 0.16, 1.08, 0.2, 0.32, 0],
+			['tyre', 0.16, 1.08, 0.2, -0.3, 0],
+			['blue', 1.01, 0.97, 0.1, 0, 0.2],
+			['glass', 0.9, 0.9, 0.14, -0.04, 0.5],
+			['paint', 0.84, 0.92, 0.04, -0.06, 0.64],
+			['beacon', 0.14, 0.8, 0.08, 0.1, 0.68],
+		],
+	},
 	bus: {
 		name: 'Bus',
 		noun: 'Bus',

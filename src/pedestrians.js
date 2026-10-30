@@ -403,12 +403,14 @@ function relax(p, dt) {
 // Whatever happens, nobody stays under a wheel: someone inside a vehicle's
 // outline pops out of its side.
 export function keepClear(p, threats, ok = () => true) {
+	p.under = null
 	for (const c of threats) {
 		const cos = Math.cos(c.angle)
 		const sin = Math.sin(c.angle)
 		const u = (p.x - c.x) * cos + (p.y - c.y) * sin
 		const v = (p.y - c.y) * cos - (p.x - c.x) * sin
 		if (Math.abs(u) > c.model.length / 2 + 0.1 || Math.abs(v) > c.model.width / 2 + 0.1) continue
+		p.under = c
 		const out = (c.model.width / 2 + 0.25) * (v < 0 ? -1 : 1) - v
 		shift(p, -sin * out, cos * out, ok)
 	}

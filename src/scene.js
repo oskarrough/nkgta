@@ -359,7 +359,7 @@ function glowAtNight(material, strength, night) {
 // Paint, glass and tyres take the same flat bands as the walls; lamps stay
 // lit, and the rim is plain ink.
 function carMaterial(kind, gradient) {
-	if (kind === 'lights') return new THREE.MeshBasicMaterial()
+	if (kind === 'lights' || kind === 'beacon') return new THREE.MeshBasicMaterial()
 	if (kind === 'heads') return new THREE.MeshBasicMaterial({ color: CAR_HEADLIGHT })
 	if (kind === 'rim') return new THREE.MeshBasicMaterial({ color: CAR_RIM.color })
 	return new THREE.MeshToonMaterial({ color: FIXED[kind] ?? '#fff', gradientMap: gradient })
@@ -369,7 +369,8 @@ function carMaterial(kind, gradient) {
 // (see models.js), plus brake lights, headlights and an ink rim on the road
 // round it. Boxes of one kind are merged, so it's one instanced mesh each.
 const MAX_CARS = 256
-const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', sign: '#f2d13a', tyre: '#303231' }
+const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', sign: '#f2d13a', tyre: '#303231', blue: '#1f4db0' }
+const BEACON = { on: new THREE.Color('#5cb8ff'), off: new THREE.Color('#1b2b6b') }
 const CAR_HEADLIGHT = '#fff3c8'
 // Cars are too low for the ink pass to find their edges, so they sit on a
 // dark rim this much wider than the body, in tiles. Tyres poke out past it.
@@ -478,6 +479,7 @@ function carMeshes(gradient, world) {
 						mesh.setMatrixAt(n, m)
 						if (kind === 'paint') mesh.setColorAt(n, c)
 						if (kind === 'lights') mesh.setColorAt(n, car.braking ? lit : dim)
+						if (kind === 'beacon') mesh.setColorAt(n, car.flash ? BEACON.on : BEACON.off)
 					}
 					n++
 				}
