@@ -270,7 +270,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 			if (typeof part?.next === 'function') part = yield* part
 			if (!part) continue
 			parts.push(part)
-			group.add(...part.meshes)
+			if (part.meshes.length) group.add(...part.meshes)
 			yield
 		}
 		const uv = plane.geometry.attributes.uv
