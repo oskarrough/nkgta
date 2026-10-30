@@ -4,13 +4,15 @@
 // and roof textures, painted in workers as the chunk comes near the view,
 // as sharp as the zoom needs, and let go again once it's far away. A coarse
 // pair stays for every chunk, so there's always something to show.
+import { PHONE } from './device.js'
+import { paintBuildings } from './map-image.js'
 import * as THREE from 'three'
 import { COLORS, T } from './tiles.js'
 import { note, PERF } from './perf.js'
 
 export const CHUNK = 128 // tiles a side
 // Texture pixels per tile, finest first. Every chunk keeps the last one.
-const LEVELS = [12, 6, 3, 1.5]
+const LEVELS = PHONE ? [6, 3, 1.5] : [12, 6, 3, 1.5]
 const FAR = LEVELS.at(-1)
 // A level will do while a screen pixel covers no more than this many of
 // its texels, a little under one, so zooming out lets go of detail early.
@@ -19,7 +21,7 @@ const UNDERSAMPLE = 0.75
 // filtering never reaches past the edge of the texture and leaves a seam.
 const GUTTER = 4
 const MARGIN = 32 // tiles round the view that count as in view, so textures are ready before they show
-const BUDGET = 128 * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
+const BUDGET = (PHONE ? 32 : 128) * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
 // Share of the time between frames spent building chunk meshes that
 // aren't needed yet, and the most per frame, in ms.
 const BUILD_SHARE = 0.25
@@ -122,8 +124,8 @@ export function createChunks(world, renderer, build) {
 	const projection = new THREE.Matrix4()
 
 	// As one string: cloning the shapes object by object costs far more.
-	const shared = JSON.stringify({ shapes: world.shapes, buildings: world.buildings })
-	const workers = Array.from({ length: Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
+	const shared = JSON.stringify({ shapes: world.shapes, buildings: paintBuildings(world.buildings) })
+	const workers = Array.from({ length: PHONE ? 1 : Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
 		const worker = new Worker(new URL('./paint-worker.js', import.meta.url), { type: 'module' })
 		worker.postMessage({ world: shared })
 		worker.onmessage = ({ data }) => {
@@ -169,7 +171,7 @@ export function createChunks(world, renderer, build) {
 		let sent = 0
 		while (arrived.length && (sent === 0 || sent < UPLOAD_BYTES)) {
 			const [entry, bitmap] = arrived.shift()
-			if (!entries.has(entry.key)) {
+			if (entries.get(entry.key) !== entry) {
 				bitmap.close()
 				continue
 			}
@@ -268,8 +270,21 @@ export function createChunks(world, renderer, build) {
 		const level = levelFor(scale)
 		const order = chunks.map((c) => [distance(c, view), c]).sort((a, b) => a[0] - b[0])
 
+		if (PHONE) {
+			for (const [d, c] of order) {
+				// Finish a suspended build before releasing its resources.
+				if (d > CHUNK && c.building) buildChunk(c)
+				if (d <= CHUNK || !c.parts) continue
+				for (const entry of entries.values()) if (entry.chunk === c) drop(entry)
+				group.remove(c.parts.group)
+				c.parts.dispose()
+				c.parts = c.shown = c.bounds = null
+				c.scale = undefined
+			}
+		}
 		for (const [d, c] of order) {
 			if (c.parts) continue
+			if (PHONE && d > MARGIN) break
 			if (d === 0) buildChunk(c)
 			else if (performance.now() - t < spare) buildChunk(c, t + spare)
 			else break

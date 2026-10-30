@@ -1,6 +1,7 @@
 // Berlin LoD2 (DL-DE-Zero-2.0), cached by kilometre tile in data/lod2/.
 // Fit measured surfaces to the game's OSM footprints, preserving passages.
 // Usage: bun scripts/build-roofs.js. Rebuild after rebuilding the map.
+import { encodeRoofs } from '../src/roof-codec.js'
 import { BBOX } from '../src/default-area.js'
 import { toUtm33 } from '../src/utm.js'
 import { decodeMap } from '../src/map-codec.js'
@@ -40,5 +41,5 @@ for (let e = e0; e <= e1; e++) {
 	}
 }
 const buildings = fitRoofs(map, [...models.values()])
-await Bun.write('public/roofs.json', JSON.stringify({ bbox: map.bbox, tileM: map.tileM, buildings }))
+await Bun.write('public/roofs.bin', encodeRoofs({ bbox: map.bbox, tileM: map.tileM, buildings }))
 console.log(`${buildings.length} of ${map.buildings.length} buildings fitted with measured roofs`)

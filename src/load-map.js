@@ -1,3 +1,4 @@
+import { decodeRoofs } from './roof-codec.js'
 import { decodeMap } from './map-codec.js'
 import { getArea, putArea } from './area-cache.js'
 import { areaFromUrl } from './area-url.js'
@@ -12,8 +13,8 @@ export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
 	if (!bbox) {
 		onStatus('Lade Karte…')
-		const roofs = fetch('/roofs.json')
-			.then((res) => (res.ok ? res.json() : null))
+		const roofs = fetch('/roofs.bin')
+			.then(async (res) => (res.ok ? decodeRoofs(await res.arrayBuffer()) : null))
 			.catch(() => null)
 		const terrain = fetch('/terrain.json')
 			.then((res) => (res.ok ? res.json() : null))

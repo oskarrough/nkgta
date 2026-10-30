@@ -229,6 +229,13 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 	const murals = createMurals(world, firewalls, gradient)
 	// A generator, so chunks can be built a building at a time between frames.
 	return createChunks(world, renderer, function* (chunk) {
+		const unwatch = []
+		const chunkOpening = {
+			isOpen: opening.isOpen,
+			watch(place, fn) {
+				unwatch.push(opening.watch(place, fn))
+			},
+		}
 		const group = new THREE.Group()
 		const plane = new THREE.Mesh(groundGeometry(chunk, world), groundMaterial(BLANK.ground, world))
 		plane.receiveShadow = true
@@ -272,17 +279,17 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		// Awnings over the chunk's shop doors, a few atlases' worth at a time.
 		const mine = [...shops.keys()].filter((i) => inChunk(chunk, shops[i]))
 		for (let k = 0; k < mine.length; k += SIGNS_PER_ATLAS) {
-			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt, opening)
+			const signs = createSigns(shops, gradient, mine.slice(k, k + SIGNS_PER_ATLAS), world.heightAt, chunkOpening)
 			glowAtNight(signs.material, SHOP_GLOW.awning, sky.night)
 			signs.layers.set(1)
 			group.add(signs)
 			yield
 		}
 		// Their names on the wall above the windows, and every other shop's.
-		const fascia = createFascia(world, chunk, gradient, sky.night, opening)
+		const fascia = createFascia(world, chunk, gradient, sky.night, chunkOpening)
 		fascia.traverse((mesh) => mesh.layers.set(1))
 		group.add(fascia)
-		const panels = createFrontPanels(world, chunk, opening, sky.night)
+		const panels = createFrontPanels(world, chunk, chunkOpening, sky.night)
 		if (panels) {
 			panels.layers.set(1)
 			group.add(panels)
@@ -305,7 +312,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 			group.add(mesh)
 		}
 		yield
-		const pools = createNightPools(world, chunk, shops, sky.night, opening)
+		const pools = createNightPools(world, chunk, shops, sky.night, chunkOpening)
 		if (pools) group.add(pools)
 		const furniture = createFurniture(world, gradient, chunk, sky.night)
 		weather.ground(plane.material, chunk, furniture.lamps)
@@ -313,6 +320,18 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const uv = plane.geometry.attributes.uv
 		return {
 			group,
+			dispose() {
+				for (const stop of unwatch) stop?.()
+				group.traverse((mesh) => {
+					mesh.geometry?.dispose()
+					if (mesh.isInstancedMesh) mesh.dispose()
+					const material = mesh.material
+					if (!material || material === wallLook || material === paintings?.material) return
+					// Chunk textures belong to the cache; atlases belong to these meshes.
+					if (mesh !== top) material.map?.dispose()
+					material.dispose()
+				})
+			},
 			roofs: houses.filter((h) => h.roof).map((h) => [h.n, h.roof]),
 			zoom(scale) {
 				for (const mesh of near) mesh.visible = scale >= DETAIL_PX

@@ -16,7 +16,7 @@ Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from O
 bun install
 bun run fetch-osm   # data/osm.json from Overpass, for the default area in src/default-area.js
 bun run build-map   # public/map.json, the static default map
-bun run build-roofs # public/roofs.json, measured Berlin roofs; caches LoD2 tiles in data/lod2/
+bun run build-roofs # public/roofs.bin, measured Berlin roofs; caches LoD2 tiles in data/lod2/
 bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
 ```
@@ -57,7 +57,7 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/jobs.js`: courier jobs, the rules: which kitchen, which door, the time and the pay. `src/courier.js` plays them in the game, `src/courier-marks.js` stands the kitchen's badge and the house numbers in the city, `src/courier-hud.js` is its app on the pocket device: the offer, the ride's clock and the pay slip. `src/addresses.js` finds every address's front door when the map is built.
 - `src/race.js`: races between gates, the rules and bookkeeping: crossing a gate, splits, the leaderboard and the ghost. `src/racing.js` plays them in the game, `src/race-gates.js` stands the gates and the ghost in the city, `src/race-hud.js` is the stopwatch, countdown and finish card, `src/race-share.js` turns a race and its ghost into a link and back. `src/daily.js` and `src/daily-panel.js`: today's race and quiz round from the date, and the Heute panel.
 
-The default map also loads `public/roofs.json`, built from [Berlin’s LoD2 building model](https://gdi.berlin.de/data/a_lod2/atom/). Run `bun run build-roofs` after rebuilding the map; downloads are cached in `data/lod2/`, so subsequent builds work offline. Roof surfaces are clipped to the game’s footprints, including courtyards and passages. Buildings with less than 95% survey coverage keep their generated roofs. Picked areas work without this file. LoD2 gives generalised roof geometry and measured heights, not roof materials or individual roof terraces.
+The default map also loads `public/roofs.bin`, built from [Berlin’s LoD2 building model](https://gdi.berlin.de/data/a_lod2/atom/). Run `bun run build-roofs` after rebuilding the map; downloads are cached in `data/lod2/`, so subsequent builds work offline. Roof surfaces are clipped to the game’s footprints, including courtyards and passages. Buildings with less than 95% survey coverage keep their generated roofs. Picked areas work without this file. LoD2 gives generalised roof geometry and measured heights, not roof materials or individual roof terraces.
 
 ## Icons
 

@@ -1,3 +1,4 @@
+import { trackSession } from './session.js'
 import { createOpening } from './opening.js'
 import { loadMap } from './load-map.js'
 import { createWorld } from './world.js'
@@ -35,6 +36,7 @@ import { areaFromUrl } from './area-url.js'
 
 const START = { lat: 52.47751, lon: 13.43874, dir: -1.98 } // Pavement at Brot und Brötchen, Karl-Marx-Straße 131
 
+const interrupted = trackSession()
 const loading = document.getElementById('loading')
 const map = await loadMap((text) => (loading.textContent = text)).catch((err) => {
 	loading.textContent = `Karte konnte nicht laden: ${err.message}`
@@ -474,6 +476,7 @@ loading.textContent = 'Male die Stadt…'
 await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
 phase('first textures')
 loading.remove()
+if (interrupted) hud.say('Letzte Fahrt unterbrochen. Neu geladen.')
 requestAnimationFrame(frame)
 if (URL_PARAMS.has('quiz')) quiz.start(URL_PARAMS.get('quiz') === 'daily' ? dateKey() : null)
 

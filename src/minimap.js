@@ -1,3 +1,4 @@
+import { paintBuildings } from './map-image.js'
 import { nearestPlace } from './places.js'
 import { note } from './perf.js'
 
@@ -34,7 +35,7 @@ export function mapImage(world) {
 		console.error('Could not paint radar', error.message)
 		worker.terminate()
 	}
-	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: world.buildings })
+	worker.postMessage({ W: world.W, H: world.H, shapes: world.shapes, buildings: paintBuildings(world.buildings) })
 	return painted
 }
 

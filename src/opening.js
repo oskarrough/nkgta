@@ -50,10 +50,14 @@ export function createOpening() {
 		isOpen: (place) => isOpen(place, hour, day),
 		watch(place, fn) {
 			const key = `${place.openingKind ?? place.kind}:${place.openingHours ?? ''}`
-			if (!listeners.has(key)) listeners.set(key, { place, callbacks: [], value: isOpen(place, hour, day) })
+			if (!listeners.has(key)) listeners.set(key, { place, callbacks: new Set(), value: isOpen(place, hour, day) })
 			const group = listeners.get(key)
-			group.callbacks.push(fn)
+			group.callbacks.add(fn)
 			fn(group.value)
+			return () => {
+				group.callbacks.delete(fn)
+				if (!group.callbacks.size) listeners.delete(key)
+			}
 		},
 		set(h, d) {
 			hour = h

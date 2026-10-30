@@ -700,3 +700,6 @@ export function renderRoofImage(world, pitched = () => false, area = wholeMap(wo
 	}
 	return { canvas, chimneys }
 }
+
+// Painters need a roof's kind for its colour, never the city's survey mesh.
+export const paintBuildings = (buildings) => buildings.map(({ rings, h, roof }) => ({ rings, h, roof: roof && { kind: roof.kind } }))
