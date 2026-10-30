@@ -47,22 +47,26 @@ const STRIPS = {
 const LANDMARKS = [
 	{
 		name: 'Rathaus Neukölln',
+		icon: 'rathaus',
 		at: [52.4813498, 13.4350912],
 		build: rathaus,
 	},
 	{
 		name: 'Magdalenenkirche',
+		icon: 'church',
 		at: [52.4721491, 13.4414742],
 		claim: 10,
 		build: magdalenen,
 	},
 	{
 		name: 'Genezarethkirche',
+		icon: 'church',
 		at: [52.4770907, 13.4220943],
 		build: genezareth,
 	},
 	{
 		name: 'Şehitlik-Moschee',
+		icon: 'mosque',
 		at: [52.4814354, 13.4097063],
 		claim: 12,
 		build: sehitlik,
@@ -155,11 +159,23 @@ function fernsehturm(k) {
 	k.frustum(ngon([0, 0], 2 * w, 6), ngon([0, 0], 0.8 * w, 6), 250, 368, '#d8d0cc')
 }
 
+const inBox = ({ bbox }, [lat, lon]) => lat > bbox.south && lat < bbox.north && lon > bbox.west && lon < bbox.east
+const lonMetres = ({ bbox }) => 111320 * Math.cos((((bbox.north + bbox.south) / 2) * Math.PI) / 180)
+const tileOf = (world, [lat, lon]) => ({
+	x: ((lon - world.bbox.west) * lonMetres(world)) / world.tileM,
+	y: ((world.bbox.north - lat) * 111320) / world.tileM,
+})
+
+// The nearby landmarks that have a pictogram, for the pocket device's map.
+export function landmarkSpots(world) {
+	return LANDMARKS.filter((lm) => lm.icon && inBox(world, lm.at)).map((lm) => ({ ...tileOf(world, lm.at), icon: lm.icon, name: lm.name }))
+}
+
 export function createLandmarks(world, gradient, sky) {
 	const { bbox, tileM } = world
-	const lonM = 111320 * Math.cos((((bbox.north + bbox.south) / 2) * Math.PI) / 180)
-	const toTile = ([lat, lon]) => ({ x: ((lon - bbox.west) * lonM) / tileM, y: ((bbox.north - lat) * 111320) / tileM })
-	const inArea = ([lat, lon]) => lat > bbox.south && lat < bbox.north && lon > bbox.west && lon < bbox.east
+	const lonM = lonMetres(world)
+	const toTile = (at) => tileOf(world, at)
+	const inArea = (at) => inBox(world, at)
 	const centre = [(bbox.north + bbox.south) / 2, (bbox.west + bbox.east) / 2]
 	const metresFrom = ([lat, lon], [lat0, lon0]) => Math.hypot((lat - lat0) * 111320, (lon - lon0) * lonM)
 

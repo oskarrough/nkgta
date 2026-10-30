@@ -1,5 +1,7 @@
+import { landmarkSpots } from './landmarks.js'
 import { paintBuildings } from './map-image.js'
 import { note } from './perf.js'
+import { findRoute } from './route.js'
 
 const ACROSS = [450, 1500, Infinity] // metres across the screen: round you, the Kiez, the whole map
 const EVERY = 160 // ms between redraws; the screen is an LCD, not a monitor
@@ -7,6 +9,37 @@ const INK = '#1f2d1b'
 const BAR = 22 // px the goal bar takes off the map's bottom edge
 const PAPER = [185, 207, 164] // the LCD, --lcd in pocket.css
 const DARK = [31, 45, 27] // its ink
+const ROUTE_EVERY = 1500 // ms between route searches
+const OFF_ROUTE = 6 // tiles from the line before it's drawn again
+const GAP = 11 // px between pictograms; the later one is left out
+
+// Pictograms, one character a pixel, drawn in ink on a paper halo.
+const ICONS = {
+	u: ['#########', '#########', '##.###.##', '##.###.##', '##.###.##', '##.###.##', '###...###', '#########', '#########'],
+	church: ['....#....', '...###...', '....#....', '...###...', '..#####..', '.#######.', '.###.###.', '.###.###.', '.###.###.'],
+	mosque: ['.......#.', '..##...#.', '.####..#.', '.####..#.', '######.#.', '######.#.', '#.#..#.#.', '######.#.', '######.##'],
+	rathaus: ['....#....', '...###...', '...#.#...', '...###...', '.#######.', '.#######.', '.#.#.#.#.', '.#######.', '#########'],
+	flag: ['#########', '##.#.#.#.', '#.#.#.#.#', '##.#.#.#.', '#.#.#.#.#', '#........', '#........', '#........', '#........'],
+}
+const SIZE = 9
+
+// What's worth a pictogram, and from how far out: the landmarks everywhere,
+// each U-Bahn station (not each entrance) up to the Kiez.
+function spotsOf(world) {
+	const stations = new Map()
+	for (const t of world.transit ?? []) {
+		if (t.kind !== 'ubahn') continue
+		const s = stations.get(t.name) ?? { x: 0, y: 0, n: 0 }
+		s.x += t.x
+		s.y += t.y
+		s.n++
+		stations.set(t.name, s)
+	}
+	return [
+		...landmarkSpots(world).map((l) => ({ ...l, zoom: 3 })),
+		...[...stations.values()].map((s) => ({ x: s.x / s.n, y: s.y / s.n, icon: 'u', zoom: 2 })),
+	]
+}
 
 // The whole map, painted small once in a worker, then printed in the LCD's two
 // colours, so each redraw is one cropped blit.
@@ -55,6 +88,9 @@ export function createPocketMap({ world, pocket }) {
 	const ctx = canvas.getContext('2d')
 	const painted = lcdMap(world)
 	const tileM = world.tileM ?? 3
+	const spots = spotsOf(world)
+	let route = null // the way to what you're heading for: { to, pts }
+	let routeAt = 0
 	let zoom = 0
 	let next = 0
 	let state = null
@@ -131,6 +167,8 @@ export function createPocketMap({ world, pocket }) {
 		ctx.strokeStyle = INK
 		ctx.fillStyle = INK
 		ctx.lineWidth = 1.5
+		dotted(waypoints(gate ?? job, at), toScreen)
+		pictograms(toScreen, w, h)
 		if (job) {
 			const near = job.hint && !whole && Math.hypot(job.hint.x - at.x, job.hint.y - at.y) * scale < Math.min(w, h) / 2
 			if (near) {
@@ -143,16 +181,15 @@ export function createPocketMap({ world, pocket }) {
 			} else mark(job.job, pin(toScreen(job), w, h, BAR))
 		}
 		if (gate) {
-			const p = pin(toScreen(gate), w, h, job ? BAR : 8)
-			ctx.beginPath()
-			ctx.arc(p.x, p.y, 6, 0, Math.PI * 2)
-			ctx.fill()
-			ctx.fillStyle = `rgb(${PAPER})`
+			const p = pin(toScreen(gate), w, h, job ? BAR : 8, 10)
+			pixels('flag', p.x, p.y)
 			ctx.font = 'bold 8px monospace'
-			ctx.textAlign = 'center'
+			ctx.textAlign = 'left'
 			ctx.textBaseline = 'middle'
-			ctx.fillText(gate.label, p.x, p.y + 0.5)
-			ctx.fillStyle = INK
+			ctx.lineWidth = 3
+			ctx.strokeStyle = `rgb(${PAPER})`
+			ctx.strokeText(gate.label, p.x + SIZE / 2 + 2, p.y)
+			ctx.fillText(gate.label, p.x + SIZE / 2 + 2, p.y)
 		}
 		if (turn) {
 			const n = { x: w / 2 + Math.sin(turn) * (h / 2 - 7), y: h / 2 - Math.cos(turn) * (h / 2 - 7) }
@@ -177,6 +214,79 @@ export function createPocketMap({ world, pocket }) {
 		ctx.fillStyle = INK
 		ctx.fill()
 		ctx.restore()
+	}
+
+	// The way to the target over the street grid, searched again when the target
+	// changes or you leave the line; a straight line while there's none.
+	function waypoints(target, at) {
+		if (!target) return (route = null)
+		const now = performance.now()
+		if (route) {
+			let i = 0
+			let best = Infinity
+			route.pts.forEach((p, k) => {
+				const d = Math.hypot(p.x - at.x, p.y - at.y)
+				if (d < best) [best, i] = [d, k]
+			})
+			route.pts = route.pts.slice(i)
+			if (best > OFF_ROUTE) route = { ...route, stale: true }
+		}
+		const moved = !route || route.to.x !== target.x || route.to.y !== target.y
+		if ((moved || route?.stale || !route.pts.length) && now >= routeAt) {
+			routeAt = now + ROUTE_EVERY
+			route = { to: { x: target.x, y: target.y }, pts: findRoute(world, at, target) ?? [] }
+		}
+		return route?.to.x === target.x && route.to.y === target.y && route.pts.length ? [at, ...route.pts] : [at, target]
+	}
+
+	function dotted(pts, toScreen) {
+		if (!pts) return
+		ctx.beginPath()
+		pts.forEach((p, i) => {
+			const s = toScreen(p)
+			if (i) ctx.lineTo(s.x, s.y)
+			else ctx.moveTo(s.x, s.y)
+		})
+		ctx.lineJoin = 'round'
+		ctx.lineCap = 'round'
+		ctx.setLineDash([0.1, 5])
+		ctx.strokeStyle = `rgb(${PAPER})`
+		ctx.lineWidth = 5
+		ctx.stroke()
+		ctx.strokeStyle = INK
+		ctx.lineWidth = 2.5
+		ctx.stroke()
+		ctx.setLineDash([])
+		ctx.lineCap = 'butt'
+		ctx.lineWidth = 1.5
+	}
+
+	// The landmarks and stations in view, one pictogram each, none on top of another.
+	function pictograms(toScreen, w, h) {
+		const placed = []
+		for (const spot of spots) {
+			if (spot.zoom < zoom + 1) continue
+			const p = toScreen(spot)
+			if (p.x < SIZE || p.y < SIZE || p.x > w - SIZE || p.y > h - BAR) continue
+			if (placed.some((q) => Math.abs(q.x - p.x) < GAP && Math.abs(q.y - p.y) < GAP)) continue
+			placed.push(p)
+			pixels(spot.icon, p.x, p.y)
+		}
+	}
+
+	// One pictogram centred on a point, in a paper halo so it stands off the map.
+	function pixels(icon, cx, cy) {
+		const rows = ICONS[icon]
+		const x0 = Math.round(cx - SIZE / 2)
+		const y0 = Math.round(cy - SIZE / 2)
+		ctx.fillStyle = `rgb(${PAPER})`
+		for (let y = 0; y < SIZE; y++) {
+			for (let x = 0; x < SIZE; x++) if (rows[y][x] === '#') ctx.fillRect(x0 + x - 1, y0 + y - 1, 3, 3)
+		}
+		ctx.fillStyle = INK
+		for (let y = 0; y < SIZE; y++) {
+			for (let x = 0; x < SIZE; x++) if (rows[y][x] === '#') ctx.fillRect(x0 + x, y0 + y, 1, 1)
+		}
 	}
 
 	// The kitchen as a bag, the door as a house, in a badge so they stand off the map.
