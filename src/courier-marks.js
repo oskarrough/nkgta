@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { badgeMaterial, throb } from './badge.js'
 import { INK } from './poster.js'
 
 const BADGE = { size: 2.2, lift: 2.2 }
@@ -18,29 +19,17 @@ function canvasMaterial(draw, w, h, Material = THREE.SpriteMaterial) {
 }
 
 const bagBadge = () =>
-	canvasMaterial(
-		(g) => {
-			g.beginPath()
-			g.arc(64, 64, 56, 0, Math.PI * 2)
-			g.fillStyle = '#e8c21a'
-			g.fill()
-			g.lineWidth = 10
-			g.strokeStyle = INK
-			g.stroke()
-			g.fillStyle = INK
-			g.beginPath()
-			g.roundRect(36, 46, 56, 46, 6)
-			g.fill()
-			g.lineWidth = 8
-			g.beginPath()
-			g.arc(64, 46, 13, Math.PI, 0)
-			g.stroke()
-			g.fillStyle = '#e8c21a'
-			g.fillRect(40, 62, 48, 6)
-		},
-		128,
-		128,
-	)
+	badgeMaterial('bag', '#e8c21a', (g) => {
+		g.beginPath()
+		g.roundRect(36, 46, 56, 46, 6)
+		g.fill()
+		g.lineWidth = 8
+		g.beginPath()
+		g.arc(64, 46, 13, Math.PI, 0)
+		g.stroke()
+		g.fillStyle = '#e8c21a'
+		g.fillRect(40, 62, 48, 6)
+	})
 
 const plates = new Map()
 function plate(number) {
@@ -119,7 +108,6 @@ export function createCourierMarks(scene, heightAt = () => 0) {
 	const root = new THREE.Group()
 	scene.add(root)
 	const badge = new THREE.Sprite(bagBadge())
-	badge.material.depthTest = false
 	badge.renderOrder = 10
 	badge.visible = false
 	root.add(badge)
@@ -150,7 +138,7 @@ export function createCourierMarks(scene, heightAt = () => 0) {
 		update(dt, player, hidden) {
 			root.visible = !hidden
 			pulse += dt
-			const k = 1 + Math.sin(pulse * 6) * 0.08
+			const k = throb(pulse)
 			badge.scale.set(BADGE.size * k, BADGE.size * k, 1)
 			badge.position.z = lift + Math.sin(pulse * 3) * 0.2
 

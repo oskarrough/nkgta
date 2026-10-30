@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { MODELS } from './models.js'
 import { postsOf } from './race.js'
 import { INK, POSTER_FONT } from './poster.js'
+import { badgeMaterial, throb } from './badge.js'
 
 const POST = { height: 1.5, width: 0.12 }
 const FLAG = { every: 0.32, width: 0.22, drop: 0.28 }
@@ -11,31 +12,13 @@ const COLORS = { next: '#e8c21a', later: '#e7e7e5', start: '#e8c21a' }
 const GHOST = { color: '#8fe3ff', rival: '#ffb25c', opacity: 0.5 }
 const NAME = { width: 4, lift: 1.6 }
 
-const badges = new Map()
-function badge(text, state) {
-	const key = `${text}:${state}`
-	if (badges.has(key)) return badges.get(key)
-	const canvas = document.createElement('canvas')
-	canvas.width = canvas.height = 128
-	const g = canvas.getContext('2d')
-	g.beginPath()
-	g.arc(64, 64, 56, 0, Math.PI * 2)
-	g.fillStyle = COLORS[state]
-	g.fill()
-	g.lineWidth = 10
-	g.strokeStyle = INK
-	g.stroke()
-	g.fillStyle = INK
-	g.font = `900 ${text.length > 1 ? 52 : 78}px ${POSTER_FONT}`
-	g.textAlign = 'center'
-	g.textBaseline = 'middle'
-	g.fillText(text, 64, 70)
-	const texture = new THREE.CanvasTexture(canvas)
-	texture.colorSpace = THREE.SRGBColorSpace
-	const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true })
-	badges.set(key, material)
-	return material
-}
+const badge = (text, state) =>
+	badgeMaterial(`${text}:${state}`, COLORS[state], (g) => {
+		g.font = `900 ${text.length > 1 ? 52 : 78}px ${POSTER_FONT}`
+		g.textAlign = 'center'
+		g.textBaseline = 'middle'
+		g.fillText(text, 64, 70)
+	})
 
 const tags = new Map()
 function nameTag(name) {
@@ -217,7 +200,7 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		update(dt, hidden) {
 			root.visible = !hidden
 			pulse += dt
-			const k = 1 + Math.sin(pulse * 6) * 0.08
+			const k = throb(pulse)
 			for (const item of items) if (item.state !== 'later') item.sprite.scale.set(item.size * k, item.size * k, 1)
 		},
 	}

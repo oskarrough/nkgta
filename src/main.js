@@ -33,6 +33,7 @@ import { createDailyPanel } from './daily-panel.js'
 import { dailyQuizResult, dateKey, saveDailyQuiz } from './daily.js'
 import { createQuiz } from './quiz.js'
 import { areaFromUrl } from './area-url.js'
+import { recall, remember, storage } from './remember.js'
 
 const START = { lat: 52.47751, lon: 13.43874, dir: -1.98 } // Pavement at Brot und Brötchen, Karl-Marx-Straße 131
 
@@ -115,15 +116,9 @@ const courier = createCourier({
 	scene: city3d.scene,
 	pfand,
 	pocket,
-	online: remembered('nk-kurier') === 'true',
-	hinted: remembered('nk-kurier-hint') === 'true',
-	remember(key, value) {
-		try {
-			localStorage.setItem(key === 'online' ? 'nk-kurier' : 'nk-kurier-hint', String(value))
-		} catch {
-			// Fine, it just won't be remembered.
-		}
-	},
+	online: recall('nk-kurier', false) === true,
+	hinted: recall('nk-kurier-hint', false) === true,
+	remember: (key, value) => remember(key === 'online' ? 'nk-kurier' : 'nk-kurier-hint', value),
 })
 const racing = createRacing({
 	pocket,
@@ -139,19 +134,7 @@ if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
 let showWalls = false
-let showMusic = false
-function remembered(key) {
-	try {
-		return localStorage.getItem(key)
-	} catch {
-		return null
-	}
-}
-try {
-	showMusic = localStorage.getItem('nk-musik-debug') === 'true'
-} catch {
-	// Debug views just start off when storage is blocked.
-}
+let showMusic = recall('nk-musik-debug', false) === true
 
 function toggleMute() {
 	sound.toggleMute()
@@ -174,11 +157,7 @@ const actions = {
 	toggleWalls: () => (showWalls = !showWalls),
 	toggleMusicDebug() {
 		showMusic = !showMusic
-		try {
-			localStorage.setItem('nk-musik-debug', String(showMusic))
-		} catch {
-			// Fine, it just won't be remembered.
-		}
+		remember('nk-musik-debug', showMusic)
 	},
 	cycleLook() {
 		city3d.cycleLook()
@@ -200,7 +179,7 @@ const actions = {
 }
 const dailyPanel = createDailyPanel({
 	date: dateKey,
-	quizResult: () => dailyQuizResult(localStorage, dateKey()),
+	quizResult: () => dailyQuizResult(storage, dateKey()),
 	raceBest: () => racing.dailyBest(dateKey()),
 	startQuiz: (date) => quiz.start(date),
 	startRace: (date) => racing.startDaily(date),
@@ -240,7 +219,7 @@ const quiz = createQuiz({
 		return true
 	},
 	restore: () => input.release(),
-	finished: (result) => saveDailyQuiz(localStorage, result),
+	finished: (result) => saveDailyQuiz(storage, result),
 })
 // All input sources share the same guard; the quiz owns its answer controls.
 const quizInput = Object.fromEntries(

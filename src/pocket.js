@@ -1,4 +1,5 @@
 import './pocket.css'
+import { recall, remember } from './remember.js'
 import { sound } from './sound.js'
 
 const TURN = 270 // degrees of knob from silent to full
@@ -105,12 +106,7 @@ export function createPocket({ turnStation, toggleMute }) {
 
 	// Where it sits: fractions of the free room across and down, or null for
 	// the default, top right under the money.
-	let spot = null
-	try {
-		spot = JSON.parse(localStorage.getItem(STORE))
-	} catch {
-		// Then it starts where it always does.
-	}
+	let spot = recall(STORE)
 	function place() {
 		if (!spot) return
 		const free = room()
@@ -231,11 +227,7 @@ export function createPocket({ turnStation, toggleMute }) {
 			const y = (parseFloat(el.style.top) - EDGE) / free.h
 			spot = snap(Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y)))
 			place()
-			try {
-				localStorage.setItem(STORE, JSON.stringify(spot))
-			} catch {
-				// It just won't stay there next time.
-			}
+			remember(STORE, spot)
 		} else if (!mode && e.type === 'pointerup') tap(target)
 	}
 	el.addEventListener('pointerup', end)

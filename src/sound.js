@@ -1,19 +1,14 @@
 import { enclosure } from './space.js'
+import { recall, remember } from './remember.js'
 
 let context
 let master
 let room // where every source sends, by how enclosed you are
 let noise
 let playerVoice
-let muted = false
+let muted = recall('nk-leise', false) === true
 // 0–1, scales everything that reaches master; squared so the slider feels even.
-let volume = 0.5
-try {
-	muted = localStorage.getItem('nk-leise') === 'true'
-	volume = Math.min(1, Math.max(0, Number(localStorage.getItem('nk-lautstaerke') ?? 0.5) || 0))
-} catch {
-	// Sound still works when browser storage is unavailable.
-}
+let volume = Math.min(1, Math.max(0, Number(recall('nk-lautstaerke', 0.5)) || 0))
 const events = []
 const note = (kind, gain) => {
 	events.push({ kind, gain: +gain.toFixed(4) })
@@ -37,13 +32,6 @@ const ROOM = 0.5 // inside a shop, the room is small whatever the street does
 let shut = 0 // 0 open to 1 shut in, as heard
 let lookAt = -Infinity
 const level = () => (muted ? 0 : 0.22 * volume * volume)
-const store = (key, value) => {
-	try {
-		localStorage.setItem(key, String(value))
-	} catch {
-		// A blocked storage write must not interrupt driving.
-	}
-}
 function applyLevel() {
 	if (!master) return
 	master.gain.cancelAndHoldAtTime(context.currentTime)
@@ -470,8 +458,8 @@ export const sound = {
 		// Unmuting at zero volume would stay silent, so come back at half.
 		if (!muted && volume === 0) volume = 0.5
 		applyLevel()
-		store('nk-leise', muted)
-		store('nk-lautstaerke', volume)
+		remember('nk-leise', muted)
+		remember('nk-lautstaerke', volume)
 		return muted
 	},
 	volume: () => volume,
@@ -479,8 +467,8 @@ export const sound = {
 		volume = Math.min(1, Math.max(0, value))
 		muted = volume === 0
 		applyLevel()
-		store('nk-leise', muted)
-		store('nk-lautstaerke', volume)
+		remember('nk-leise', muted)
+		remember('nk-lautstaerke', volume)
 		return muted
 	},
 	// Read actual AudioParams for browser verification without an audio device.

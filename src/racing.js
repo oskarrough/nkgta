@@ -8,34 +8,23 @@ import { copy } from './copy.js'
 import { dailyId, dailyRace, isDaily } from './daily.js'
 import { streetSpots } from './quiz-rules.js'
 import { cleanName, nickname, raceFromHash, shareLink } from './race-share.js'
+import { recall, remember, storage } from './remember.js'
 
 const COUNTDOWN = 3 // seconds
 const TELEPORT = 6 // tiles in a frame: a respawn, not a ride through a gate
-
-const storage = (() => {
-	try {
-		return localStorage
-	} catch {
-		return { getItem: () => null, setItem() {} }
-	}
-})()
 
 const NAME_KEY = 'nk-name'
 let nameNow = null // the player's name on shared ghosts: set once, a Kiez nickname until then
 const myName = () => {
 	if (!nameNow) {
-		nameNow = cleanName(storage.getItem(NAME_KEY))
+		nameNow = cleanName(recall(NAME_KEY))
 		if (!nameNow) setName(nickname())
 	}
 	return nameNow
 }
 function setName(name) {
 	nameNow = cleanName(name) || nameNow || nickname()
-	try {
-		storage.setItem(NAME_KEY, nameNow)
-	} catch {
-		// The name lasts until the tab closes.
-	}
+	remember(NAME_KEY, nameNow)
 }
 
 export function createRacing({ world, player, scene, gradient, area, say, snapCamera, pocket }) {

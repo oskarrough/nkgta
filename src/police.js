@@ -9,6 +9,7 @@ import { MODELS } from './models.js'
 import { leaveCar } from './player.js'
 import { euro } from './pfand.js'
 import { sound } from './sound.js'
+import { createKnockout } from './knockout.js'
 import { SOLID, T } from './tiles.js'
 
 export const MAX_HEAT = 3
@@ -23,7 +24,7 @@ const FINE = 5000 // cents a star
 const GRAB = { car: 1.5, foot: 0.6 } // seconds within reach before you're nicked
 const REACH = 0.9 // tiles from the bus's side
 const CREEP = 1.9 // tiles/s a cop keeps under near someone on foot: below lethal
-const BUST = { show: 1.3, fade: 0.45 } // seconds BUSTED is up, and the fade either side
+const BUSTED_FOR = 1.3 // seconds BUSTED is up
 const FLASH = 5 // blue light, flashes a second
 const SIREN_HEAR = 45 // tiles
 
@@ -35,8 +36,7 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 	let unseen = 0 // seconds since any cop saw you
 	let everSeen = false
 	let summonIn = 0
-	let bust = null // { t } while you're being nicked
-	let waking = 0
+	const bust = createKnockout({ show: BUSTED_FOR, fade, cut: bookYou })
 	let clock = 0
 
 	function raise(by = 1) {
@@ -47,7 +47,7 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 
 	// Someone saw you take a car: the driver you threw out, or a passer-by.
 	function steal(car) {
-		if (bust || (car && stolen.has(car))) return
+		if (bust.shown() || (car && stolen.has(car))) return
 		if (car) stolen.add(car)
 		raise()
 	}
@@ -120,7 +120,7 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 
 	// Got you. The screen fades while BUSTED is up, then the paperwork.
 	function nick() {
-		bust = { t: 0 }
+		bust.start()
 		player.speed = 0
 		if (player.car) driveCar(player.car, { hold: true }, world, 0)
 		onBust()
@@ -151,23 +151,11 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 	// `hidden`: inside a shop or otherwise off the street, where nobody can see you.
 	function update(dt, view, hidden = false) {
 		clock += dt
-		if (bust) {
-			bust.t += dt
-			if (bust.t < BUST.show) {
-				fade(Math.max(0, 1 - (BUST.show - bust.t) / BUST.fade))
-				sound.siren(1, 0)
-				return
-			}
-			bust = null
-			fade(1)
-			bookYou()
-			waking = BUST.fade
-			sound.siren(0, 0)
+		const nicked = bust.shown()
+		bust.update(dt)
+		if (nicked) {
+			sound.siren(bust.shown() ? 1 : 0, 0)
 			return
-		}
-		if (waking > 0) {
-			waking = Math.max(0, waking - dt)
-			fade(waking / BUST.fade)
 		}
 		// Someone under your wheels. Each one counts once.
 		if (!hidden && player.car && speedOf(player.car) > 1) for (const p of traffic.peds) if (p.under === player.car) hit(p)
@@ -262,7 +250,7 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 	}
 
 	function hit(p) {
-		if (p.counted || bust) return
+		if (p.counted || bust.shown()) return
 		p.counted = true
 		raise()
 	}
@@ -274,8 +262,8 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 		// For trying it out: heat up from the console.
 		heat: () => heat,
 		cops,
-		active: () => !!bust || waking > 0,
-		shown: () => !!bust,
+		active: bust.active,
+		shown: bust.shown,
 		raise,
 	}
 }

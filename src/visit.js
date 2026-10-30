@@ -214,17 +214,19 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			renderer.autoClear = true
 		},
 
+		// What E does at a shop door, { action: 'shop' | 'exit' }, or a { note } to read instead.
 		hint() {
-			if (warp) return ''
+			if (warp) return null
 			if (inside) {
-				if (doener.active()) return ''
-				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) return pfand.bag.bottles ? '' : 'Pfand? Erst sammeln.'
-				return 'E: raus auf die Straße'
+				if (doener.active()) return null
+				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y))
+					return pfand.bag.bottles ? null : { note: 'Pfand? Erst sammeln.' }
+				return { action: 'exit' }
 			}
 			if (player.car || player.onBike) return null
 			const s = shopAt(shops, player.x, player.y)
 			if (!s || !opening.isOpen(s.place)) return null
-			return `E: ${s.name} betreten`
+			return { action: 'shop' }
 		},
 	}
 
