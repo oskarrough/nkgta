@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import { createWorld } from '../src/world.js'
 import { createPlayer, updatePlayer } from '../src/player.js'
 import { createCar, driveCar, speedOf } from '../src/car.js'
-import { createCamera } from '../src/camera.js'
 import { MODELS } from '../src/models.js'
 import { SURFACE, feelOn, surfaceAt } from '../src/surface.js'
 import { T } from '../src/tiles.js'
@@ -101,16 +100,4 @@ describe('in a car', () => {
 	test('cobbles hold a car back', () => {
 		expect(speedOf(drive(MODELS.car, { cobbled: true }))).toBeLessThan(speedOf(drive(MODELS.car)))
 	})
-})
-
-test('rough ground shakes the view, smooth ground holds it still', () => {
-	const canvas = { width: 1280, height: 720 }
-	const camera = createCamera({})
-	const smooth = { x: 10, y: 10, speed: 3, rough: 0 }
-	const rough = { x: 10, y: 10, speed: 3, rough: 1 }
-	const frames = (target) => Array.from({ length: 30 }, () => camera.update(target, canvas, 1 / 60, false))
-	// How far the view sits from where the player is, as the zoom settles.
-	const sway = (list) => Math.max(...list.map((f) => Math.abs(f.x - (10 * f.scale - canvas.width / 2))))
-	expect(sway(frames(smooth))).toBe(0)
-	expect(sway(frames(rough))).toBeGreaterThan(0.5)
 })

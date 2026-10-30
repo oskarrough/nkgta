@@ -18,7 +18,7 @@ export function createPlayer(start) {
 		onBike: false,
 		car: null,
 		bike: { x: start.x + 1.2, y: start.y },
-		// Ground shake for the camera and the bike, set from the surface each frame.
+		// How rough the ground under the bike is, set from the surface each frame.
 		rough: 0,
 	}
 }
