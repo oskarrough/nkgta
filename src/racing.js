@@ -110,6 +110,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 
 	function finish() {
 		if (draft) {
+			if (draft.length < 2) return void say('Erst weiterfahren und mit G ein zweites Tor setzen.')
 			if (draft.length >= 2) {
 				race = { id: Date.now().toString(36), gates: draft, times: [], best: null }
 				races.push(race)
