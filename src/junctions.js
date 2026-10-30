@@ -2,11 +2,15 @@
 // elsewhere the bigger road goes first and, between equals, rechts vor links.
 import { pointAt } from './roads.js'
 import { LENGTH } from './car.js'
+import { MODELS } from './models.js'
 
 const MERGE = 4 // tiles: junction nodes this close are one junction, like a split carriageway
 const GREEN = 12 // seconds
 const AMBER = 2
 const CLEAR = 2 // all red, so the junction empties
+const READY = 1 // red and amber together, the last second of red
+const CREEP = 0.25 // tiles a driver edges past the line on red and amber
+const BOLD = 0.3 // share of taxi drivers who take a late amber
 const CYCLE = 2 * (GREEN + AMBER + CLEAR)
 const APPROACH = 7 // tiles before its stop line a car counts as arriving
 const PATIENCE = 4 // seconds a car waits before it goes anyway
@@ -56,6 +60,7 @@ export function createJunctions(edges, signals = []) {
 
 	let time = 0
 	const waited = new WeakMap() // car → seconds stood at a stop line
+	const bold = new WeakMap() // car → runs amber
 
 	// Who's arriving where this frame, and who's already in the middle.
 	function update(cars, dt) {
@@ -83,33 +88,35 @@ export function createJunctions(edges, signals = []) {
 
 	const light = (j, e) => signalPhase(time + j.offset + (e.phase * CYCLE) / 2)
 
-	// Should car c stop at the line where lane e meets a junction, `gap` tiles ahead?
+	// Where car c, `gap` tiles short of the line where lane e meets a
+	// junction, should stop: tiles on, or false to drive on.
 	function wait(c, e, gap) {
 		const j = entryOf.get(e)
 		if (!j || gap < -0.3) return false
-		if (e.crosswalk?.busy) return true // people on the crossing just past the line
+		if (e.crosswalk?.busy) return gap // people on the crossing just past the line
 		if (j.signal) {
-			const state = light(j, e)
-			// On amber, stop if you comfortably can.
-			const v = Math.hypot(c.vx, c.vy)
-			return state === 'red' || (state === 'amber' && gap > (v * v) / (2 * (c.model?.driver?.b ?? 1)))
+			if (!bold.has(c)) bold.set(c, c.model === MODELS.taxi && Math.random() < BOLD)
+			return atLight(light(j, e), gap, Math.hypot(c.vx, c.vy), c.model?.driver?.b ?? 1, bold.get(c))
 		}
 		if ((waited.get(c) ?? 0) > PATIENCE) return false
 		// Something crossing in the middle.
 		const crossing = (o) => o !== c && Math.hypot(o.vx, o.vy) > 0.3 && Math.abs(Math.cos(o.angle - e.heading)) < 0.85
-		if (j.inside.some(crossing)) return true
+		if (j.inside.some(crossing)) return gap
 		// Someone with right of way on the way in.
-		return j.arriving.some((a) => a.car !== c && a.edge !== e && goesFirst(a.edge, e))
+		return j.arriving.some((a) => a.car !== c && a.edge !== e && goesFirst(a.edge, e)) && gap
 	}
 
-	// The traffic lights to draw: one at each stop line, on the kerb.
+	// The traffic lights to draw, one at each stop line on the kerb, with the
+	// lane they hold and whether people may cross it.
+	const posts = junctions
+		.filter((j) => j.signal)
+		.flatMap((j) => j.entries.map((e) => ({ ...pointAt(e.kerb, Math.min(e.len, e.stop + LENGTH / 2)), j, e, state: 'red', walk: false })))
 	function lights() {
-		const out = []
-		for (const j of junctions) {
-			if (!j.signal) continue
-			for (const e of j.entries) out.push({ ...pointAt(e.kerb, Math.min(e.len, e.stop + LENGTH / 2)), state: light(j, e) })
+		for (const l of posts) {
+			l.state = light(l.j, l.e)
+			l.walk = walk(l.e)
 		}
-		return out
+		return posts
 	}
 
 	// Somewhere in or right next to a junction, where nobody should park.
@@ -125,11 +132,22 @@ export function createJunctions(edges, signals = []) {
 	return { update, wait, lights, near, walk, list: junctions }
 }
 
-// Every light runs off one clock: green, amber, then red while the cross
-// road has its turn, at t seconds into the cycle.
+// Every light runs off one clock, the German way: green, amber, red while
+// the cross road has its turn, then red and amber together, at t seconds
+// into the cycle.
 export function signalPhase(t) {
 	const at = ((t % CYCLE) + CYCLE) % CYCLE
-	return at < GREEN ? 'green' : at < GREEN + AMBER ? 'amber' : 'red'
+	return at < GREEN ? 'green' : at < GREEN + AMBER ? 'amber' : at < CYCLE - READY ? 'red' : 'redamber'
+}
+
+// What a driver does at a light in `state`, `gap` tiles short of the line at
+// speed v with braking b: where to stop, or false to drive on. On red and
+// amber they edge up past the line; on amber they stop if they comfortably
+// can, unless they're bold.
+export function atLight(state, gap, v, b, bold = false) {
+	if (state === 'green') return false
+	if (state === 'amber' && (bold || gap <= (v * v) / (2 * b))) return false
+	return state === 'redamber' ? gap + CREEP : gap
 }
 
 // People walk with the traffic beside them, stepping off only in the first

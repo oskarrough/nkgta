@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { walk, dodge, contact, keepClear, glance, dodgeStep } from '../src/pedestrians.js'
+import { walk, dodge, contact, keepClear, glance, dodgeStep, crossNow } from '../src/pedestrians.js'
 import { mayWalk, signalPhase } from '../src/junctions.js'
 
 // No one stops to look at their phone mid-test.
@@ -62,12 +62,22 @@ describe('people on foot', () => {
 		expect(p.s).toBeGreaterThan(1)
 	})
 
+	test('people wait for the green man, except a rebel when the road is clear', () => {
+		const clear = () => true
+		const busy = () => false
+		expect(crossNow(true, 0, false, busy)).toBe(true)
+		expect(crossNow(false, 60, false, clear)).toBe(false)
+		expect(crossNow(false, 0.5, true, clear)).toBe(false)
+		expect(crossNow(false, 5, true, busy)).toBe(false)
+		expect(crossNow(false, 5, true, clear)).toBe(true)
+	})
+
 	test('people only step off while the cars they cross are held at red', () => {
 		for (const phase of [0, 1])
 			for (let t = 0; t < 64; t += 0.1) {
 				if (!mayWalk(t + ((1 - phase) * 32) / 2)) continue
 				// Red now and for the 10 s it takes to cross a wide road after.
-				for (let later = 0; later <= 10; later += 0.5) expect(signalPhase(t + later + (phase * 32) / 2)).toBe('red')
+				for (let later = 0; later <= 10; later += 0.5) expect(signalPhase(t + later + (phase * 32) / 2)).toStartWith('red')
 			}
 	})
 })

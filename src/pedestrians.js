@@ -16,6 +16,8 @@ const PER_PERSON = 5 // tiles of pavement per person
 const MAX = 90
 const GAP = 7 // tiles: no car this close before people cross where there are no lights
 const PATIENCE = 6 // seconds before they go anyway
+const REBEL = 0.06 // share of people who cross on a red man when the road is clear
+const DEFIANCE = 2 // seconds a rebel waits first
 const REACH = 1.5 // tiles: how close another track must start to walk on along it
 
 // Getting out of the way of cars and bikes, after Slop New York: every ~120 ms
@@ -77,17 +79,10 @@ export function createPedestrians(world, junctions) {
 				}
 			}
 		}
-		const j = entryJunction.get(e)
-		if (j && e.stop !== undefined) {
-			const p = pointAt(e.lane, Math.min(e.len - 0.1, e.stop + LENGTH / 2 + 0.45))
-			const nx = -Math.sin(p.dir)
-			const ny = Math.cos(p.dir)
-			const mid = e.twin ? e.w / 4 : 0
-			const half = e.w / 2 + PAVE
-			const from = { x: p.x - nx * (mid - half), y: p.y - ny * (mid - half), s: 0 }
-			const to = { x: p.x - nx * (mid + half), y: p.y - ny * (mid + half), s: 2 * half }
-			if (walkable(world.tileAt(from.x, from.y)) && walkable(world.tileAt(to.x, to.y))) {
-				e.crosswalk = { line: [from, to], a: 0, b: 2 * half, edge: e, busy: 0 }
+		if (entryJunction.has(e) && e.stop !== undefined) {
+			const line = crossingLine(world, e)
+			if (line) {
+				e.crosswalk = { line, a: 0, b: line[1].s, edge: e, busy: 0 }
 				out.push(e.crosswalk)
 			}
 		}
@@ -95,15 +90,10 @@ export function createPedestrians(world, junctions) {
 		return out
 	}
 
-	// Lights where there are some. Otherwise a gap in the traffic, counting
-	// cars waiting to go, so a stream of people doesn't hold them up for good,
-	// or, after a while waiting, just go: the cars will stop.
-	function mayCross(track, waited, cars) {
-		const lit = junctions.walk(track.edge)
-		if (lit !== undefined) return lit
-		if (waited > PATIENCE) return true
+	function mayCross(track, waited, cars, p) {
 		const mid = pointAt(track.line, (track.a + track.b) / 2)
-		return !cars.some((c) => c.ai && Math.abs(c.x - mid.x) < GAP && Math.abs(c.y - mid.y) < GAP)
+		const clear = () => !cars.some((c) => c.ai && Math.abs(c.x - mid.x) < GAP && Math.abs(c.y - mid.y) < GAP)
+		return crossNow(junctions.walk(track.edge), waited, (p?.seed ?? 1) < REBEL, clear)
 	}
 
 	function update(dt, near, cars, hidden, ring, budget, scare = null, hour = 11, day = 0) {
@@ -136,7 +126,7 @@ export function createPedestrians(world, junctions) {
 			return options[Math.floor(Math.random() * options.length)]
 		}
 		for (const c of crosswalks) c.busy = 0
-		walk(people, dt, (t, waited) => mayCross(t, waited, cars), next, scare)
+		walk(people, dt, (t, waited, p) => mayCross(t, waited, cars, p), next, scare)
 		if (scare) for (const p of people) keepClear(p, scare.threats, scare.ok)
 		updatePets(people, dt, cars, scare)
 		crosswalks = people.filter((p) => p.track.edge && !p.kerb).map((p) => p.track)
@@ -174,6 +164,28 @@ export function createPedestrians(world, junctions) {
 	return { people, update }
 }
 
+// The crossing over lane e's arm, just past its stop line, kerb to kerb, or
+// null if either end isn't pavement.
+export function crossingLine(world, e) {
+	const p = pointAt(e.lane, Math.min(e.len - 0.1, e.stop + LENGTH / 2 + 0.45))
+	const nx = -Math.sin(p.dir)
+	const ny = Math.cos(p.dir)
+	const mid = e.twin ? e.w / 4 : 0
+	const half = e.w / 2 + PAVE
+	const from = { x: p.x - nx * (mid - half), y: p.y - ny * (mid - half), s: 0 }
+	const to = { x: p.x - nx * (mid + half), y: p.y - ny * (mid + half), s: 2 * half }
+	return walkable(world.tileAt(from.x, from.y)) && walkable(world.tileAt(to.x, to.y)) ? [from, to] : null
+}
+
+// Step off the kerb now? With the green man, yes; with the red one only a
+// rebel, after a moment, with the road clear. Without lights: a gap in the
+// traffic, counting cars waiting to go, so a stream of people doesn't hold
+// them up for good, or, after a while waiting, just go: the cars will stop.
+export function crossNow(lit, waited, rebel, clear) {
+	if (lit !== undefined) return lit || (rebel && waited > DEFIANCE && clear())
+	return waited > PATIENCE || clear()
+}
+
 export function walk(people, dt, mayCross, next = () => null, scare = null) {
 	for (let i = 0; i < people.length; i++) {
 		const p = people[i]
@@ -190,7 +202,7 @@ export function walk(people, dt, mayCross, next = () => null, scare = null) {
 			glance(p, dt, scare, room)
 		}
 		p.waited = p.kerb ? (p.waited ?? 0) + dt : 0
-		if (p.kerb && p.pause <= 0 && mayCross(t, p.waited)) p.kerb = false
+		if (p.kerb && p.pause <= 0 && mayCross(t, p.waited, p)) p.kerb = false
 		if (!t.edge && p.pause <= 0 && Math.random() < dt * 0.02) p.pause = 2 + Math.random() * 5
 		p.pause = Math.max(0, p.pause - dt)
 

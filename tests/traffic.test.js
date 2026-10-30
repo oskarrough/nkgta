@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { createTraffic, freeRoad, follow, stopAt, pedal, moverOf, threatTime, dodge } from '../src/traffic.js'
-import { signalPhase, waveOffset } from '../src/junctions.js'
+import { atLight, signalPhase, waveOffset } from '../src/junctions.js'
 import { createCar, driveCar, forwardSpeed } from '../src/car.js'
 import { MODELS } from '../src/models.js'
 import { roadGraph } from '../src/roads.js'
@@ -79,15 +79,26 @@ describe('intelligent driver model', () => {
 })
 
 describe('traffic lights', () => {
-	test('green, amber, red, and the cross road is never green at the same time', () => {
-		expect(signalPhase(0)).toBe('green')
-		expect(signalPhase(12.5)).toBe('amber')
-		expect(signalPhase(15)).toBe('red')
-		expect(signalPhase(-1)).toBe('red')
+	test('green, amber, red, red and amber, and the cross road is never green at the same time', () => {
+		const order = []
+		for (let t = 0; t < 32; t += 0.25) if (order.at(-1) !== signalPhase(t)) order.push(signalPhase(t))
+		expect(order).toEqual(['green', 'amber', 'red', 'redamber'])
+		expect(signalPhase(-0.5)).toBe('redamber')
 		for (let t = 0; t < 32; t += 0.25) {
 			const cross = signalPhase(t + 16)
 			expect(signalPhase(t) === 'green' && cross === 'green').toBe(false)
 		}
+	})
+
+	test('drivers stop at red, creep on red and amber, and only the bold run an amber they could stop for', () => {
+		expect(atLight('green', 2, 4, 1)).toBe(false)
+		expect(atLight('red', 2, 4, 1)).toBe(2)
+		expect(atLight('red', 2, 4, 1, true)).toBe(2)
+		expect(atLight('redamber', 0, 0, 1)).toBeGreaterThan(0)
+		expect(atLight('redamber', 0, 0, 1)).toBeLessThan(0.3) // still behind the junction
+		expect(atLight('amber', 1, 4, 1)).toBe(false) // too close to stop
+		expect(atLight('amber', 12, 4, 1)).toBe(12)
+		expect(atLight('amber', 12, 4, 1, true)).toBe(false)
 	})
 
 	test('both ways along a road share one wave', () => {

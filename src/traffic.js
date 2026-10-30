@@ -225,8 +225,9 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			[ai.edge, ai.edge.stop - ai.s - longer],
 			[ai.next, ai.edge.len - ai.s + (ai.next?.stop ?? 0) - longer],
 		]) {
-			if (e?.stop === undefined || c.hunt || !junctions.wait(c, e, gap)) continue
-			worst = Math.min(worst, stopAt(d, fwd, gap))
+			if (e?.stop === undefined || c.hunt) continue
+			const stop = junctions.wait(c, e, gap)
+			if (stop !== false) worst = Math.min(worst, stopAt(d, fwd, stop))
 		}
 		// People crossing the road we turn into: wait at the line, not in the
 		// middle of the junction.
