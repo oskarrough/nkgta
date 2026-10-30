@@ -405,7 +405,7 @@ export const sound = {
 	start,
 	listen,
 	enclosure: () => shut,
-	audio: () => context && { context, master, room, muted, duck: ducking },
+	audio: () => context && { context, master, room, noise, muted, duck: ducking },
 	engine,
 	street,
 	async door() {

@@ -4,6 +4,7 @@ import { createWorld } from './world.js'
 import { createInput } from './input.js'
 import { createPlayer, leaveCar, nearBike, toggleBike, updatePlayer } from './player.js'
 import { createTraffic } from './traffic.js'
+import { createChatter } from './chatter.js'
 import { createWasted } from './wasted.js'
 import { hospitalWake } from './hospital.js'
 import { createPfand } from './pfand.js'
@@ -56,7 +57,12 @@ if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 const hud = createHud(world)
-const traffic = createTraffic(world, (text) => hud.say(text))
+const chatter = createChatter(world, shops)
+const traffic = createTraffic(
+	world,
+	(text) => hud.say(text),
+	(p) => chatter.shout(p),
+)
 const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
 const pocket = createPocket({
@@ -375,6 +381,7 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
+	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside })
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() })
 	actors.update(player, traffic.peds, pfand.bottles, traffic.lights(), cam, dt, visit.room())
 	if (Number.isNaN(frozenHour)) clock.tick(dt)

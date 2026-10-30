@@ -25,7 +25,7 @@ const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', 
 const DODGE = { notice: 1.8, hold: 1.2, fast: 2.2 }
 const CALM = { alarm: 0, reaction: 0, panic: 0, panicAcc: 0, evade: 0, honk: false }
 
-export function createTraffic(world, say = () => {}) {
+export function createTraffic(world, say = () => {}, voice = () => {}) {
 	const edges = roadGraph(world)
 	const signals = []
 	for (let i = 0; i < (world.signals?.length ?? 0); i += 2) signals.push({ x: world.signals[i], y: world.signals[i + 1] })
@@ -390,6 +390,7 @@ export function createTraffic(world, say = () => {}) {
 				if (shouted < 3 || Math.hypot(p.x - player.x, p.y - player.y) > SHOUT_RANGE) return
 				shouted = 0
 				say(p.pet?.kind === 'dog' ? 'Wau! Wau!' : DIVE_SHOUTS[Math.floor(Math.random() * DIVE_SHOUTS.length)])
+				if (!p.pet) voice(p)
 			},
 		}
 
