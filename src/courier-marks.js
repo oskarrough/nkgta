@@ -2,19 +2,19 @@ import * as THREE from 'three'
 import { INK } from './poster.js'
 
 const BADGE = { size: 2.2, lift: 2.2 }
-const PLATE = { width: 1.14, lift: 1.2, near: 40 } // tiles; plates show within `near` of you
+const PLATE = { width: 0.62, lift: 1.65, side: 0.72, near: 40 } // tiles; plates show within `near` of you
 const FACE = 160 // enamel plate texture, wider than tall like the ones on Berlin doorways
 const FACE_H = 136
 const FACE_PAPER = '#f2eee0'
 
-function canvasMaterial(draw, w, h) {
+function canvasMaterial(draw, w, h, Material = THREE.SpriteMaterial) {
 	const canvas = document.createElement('canvas')
 	canvas.width = w
 	canvas.height = h
 	draw(canvas.getContext('2d'), w, h)
 	const texture = new THREE.CanvasTexture(canvas)
 	texture.colorSpace = THREE.SRGBColorSpace
-	return new THREE.SpriteMaterial({ map: texture, transparent: true })
+	return new Material({ map: texture, transparent: true })
 }
 
 const bagBadge = () =>
@@ -109,6 +109,7 @@ function plate(number) {
 		},
 		FACE,
 		FACE_H,
+		THREE.MeshBasicMaterial,
 	)
 	plates.set(number, material)
 	return material
@@ -123,6 +124,11 @@ export function createCourierMarks(scene, heightAt = () => 0) {
 	badge.visible = false
 	root.add(badge)
 	const pool = []
+	const plane = new THREE.PlaneGeometry(1, 1)
+	const basis = new THREE.Matrix4()
+	const tangent = new THREE.Vector3()
+	const normal = new THREE.Vector3()
+	const up = new THREE.Vector3(0, 0, 1)
 	let street = [] // the drop-off street's doors
 	let since = Infinity
 	let pulse = 0
@@ -152,19 +158,22 @@ export function createCourierMarks(scene, heightAt = () => 0) {
 			since = 0
 			const near = street.filter((d) => Math.hypot(d.x - player.x, d.y - player.y) < PLATE.near)
 			while (pool.length < near.length) {
-				const sprite = new THREE.Sprite()
-				pool.push(sprite)
-				root.add(sprite)
+				const sign = new THREE.Mesh(plane, plate(''))
+				pool.push(sign)
+				root.add(sign)
 			}
-			pool.forEach((sprite, i) => {
+			pool.forEach((sign, i) => {
 				const d = near[i]
-				sprite.visible = !!d
+				sign.visible = !!d
 				if (!d) return
-				sprite.material = plate(d.number)
-				const x = d.x + d.nx * 0.35
-				const y = d.y + d.ny * 0.35
-				sprite.position.set(x, -y, heightAt(x, y) + PLATE.lift)
-				sprite.scale.set(PLATE.width, (PLATE.width * FACE_H) / FACE, 1)
+				sign.material = plate(d.number)
+				const x = d.x + d.nx * 0.03 + d.ny * PLATE.side
+				const y = d.y + d.ny * 0.03 - d.nx * PLATE.side
+				sign.position.set(x, -y, heightAt(x, y) + PLATE.lift)
+				tangent.set(d.ny, d.nx, 0)
+				normal.set(d.nx, -d.ny, 0)
+				sign.quaternion.setFromRotationMatrix(basis.makeBasis(tangent, up, normal))
+				sign.scale.set(PLATE.width, (PLATE.width * FACE_H) / FACE, 1)
 			})
 		},
 	}
