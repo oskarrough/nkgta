@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import polygonBoolean from 'polygon-clipping'
 import { CHUNK } from './chunks.js'
+import { SURFACE, surfaceFrame, surfacePoint } from './ground-surface.js'
 import { GROUND_STEP } from './scene-ground.js'
 import { T, COLORS, KERB, MARK } from './tiles.js'
 import {
@@ -223,6 +224,10 @@ function buffer(Type, size, normalized = false) {
 export function* buildGeometry({ world, chunk, entries }) {
 	const all = (entries ?? shapesIn(world, chunk)).map((entry) => ({
 		...entry,
+		frame:
+			entry.shape.t === T.SIDEWALK || entry.shape.t === 'sett' || entry.shape.sett
+				? { ...surfaceFrame(entry.shape, world.tileM), id: entry.order }
+				: undefined,
 		rings: entry.shape.rings?.map((r) => Array.from({ length: r.length / 2 }, (_, i) => [r[i * 2], r[i * 2 + 1]])),
 	}))
 	if (!all.length) return
@@ -231,15 +236,16 @@ export function* buildGeometry({ world, chunk, entries }) {
 		normals = buffer(Int16Array, 3, true),
 		colors = buffer(Uint8Array, 3, true),
 		surfaces = buffer(Uint8Array, 1),
+		paving = buffer(Float32Array, 2),
 		indices = buffer(Uint32Array, 1)
 	const dx = chunk.w / (world.flat ? 1 : Math.ceil(chunk.w / GROUND_STEP))
 	const dy = chunk.h / (world.flat ? 1 : Math.ceil(chunk.h / GROUND_STEP))
 	const vertices = new Map()
-	const add = (points, color, height, surface) => {
+	const add = (points, color, height, surface, frame) => {
 		if (points.length < 3) return
 		const face = []
 		for (const [x, y] of points) {
-			const key = `${Math.round(x * 1e6)},${Math.round(y * 1e6)},${color.getHex()},${surface}`
+			const key = `${Math.round(x * 1e6)},${Math.round(y * 1e6)},${color.getHex()},${surface},${frame?.id ?? -1}`
 			if (vertices.has(key)) {
 				face.push(vertices.get(key))
 				continue
@@ -253,12 +259,13 @@ export function* buildGeometry({ world, chunk, entries }) {
 			normals.push(Math.round((-sx / length) * 32767), Math.round((sy / length) * 32767), Math.round(32767 / length))
 			colors.push(Math.round(color.r * 255), Math.round(color.g * 255), Math.round(color.b * 255))
 			surfaces.push(surface)
+			paving.push(...(frame?.segments ? surfacePoint(frame, x, y) : [x * (world.tileM ?? 3), y * (world.tileM ?? 3)]))
 		}
 		for (let i = 1; i + 1 < face.length; i++) {
 			if (face[0] !== face[i] && face[0] !== face[i + 1] && face[i] !== face[i + 1]) indices.push(face[0], face[i + 1], face[i])
 		}
 	}
-	function* emit(polygons, color, surface = 0) {
+	function* emit(polygons, color, surface = SURFACE.paint, frame) {
 		if (!polygons.length) return
 		const area = polygonClipping.intersection(polygons, rectangle(patch.x, patch.y, patch.x + patch.w, patch.y + patch.h))
 		for (let row = Math.floor((patch.y - chunk.y) / dy); row < Math.ceil((patch.y + patch.h - chunk.y) / dy); row++) {
@@ -283,12 +290,13 @@ export function* buildGeometry({ world, chunk, entries }) {
 							z01 = world.heightAt(x0, y0 + dy),
 							z11 = world.heightAt(x0 + dx, y0 + dy)
 						const diagonal = ([x, y]) => 1 - (x - x0) / dx - (y - y0) / dy
-						add(clip(cell, diagonal), color, (x, y) => z00 + ((z10 - z00) * (x - x0)) / dx + ((z01 - z00) * (y - y0)) / dy, surface)
+						add(clip(cell, diagonal), color, (x, y) => z00 + ((z10 - z00) * (x - x0)) / dx + ((z01 - z00) * (y - y0)) / dy, surface, frame)
 						add(
 							clip(cell, (p) => -diagonal(p)),
 							color,
 							(x, y) => z11 + (z01 - z11) * (1 - (x - x0) / dx) + (z10 - z11) * (1 - (y - y0) / dy),
 							surface,
+							frame,
 						)
 					}
 				}
@@ -316,10 +324,10 @@ export function* buildGeometry({ world, chunk, entries }) {
 					(a, b) => (a.shape.t === T.WATER ? 6.9 : a.shape.layer) - (b.shape.t === T.WATER ? 6.9 : b.shape.layer) || a.order - b.order,
 				)
 			const batches = new Map()
-			const paint = (polygons, color, surface) => {
+			const paint = (polygons, color, surface, frame) => {
 				if (!polygons.length) return
-				const key = `${color.getHex()},${surface}`
-				if (!batches.has(key)) batches.set(key, { polygons: [], color, surface })
+				const key = `${color.getHex()},${surface},${frame?.id ?? -1}`
+				if (!batches.has(key)) batches.set(key, { polygons: [], color, surface, frame })
 				batches.get(key).polygons.push(polygons)
 			}
 			let covered = []
@@ -346,7 +354,16 @@ export function* buildGeometry({ world, chunk, entries }) {
 					yield
 					continue
 				}
-				const surface = sett ? 2 : 1
+				const surface = sett
+					? SURFACE.setts
+					: s.t === T.SIDEWALK && !gravel
+						? s.line
+							? SURFACE.pavement
+							: SURFACE.square
+						: s.t === T.ROAD
+							? SURFACE.asphalt
+							: SURFACE.plain
+				const frame = surface === SURFACE.setts || surface === SURFACE.pavement ? entry.frame : undefined
 				if (s.rings && OUTLINED.has(s.t)) {
 					const border = union(s.rings.map((r) => stroke([...r, r[0], r[1]], SHAPE_OUTLINE, patch)))
 					const edge = polygonClipping.intersection(visible, border)
@@ -355,16 +372,16 @@ export function* buildGeometry({ world, chunk, entries }) {
 						.multiplyScalar(0.45)
 						.add(new THREE.Color().setRGB(26 / 255, 30 / 255, 30 / 255).multiplyScalar(0.55))
 						.convertSRGBToLinear()
-					paint(edge, ink, surface)
+					paint(edge, ink, SURFACE.plain)
 					visible = polygonClipping.difference(visible, border)
 				}
 				if (s.rings && TONES[s.t]) {
 					const shifted = ringArea(entry.rings.map((r) => r.map(([px, py]) => [px - TONE_SHIFT, py + TONE_SHIFT])))
 					const tone = polygonClipping.intersection(visible, shifted, bounds)
-					paint(tone, new THREE.Color(TONES[s.t]), surface)
+					paint(tone, new THREE.Color(TONES[s.t]), surface, frame)
 					visible = polygonClipping.difference(visible, tone)
 				}
-				paint(visible, new THREE.Color(base), surface)
+				paint(visible, new THREE.Color(base), surface, frame)
 				if (gravel) {
 					const border = polygonClipping.difference(footprint(entry, GRAVEL_EDGE_WIDTH), polygon, covered)
 					paint(border, new THREE.Color(GRAVEL_EDGE), surface)
@@ -372,8 +389,8 @@ export function* buildGeometry({ world, chunk, entries }) {
 				}
 				yield
 			}
-			for (const { polygons, color, surface } of batches.values()) {
-				yield* emit(union(polygons), color, surface)
+			for (const { polygons, color, surface, frame } of batches.values()) {
+				yield* emit(union(polygons), color, surface, frame)
 			}
 			const runs = new Map()
 			for (const entry of entries) {
@@ -413,6 +430,7 @@ export function* buildGeometry({ world, chunk, entries }) {
 	geometry.setAttribute('normal', normals.attribute())
 	geometry.setAttribute('color', colors.attribute())
 	geometry.setAttribute('surface', surfaces.attribute())
+	geometry.setAttribute('paving', paving.attribute())
 	geometry.setIndex(indices.attribute(positions.length / 3 < 65535 ? Uint16Array : Uint32Array))
 	geometry.computeBoundingSphere()
 	geometry.computeBoundingBox()

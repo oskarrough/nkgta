@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { HILLS } from './terrain.js'
+import { SURFACE } from './ground-surface.js'
 import { DECK } from './clouds.js'
 import { d, glsl, pulse } from './scene-shader.js'
 
@@ -11,10 +12,8 @@ const GROUND_DETAIL = {
 	lawnTufts: 0.16, // single dark tufts
 	yardWear: 0.08, // worn patches on courtyards and bare ground
 	yardJoints: 0.08, // the gaps between their cobbles
-	pavingJoints: 0.09, // and between the pavement slabs
 	asphaltPatches: 0.1, // repaired patches in the tarmac
 	settJoints: 0.2, // the gaps between the setts of a cobbled street
-	settSize: 7, // setts per tile, about
 	waves: 0.65, // pale wave dashes on water
 	waveDrift: 0.15, // and how fast they drift, tiles a second
 	glints: 0.035, // share of sunlit water cells sparkling at any moment
@@ -63,6 +62,7 @@ export function groundMaterial(map, world) {
 		},
 	])
 	uniforms.map = { value: map }
+	uniforms.tileM = { value: world.tileM ?? 3 }
 	uniforms.mapRect = { value: new THREE.Vector4(0, 0, world.W, world.H) }
 	return new THREE.ShaderMaterial({
 		lights: true,
@@ -71,12 +71,14 @@ export function groundMaterial(map, world) {
 			uniform vec3 toSun;
 			#ifdef ROAD_PAINT
 				attribute float surface;
+				attribute vec2 paving;
 				uniform vec4 mapRect;
 			#endif
 			varying vec2 vUv;
 			#ifdef ROAD_PAINT
 				varying vec3 vPaint;
 				varying float vSurface;
+				varying vec2 vPaving;
 			#endif
 			varying vec2 vTile;
 			varying float vHill;
@@ -89,6 +91,7 @@ export function groundMaterial(map, world) {
 				#ifdef ROAD_PAINT
 					vPaint = color;
 					vSurface = surface;
+					vPaving = paving;
 					vUv = vec2((position.x - mapRect.x) / mapRect.z, 1.0 - (-position.y - mapRect.y) / mapRect.w);
 				#endif
 				// Slopes towards the sun a touch brighter, away from it darker,
@@ -109,12 +112,14 @@ export function groundMaterial(map, world) {
 			uniform vec3 deck;
 			uniform vec2 size;
 			uniform float time;
+			uniform float tileM;
 			uniform vec3 shade;
 			uniform bool receiveShadow;
 			varying vec2 vUv;
 			#ifdef ROAD_PAINT
 				varying vec3 vPaint;
 				varying float vSurface;
+				varying vec2 vPaving;
 			#endif
 			varying vec2 vTile;
 			varying float vHill;
@@ -129,11 +134,11 @@ export function groundMaterial(map, world) {
 			void main() {
 				#ifdef ROAD_PAINT
 					vec4 ground = texture2D(map, vUv);
-					gSett = step(1.5, vSurface);
-					vec3 color = vSurface < 0.5 ? vPaint : groundDetail(vPaint, vTile, time) * ground.a;
+					vec3 color = vPaint;
+					if (vSurface > 1.5) color = surfaceDetail(vPaint, vPaving, vTile * tileM, vSurface) * ground.a;
+					else if (vSurface > 0.5) color = groundDetail(vPaint, vTile, time) * ground.a;
 				#else
 				vec4 ground = texture2D(map, vUv);
-				gSett = 0.0;
 				vec3 color = groundDetail(ground.rgb, vTile, time) * ground.a;
 				#endif
 				float lit = getShadowMask();
@@ -157,10 +162,8 @@ export function groundMaterial(map, world) {
 		`,
 	})
 }
-// The ground's materials, told apart by the colour the map painted: green
-// is lawn, dark grey is tarmac, pale grey is pavement, the khaki between is
-// courtyards and bare ground. Every pattern comes in hard steps, like paint,
-// and fades out before its stones get smaller than a pixel.
+// Geometry carries explicit surface IDs; remaining painted areas retain
+// their colour classification. Fine detail fades before it can shimmer.
 const groundDetail = `
 ${pulse}
 float gHash(vec2 p) {
@@ -207,19 +210,56 @@ float gSetts(vec2 p) {
 	return sqrt(f2) - sqrt(f1);
 }
 
-// How much of a pavement slab pattern is joint, as gStones draws it, filtered
-// over a pixel w tiles wide so the joints thin into a tone, not a flicker.
-float gJoints(vec2 p, float edge, vec2 w) {
-	float half_ = (1.0 - edge) * 0.5;
-	float jx = pulse(p.x + floor(p.y) * 0.5 + half_, 0.0, 2.0 * half_, w.x);
-	float jy = pulse(p.y + half_, 0.0, 2.0 * half_, w.y);
-	return 1.0 - (1.0 - jx) * (1.0 - jy);
+// Box-filter the joints; stone variation disappears before a stone spans
+// fewer than two pixels. Derivatives are taken before staggering the rows.
+float gRows(vec2 q, vec2 width, vec2 gap, float contrast, float variation) {
+	float seen = 1.0 - smoothstep(0.22, 0.65, max(width.x, width.y));
+	q.x += mod(floor(q.y), 2.0) * 0.5;
+	float jx = pulse(q.x + gap.x * 0.5, 0.0, gap.x, width.x);
+	float jy = pulse(q.y + gap.y * 0.5, 0.0, gap.y, width.y);
+	float average = 1.0 - (1.0 - gap.x) * (1.0 - gap.y);
+	float joints = mix(average, 1.0 - (1.0 - jx) * (1.0 - jy), seen);
+	float tone = (step(0.5, gHash(floor(q))) - 0.5) * variation * seen;
+	return 1.0 - joints * contrast + tone;
+}
+
+float gCobbles(vec2 uv) {
+	vec2 size = vec2(0.18, 0.22);
+	vec2 width = fwidth(uv.yx);
+	vec2 q = uv.yx / size;
+	float seen = 1.0 - smoothstep(0.22, 0.65, max(width.x / size.x, width.y / size.y));
+	q.x += mod(floor(q.y), 2.0) * 0.5;
+	float stone = gHash(floor(q));
+	float radius = 0.018;
+	vec2 inset = abs(fract(q) - 0.5) * size - (size * 0.5 - radius - 0.006 - stone * 0.003);
+	float edge = length(max(inset, 0.0)) + min(max(inset.x, inset.y), 0.0) - radius;
+	float pixel = max(max(width.x, width.y), 0.0001);
+	float joint = mix(0.15, smoothstep(-pixel * 0.5, pixel * 0.5, edge), seen);
+	return 1.0 - joint * ${d(GROUND_DETAIL.settJoints)} + (stone - 0.5) * 0.065 * seen;
+}
+
+vec3 surfaceDetail(vec3 color, vec2 uv, vec2 metres, float surface) {
+	vec2 width = fwidth(uv);
+	if (surface < ${d(SURFACE.setts + 0.5)}) {
+		return color * gCobbles(uv);
+	}
+	if (abs(surface - ${d(SURFACE.asphalt)}) < 0.5) {
+		vec2 grain = metres * 12.5;
+		float seen = 1.0 - smoothstep(0.22, 0.7, max(fwidth(grain).x, fwidth(grain).y));
+		float repair = step(0.73, gBlots(metres * 0.1 + 11.3));
+		return color * (1.0 - repair * ${d(GROUND_DETAIL.asphaltPatches)} + (gNoise(grain) - 0.5) * 0.025 * seen);
+	}
+	vec2 slabSize = vec2(0.9, 1.5);
+	float slab = gRows((uv + vec2(0.0, 0.75)) / slabSize, width / slabSize, vec2(0.008) / slabSize, 0.18, 0.035);
+	if (surface > ${d(SURFACE.square - 0.5)}) return color * slab;
+	float mosaic = gRows(uv / 0.09, width / 0.09, vec2(0.008 / 0.09), 0.18, 0.07);
+	float band = 1.0 - smoothstep(0.75 - width.y, 0.75 + max(width.y, 0.0001), abs(uv.y));
+	float seen = 1.0 - smoothstep(0.18, 0.6, max(width.x, width.y));
+	return color * mix(0.98, mix(mosaic * 0.96, slab * 1.025, band), seen);
 }
 
 // Set by groundDetail: how much of this point is water.
 float gWater = 0.0;
-// Set before it: how much of this point is cobbled street, from the map's alpha.
-float gSett = 0.0;
 
 vec3 groundDetail(vec3 color, vec2 p, float time) {
 	float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -247,8 +287,6 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	float near = 1.0 - smoothstep(0.05, 0.12, px);
 	float f = 1.0;
 
-	float clumps = gBlots(p * 0.8);
-	vec2 tuft = gStones(p * 2.2);
 	// Short pale dashes on open water, past the shallows, rows drifting
 	// either way.
 	vec2 q = p * vec2(0.9, 2.6);
@@ -256,22 +294,16 @@ vec3 groundDetail(vec3 color, vec2 p, float time) {
 	vec2 wf = fract(q);
 	f += water * (1.0 - step(0.2, lum)) * mix(0.044, step(0.72, gHash(floor(q))) * step(abs(wf.y - 0.5), 0.13) * step(abs(wf.x - 0.5), 0.3), fine) * ${d(GROUND_DETAIL.waves)};
 
-	f -= lawn * (1.0 - pitch) * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} * near + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
-
-	float wear = gBlots(p * 0.45 + 3.7);
-	float setts = gSetts(p * 4.0);
-	f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} * near + mix(0.18, step(setts, 0.1), joint) * ${d(GROUND_DETAIL.yardJoints)});
-
-	f -= pavement * gJoints(p * 2.0, 0.86, fwidth(p) * 2.0) * ${d(GROUND_DETAIL.pavingJoints)};
-
-	float repair = gBlots(p * 0.3 + 11.3);
-	f -= tarmac * (1.0 - gSett) * step(0.73, repair) * ${d(GROUND_DETAIL.asphaltPatches)};
-
-	// Cobbled streets: small setts, their joints thinning into a tone before
-	// they'd flicker.
-	float sett = gSetts(p * ${d(GROUND_DETAIL.settSize)});
-	float settJoint = 1.0 - smoothstep(${d(0.1 / GROUND_DETAIL.settSize)}, ${d(0.24 / GROUND_DETAIL.settSize)}, px);
-	f -= gSett * mix(0.21, step(sett, 0.12), settJoint) * ${d(GROUND_DETAIL.settJoints)};
+	if (lawn > 0.0 && pitch < 1.0) {
+		float clumps = gBlots(p * 0.8);
+		vec2 tuft = gStones(p * 2.2);
+		f -= lawn * (1.0 - pitch) * (step(0.66, clumps) * ${d(GROUND_DETAIL.lawnClumps)} * near + step(0.93, tuft.x) * step(tuft.y, 0.45) * ${d(GROUND_DETAIL.lawnTufts)} * mid);
+	}
+	if (yard > 0.0) {
+		float wear = gBlots(p * 0.45 + 3.7);
+		float setts = gSetts(p * 4.0);
+		f -= yard * (step(0.64, wear) * ${d(GROUND_DETAIL.yardWear)} * near + mix(0.18, step(setts, 0.1), joint) * ${d(GROUND_DETAIL.yardJoints)});
+	}
 
 	return color * f;
 }

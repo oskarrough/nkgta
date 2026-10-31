@@ -15,7 +15,7 @@ export const CHUNK = 128 // tiles a side
 export const DETAIL_PX = 3
 // Texture pixels per tile, finest first. Every chunk keeps the last one.
 const LEVELS = [12, 6, 3, 1.5]
-const GROUND_MAX = PHONE ? 3 : 6
+const GROUND_MAX = 3
 const FAR = LEVELS.at(-1)
 // A level will do while a screen pixel covers no more than this many of
 // its texels, a little under one, so zooming out lets go of detail early.
