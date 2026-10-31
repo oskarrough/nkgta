@@ -53,6 +53,7 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the
 - Anything standing in the city gets its z from `world.heightAt(x, y)` (tiles, 0 at the lowest point); slopes from `world.slopeAt`. Without terrain, e.g. picked areas, both return 0, so new code must work flat too.
 - Buildings stand on the lowest ground under their outline; walls reach a little below it. The overhead camera rises with the ground at the view's centre so the 2D overlay lines up there. Shop interiors stay flat (`cam.ground: 0`).
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
+- Ground paint must follow `groundGeometry`'s grid triangles: bilinear `heightAt` between vertices can sink a decal into a hill. `src/road-paint.js` clips to that grid with a 0.005-tile lift; keep polygon operations in small patches so background chunk builds do not stall frames.
 - `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
 
 ## Working in a worktree

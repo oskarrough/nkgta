@@ -28,7 +28,7 @@ const EDGE_FADE = 3
 // A chunk's ground, in world coordinates: one quad where the land is flat,
 // else a mesh following its rises and dips, a vertex every GROUND_STEP
 // tiles, its normals from the slope so neighbouring chunks shade alike.
-const GROUND_STEP = 2
+export const GROUND_STEP = 2
 const HILLSHADE = HILLS.shade
 export function groundGeometry(chunk, world) {
 	const flat = world.flat
@@ -70,6 +70,9 @@ export function groundMaterial(map, world) {
 		vertexShader: `
 			uniform vec3 toSun;
 			varying vec2 vUv;
+			#ifdef ROAD_PAINT
+				varying vec3 vPaint;
+			#endif
 			varying vec2 vTile;
 			varying float vHill;
 			varying vec3 vNormal;
@@ -78,6 +81,9 @@ export function groundMaterial(map, world) {
 
 			void main() {
 				vUv = uv;
+				#ifdef ROAD_PAINT
+					vPaint = color;
+				#endif
 				// Slopes towards the sun a touch brighter, away from it darker,
 				// and no more so when the sun is low.
 				vHill = 1.0 + (dot(normal, toSun) - toSun.z) / max(toSun.z, 0.6) * ${d(HILLSHADE)};
@@ -99,6 +105,9 @@ export function groundMaterial(map, world) {
 			uniform vec3 shade;
 			uniform bool receiveShadow;
 			varying vec2 vUv;
+			#ifdef ROAD_PAINT
+				varying vec3 vPaint;
+			#endif
 			varying vec2 vTile;
 			varying float vHill;
 			varying vec3 vNormal;
@@ -110,11 +119,16 @@ export function groundMaterial(map, world) {
 			${groundDetail}
 
 			void main() {
+				#ifdef ROAD_PAINT
+					vec3 color = vPaint;
+				#else
 				vec4 ground = texture2D(map, vUv);
 				gSett = clamp((1.0 - ground.a) / ${d(SETT_ALPHA)}, 0.0, 1.0);
 				vec3 color = groundDetail(ground.rgb, vTile, time);
+				#endif
 				float lit = getShadowMask();
 				color *= mix(shade, sun, lit) * vHill;
+				#ifndef ROAD_PAINT
 				// Sun glints on water: a few cells at a time flash a white point,
 				// gone once they'd be smaller than a pixel.
 				vec2 gc = floor(vTile / ${d(GROUND_DETAIL.glintCell)});
@@ -123,6 +137,7 @@ export function groundMaterial(map, world) {
 				float spot = step(abs(gp.x) + abs(gp.y), ${d(GROUND_DETAIL.glintSize)});
 				float seen = 1.0 - smoothstep(${d(GROUND_DETAIL.glintSize * 0.5)}, ${d(GROUND_DETAIL.glintSize)}, length(fwidth(vTile)) * 1.2);
 				color = mix(color, ${glsl(GLINT)}, gWater * step(0.5, lit) * flash * spot * seen);
+				#endif
 				// The last few tiles fade into the sky under the clouds.
 				vec2 edge = min(vTile * vec2(1.0, -1.0), size - vTile * vec2(1.0, -1.0));
 				color = mix(deck, color, smoothstep(0.0, ${EDGE_FADE.toFixed(1)}, min(edge.x, edge.y)));
