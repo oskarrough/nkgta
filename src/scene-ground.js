@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { HILLS } from './terrain.js'
 import { DECK } from './clouds.js'
-import { SETT_ALPHA } from './map-image.js'
 import { d, glsl, pulse } from './scene-shader.js'
 
 // What the ground is made of, drawn on top of the map's flat colours by
@@ -64,14 +63,20 @@ export function groundMaterial(map, world) {
 		},
 	])
 	uniforms.map = { value: map }
+	uniforms.mapRect = { value: new THREE.Vector4(0, 0, world.W, world.H) }
 	return new THREE.ShaderMaterial({
 		lights: true,
 		uniforms,
 		vertexShader: `
 			uniform vec3 toSun;
+			#ifdef ROAD_PAINT
+				attribute float surface;
+				uniform vec4 mapRect;
+			#endif
 			varying vec2 vUv;
 			#ifdef ROAD_PAINT
 				varying vec3 vPaint;
+				varying float vSurface;
 			#endif
 			varying vec2 vTile;
 			varying float vHill;
@@ -83,6 +88,8 @@ export function groundMaterial(map, world) {
 				vUv = uv;
 				#ifdef ROAD_PAINT
 					vPaint = color;
+					vSurface = surface;
+					vUv = vec2((position.x - mapRect.x) / mapRect.z, 1.0 - (-position.y - mapRect.y) / mapRect.w);
 				#endif
 				// Slopes towards the sun a touch brighter, away from it darker,
 				// and no more so when the sun is low.
@@ -107,6 +114,7 @@ export function groundMaterial(map, world) {
 			varying vec2 vUv;
 			#ifdef ROAD_PAINT
 				varying vec3 vPaint;
+				varying float vSurface;
 			#endif
 			varying vec2 vTile;
 			varying float vHill;
@@ -120,11 +128,13 @@ export function groundMaterial(map, world) {
 
 			void main() {
 				#ifdef ROAD_PAINT
-					vec3 color = vPaint;
+					vec4 ground = texture2D(map, vUv);
+					gSett = step(1.5, vSurface);
+					vec3 color = vSurface < 0.5 ? vPaint : groundDetail(vPaint, vTile, time) * ground.a;
 				#else
 				vec4 ground = texture2D(map, vUv);
-				gSett = clamp((1.0 - ground.a) / ${d(SETT_ALPHA)}, 0.0, 1.0);
-				vec3 color = groundDetail(ground.rgb, vTile, time);
+				gSett = 0.0;
+				vec3 color = groundDetail(ground.rgb, vTile, time) * ground.a;
 				#endif
 				float lit = getShadowMask();
 				color *= mix(shade, sun, lit) * vHill;

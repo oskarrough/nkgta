@@ -9,8 +9,8 @@ export const PX = 4 // screen pixels per tile at zoom 1
 // Look. Everything here is a knob to tune against the reference.
 const GROUND_PX = 12 // texture pixels per tile, at most
 const ROOF_PX = 12
-const TONE_SHIFT = 1.1 // tiles the lighter ground tone slides south-west
-const SHAPE_OUTLINE = 0.7 // ink around parks and water, tiles
+export const TONE_SHIFT = 1.1 // tiles the lighter ground tone slides south-west
+export const SHAPE_OUTLINE = 0.7 // ink around parks and water, tiles
 const PLOT_OUTLINE = 0.5 // contact ink around building plots, tiles
 // Contact shade on the ground round every building, in hard steps: total
 // width in tiles and how much darker each step makes it.
@@ -59,29 +59,28 @@ const PITCH_INSET = 1 // touchline distance from the pitch's edge, tiles
 const PITCH_LINE = 0.25
 const PITCH_CIRCLE = 3 // at most, and a quarter of the pitch's width
 const PITCH_SMALL = 6 // narrower than this, no halfway line
-const FOOTPATH = 1.5 // pavement lines this narrow are footpaths, tiles
-const GRAVEL = '#d2c4a0'
-const GRAVEL_EDGE = '#8f8a68'
-const GRAVEL_EDGE_WIDTH = 0.3
+export const FOOTPATH = 1.5 // pavement lines this narrow are footpaths, tiles
+export const GRAVEL = '#d2c4a0'
+export const GRAVEL_EDGE = '#8f8a68'
+export const GRAVEL_EDGE_WIDTH = 0.3
 const HATCH_INK = '#877e70'
 const HATCH_WIDTH = 2
 // Kerb paint (see kerbs.js): green bike lanes edged white, red cycle tracks on
-// the pavement, and cobbles, a paler, warmer grey than tarmac. Cobbles also
-// take some of the texture's alpha away, which is how the ground shader
-// knows to lay setts there.
-const BIKE_LANE = '#4f9d5d'
-const SETT = '#5d5b57'
+// the pavement, and cobbles, a paler, warmer grey than tarmac. Chunk
+// geometry carries the cobble flag; overview textures keep it in alpha.
+export const BIKE_LANE = '#4f9d5d'
+export const SETT = '#5d5b57'
 export const SETT_ALPHA = 0.5
 
 // Flat second tone for parks and water, one step lighter than the base.
-const TONES = {
+export const TONES = {
 	[T.GRASS]: '#679a3d',
 	[T.PITCH]: '#5a8a48',
 	[T.PLAYGROUND]: '#d3b171',
 	[T.WATER]: '#4b6a69',
 	[T.SIDEWALK]: '#bcb3a4',
 }
-const OUTLINED = new Set([T.GRASS, T.WATER, T.PITCH, T.PLAYGROUND, T.PRIVATE, T.SIDEWALK])
+export const OUTLINED = new Set([T.GRASS, T.WATER, T.PITCH, T.PLAYGROUND, T.PRIVATE, T.SIDEWALK])
 
 const trace = (g, pts) => {
 	g.moveTo(pts[0], pts[1])
@@ -191,7 +190,7 @@ const touches = (area, rings, pad, key) => {
 // answer as every park in one path, right down to points on an outline.
 const parksOf = new WeakMap()
 const inParks = new WeakMap()
-function inPark(shapes, s) {
+export function inPark(shapes, s) {
 	if (inParks.has(s)) return inParks.get(s)
 	let parks = parksOf.get(shapes)
 	if (!parks) {
@@ -372,6 +371,7 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 	}
 	const cobble = (s) => {
 		stroke(s, SETT, s.w)
+		if (area.soft) return
 		g.globalCompositeOperation = 'destination-out'
 		stroke(s, `rgba(0, 0, 0, ${SETT_ALPHA})`, s.w)
 		g.globalCompositeOperation = 'source-over'
@@ -452,6 +452,8 @@ export function renderMapImage(world, area = wholeMap(world, GROUND_PX)) {
 	// Buildings themselves are painted by their roofs in the 3D scene.
 	const plots = new Path2D()
 	for (const b of buildings) if (touches(area, b.rings, 2)) for (const r of b.rings) plots.addPath(ringPath([r]))
+	// Geometry keeps its own colour; the alpha carries only wall contact shade.
+	if (area.soft) g.globalCompositeOperation = 'destination-out'
 	for (const [width, dark] of CONTACT_SHADE) {
 		g.strokeStyle = `rgba(${CONTACT_COLOR}, ${dark})`
 		g.lineWidth = width

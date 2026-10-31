@@ -264,7 +264,18 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const paintings = murals.decals(houses)
 		if (paintings) group.add(paintings)
 		yield
-		const ctx = { world, chunk, shops, gradient, sky, weather, opening: chunkOpening, houses, ground: plane.material }
+		const ctx = {
+			world,
+			chunk,
+			shops,
+			gradient,
+			sky,
+			weather,
+			opening: chunkOpening,
+			houses,
+			ground: plane.material,
+			canvas: renderer.domElement,
+		}
 		const parts = []
 		for (const feature of FEATURES) {
 			let part = feature.build(ctx)
@@ -304,6 +315,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 					return
 				}
 				plane.material.uniforms.map.value = texture
+				plane.material.uniforms.mapRect.value.set(area.x, area.y, area.w, area.h)
 				const at = plane.geometry.attributes.position
 				for (let i = 0; i < uv.count; i++) uv.setXY(i, (at.getX(i) - area.x) / area.w, 1 - (-at.getY(i) - area.y) / area.h)
 				uv.needsUpdate = true

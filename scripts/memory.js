@@ -143,7 +143,7 @@ try {
 				if (o.geometry) {
 					geometries.add(o.geometry)
 					for (const a of Object.values(o.geometry.attributes)) buffers.add((a.array ?? a.data?.array)?.buffer)
-					if (o.geometry.index) buffers.add(o.geometry.index.array.buffer)
+					if (o.geometry.index?.array) buffers.add(o.geometry.index.array.buffer)
 				}
 				for (const a of [o.instanceMatrix, o.instanceColor]) if (a) buffers.add(a.array.buffer)
 			})

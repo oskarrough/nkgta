@@ -15,6 +15,7 @@ export const CHUNK = 128 // tiles a side
 export const DETAIL_PX = 3
 // Texture pixels per tile, finest first. Every chunk keeps the last one.
 const LEVELS = [12, 6, 3, 1.5]
+const GROUND_MAX = PHONE ? 3 : 6
 const FAR = LEVELS.at(-1)
 // A level will do while a screen pixel covers no more than this many of
 // its texels, a little under one, so zooming out lets go of detail early.
@@ -23,7 +24,7 @@ const UNDERSAMPLE = 0.75
 // filtering never reaches past the edge of the texture and leaves a seam.
 const GUTTER = 4
 const MARGIN = 32 // tiles round the view that count as in view, so textures are ready before they show
-const BUDGET = (PHONE ? 32 : 128) * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
+const BUDGET = (PHONE ? 16 : 128) * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
 // Share of the time between frames spent building chunk meshes that
 // aren't needed yet, and the most per frame, in ms.
 const BUILD_SHARE = 0.25
@@ -104,7 +105,7 @@ function areaOf(c, kind, px) {
 	const g = GUTTER / px
 	const width = Math.ceil((x1 - x0) * px) + GUTTER * 2
 	const height = Math.ceil((y1 - y0) * px) + GUTTER * 2
-	return { x: x0 - g, y: y0 - g, w: width / px, h: height / px, px, width, height }
+	return { x: x0 - g, y: y0 - g, w: width / px, h: height / px, px, width, height, soft: kind === 'ground' }
 }
 
 // `build(chunk)` makes a chunk's meshes: { group, roofs, show(kind, texture,
@@ -241,12 +242,21 @@ export function createChunks(world, renderer, build) {
 	}
 
 	function buildChunk(c, until = Infinity) {
+		if (c.waiting) return
 		const t = performance.now()
 		c.building ??= build(c)
 		c.buildMs ??= 0
 		let step
-		do step = c.building.next()
-		while (!step.done && performance.now() < until)
+		do {
+			step = c.building.next()
+			if (step.value instanceof Promise) {
+				c.waiting = true
+				step.value.then(() => {
+					c.waiting = false
+				})
+				break
+			}
+		} while (!step.done && performance.now() < until)
 		c.buildMs += performance.now() - t
 		if (!step.done) return
 		c.parts = step.value
@@ -310,11 +320,15 @@ export function createChunks(world, renderer, build) {
 				continue
 			}
 			for (const l of LEVELS.slice(LEVELS.indexOf(level), -1)) {
-				const cost = kinds.reduce((sum, kind) => sum + bytesOf(areaOf(c, kind, l).width, areaOf(c, kind, l).height), 0)
+				const target = { ground: Math.min(l, GROUND_MAX), roofs: l }
+				const cost = kinds.reduce((sum, kind) => {
+					const area = areaOf(c, kind, target[kind])
+					return sum + bytesOf(area.width, area.height)
+				}, 0)
 				if (cost > room) continue
 				room -= cost
-				c.target = { ground: l, roofs: l }
-				for (const kind of kinds) want(c, kind, l, false, d)
+				c.target = target
+				for (const kind of kinds) want(c, kind, c.target[kind], false, d)
 				break
 			}
 		}
@@ -322,7 +336,7 @@ export function createChunks(world, renderer, build) {
 		phoneTextures.sort((a, b) => Number(a.kind === 'roofs') - Number(b.kind === 'roofs') || a.d - b.d)
 		for (const { c, kind, d } of phoneTextures) {
 			for (const l of LEVELS.slice(LEVELS.indexOf(level), -1)) {
-				if (kind === 'roofs' && l > 6) continue
+				if (l > (kind === 'ground' ? GROUND_MAX : 6)) continue
 				const area = areaOf(c, kind, l)
 				const cost = bytesOf(area.width, area.height)
 				if (cost > room) continue
@@ -375,7 +389,7 @@ export function createChunks(world, renderer, build) {
 				const check = () => {
 					update(view, scale)
 					const done = chunks.every(
-						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown[k]),
+						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown?.[k]),
 					)
 					if (done || performance.now() - start > 15000) resolve()
 					else setTimeout(check, 30)
