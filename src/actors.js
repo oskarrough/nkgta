@@ -156,7 +156,7 @@ const STRIDE = 0.55 // radians either way at the hip
 // look has them under two pixels deep.
 const OVERHEAD = 1.4
 
-// From straight above, people and the bike show through tree crowns and
+// From straight above, the player and bike show through tree crowns and
 // roofs, as the flat layer they replace did: like the clouds (see clouds.js)
 // they're drawn shrunk towards the camera, the same on screen but this much
 // nearer it. Their shadows fall from where they really are.
@@ -182,7 +182,6 @@ function crowd(material, size) {
 		mesh.castShadow = true
 		mesh.frustumCulled = false
 		mesh.count = 0
-		standOut(mesh)
 		group.add(mesh)
 		return mesh
 	})
@@ -246,8 +245,9 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	}
 
 	const people = inkOutside(new THREE.MeshToonMaterial({ gradientMap }))
-	const pets = createPetActors(root, people, standOut, heightAt)
+	const pets = createPetActors(root, people, heightAt)
 	const you = crowd(people, 1)
+	for (const mesh of you.meshes) standOut(mesh)
 	let crowds = crowd(people, 128)
 	root.add(crowds.group)
 	const looks = new WeakMap()

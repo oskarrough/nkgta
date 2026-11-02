@@ -71,11 +71,10 @@ export function createPets(world) {
 }
 
 // All coats, leads and moving legs share a single instanced box draw call.
-export function createPetActors(root, material, standOut, heightAt) {
+export function createPetActors(root, material, heightAt) {
 	const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, 4096)
 	mesh.frustumCulled = false
 	mesh.castShadow = true
-	standOut(mesh)
 	root.add(mesh)
 	const matrix = new THREE.Matrix4(),
 		rotation = new THREE.Quaternion(),
@@ -90,7 +89,6 @@ export function createPetActors(root, material, standOut, heightAt) {
 	)
 	const barks = new THREE.InstancedMesh(barkGeo, material, 128)
 	barks.frustumCulled = false
-	standOut(barks)
 	root.add(barks)
 	return (people, grow, lookFor) => {
 		let n = 0,
