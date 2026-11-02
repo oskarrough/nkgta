@@ -57,6 +57,7 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
 - Ground paint must follow `groundGeometry`'s grid triangles: bilinear `heightAt` between vertices can sink a decal into a hill. `src/ground-paint.js` clips to that grid with 0.002-tile fills and 0.015-tile paint; keep polygon operations in small patches so background chunk builds do not stall frames.
 - Ground surface coordinates are metres along the full source way, not chunk-local UVs; retain their phase through patch/chunk boundaries. Take shader derivatives before row staggering and fade subpixel stones to their average.
+- Project ground vertices into camera space before perspective (`projectionMatrix * (modelViewMatrix * position)`): combining projection and view first loses the tiny fill/terrain depth gap at large map coordinates, making triangles flicker in chase. Increasing shadow bias does not fix it.
 - Compose ground polygons on the integer lattice in `ground-paint.js`; repeated float cuts can break polygon-clipping on nearly coincident edges. Use a constant depth offset (factor 0): slope bias on narrow triangles tears paint edges in chase view. Before dropping static attribute arrays after upload, compute both bounds and arrange regeneration after context restoration.
 - `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
 

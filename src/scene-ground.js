@@ -103,7 +103,8 @@ export function groundMaterial(map, world) {
 				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
 				vTile = worldPosition.xy;
 				#include <shadowmap_vertex>
-				gl_Position = projectionMatrix * viewMatrix * worldPosition;
+				// Keep the small ground/fill depth gap out of the large world-space projection.
+				gl_Position = projectionMatrix * (modelViewMatrix * vec4(position, 1.0));
 			}
 		`,
 		fragmentShader: `
