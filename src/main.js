@@ -27,6 +27,8 @@ import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createPocket } from './pocket.js'
 import { createPocketMap } from './pocket-map.js'
+import { createRideScreen } from './ride-screen.js'
+import { rideKind, skating } from './rides.js'
 import { createRacing } from './racing.js'
 import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
@@ -142,6 +144,7 @@ let showMusic = recall('nk-musik-debug', false) === true
 function toggleMute() {
 	sound.toggleMute()
 }
+const rides = createRideScreen({ player, pocket, available: () => !visit.inside() && !wasted.active() && !police.active() })
 const actions = {
 	cameraActive: camera.active,
 	look: camera.look,
@@ -151,6 +154,9 @@ const actions = {
 		camera.toggle(player)
 	},
 	use,
+	openRides: () => {
+		if (menu.hidden) rides.open()
+	},
 	choose: (i) => visit.choose(i),
 	shiftChoice: (n) => visit.shiftChoice(n),
 	toggleMute,
@@ -197,7 +203,7 @@ const feedback = createFeedback({
 		y: player.y,
 		street: world.streetAt(player.x, player.y),
 		hour: clock.hour,
-		vehicle: player.car ? player.car.model.name : player.onBike ? 'bike' : 'foot',
+		vehicle: player.car ? player.car.model.name : player.onBike ? rideKind(player) : 'foot',
 		camera: camera.selected() ? 'third person' : 'overhead',
 		agent: shortAgent(navigator.userAgent, document.body.classList.contains('touch')),
 		version: typeof __GAME_VERSION__ === 'undefined' ? 'dev' : __GAME_VERSION__,
@@ -243,6 +249,13 @@ tuneClock(document.getElementById('clock'), clock)
 tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 const menuItems = {
+	rides: [
+		() => {
+			showMenu(false)
+			rides.open()
+		},
+		() => null,
+	],
 	daily: [
 		() => {
 			showMenu(false)
@@ -390,7 +403,7 @@ function frame(now) {
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
-	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
+	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
 	if (quiz.active()) quiz.tick(now, from)
 	else visit.update(dt, heading())
 	wasted.update(dt)
@@ -434,7 +447,7 @@ function frame(now) {
 	const door = visit.hint()
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
-	input.setDriving(!!player.car)
+	input.setDriving(!!player.car || skating(player))
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
 	pocketMap.follow({
 		at: street,

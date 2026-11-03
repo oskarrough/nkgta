@@ -1,6 +1,7 @@
 // A passing shower, then a slow dry-out. Reflections are painted bands in
 // the ground pass: no mirrored city, render target or extra lights.
 import * as THREE from 'three'
+import { windAt } from './rides.js'
 import { wetMask } from './wet-mask.js'
 import { signColor } from './signs.js'
 
@@ -50,6 +51,9 @@ export function createWeather(world, shops, night, search = location.search, ope
 
 	return {
 		streaks,
+		get wind() {
+			return windAt(elapsed)
+		},
 		setSignals(lights) {
 			signals = lights
 		},

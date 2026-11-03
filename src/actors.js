@@ -6,6 +6,8 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { inkOutside } from './ink.js'
 import { createPetActors } from './pets.js'
+import { createRideActor } from './ride-models.js'
+import { rideKind, skating } from './rides.js'
 
 // What a person wears, from their seed. From above what shows is hair,
 // shoulders and the odd hat or backpack, so those vary the most. Nobody wears
@@ -246,6 +248,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 
 	const people = inkOutside(new THREE.MeshToonMaterial({ gradientMap }))
 	const pets = createPetActors(root, people, heightAt)
+	const rideActor = createRideActor(root, gradientMap, heightAt, standOut)
 	const you = crowd(people, 1)
 	for (const mesh of you.meshes) standOut(mesh)
 	let crowds = crowd(people, 128)
@@ -311,13 +314,14 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 				grow,
 				player.down ? 1 : 0,
 			)
-			done(you, shown ? 1 : 0)
+			done(you, shown && (!skating(player) || player.down) ? 1 : 0)
+			rideActor(player, rideKind(player), PLAYER_LOOK, grow, !room && (shown || !player.onBike), dt)
 			puddle.visible = !!player.down && !room
 			puddle.position.set(player.x, -player.y, ground + 0.004)
 			puddle.rotation.z = -player.dir
 			puddle.scale.set(0.75 * grow, 0.6 * grow, 1)
 
-			bike.visible = !room && (!player.down || !player.onBike)
+			bike.visible = rideKind(player) === 'bike' && !room && (!player.down || !player.onBike)
 			const on = player.onBike ? player : player.bike
 			bike.position.set(on.x, -on.y, heightAt(on.x, on.y) + (player.onBike ? bob : 0))
 			bike.rotation.z = player.onBike ? -player.dir + bob * 1.8 : 0

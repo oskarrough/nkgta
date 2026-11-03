@@ -164,6 +164,7 @@ export function createTouch(actions) {
 		// Where the thumb points, each axis -1…1.
 		axis: stickAxis,
 		drive: (car) => stickDrive(car, stickAxis(), brakeHeld),
+		brake: () => brakeHeld,
 		setUse(action) {
 			if (use.dataset.action === (action ?? '')) return
 			use.dataset.action = action ?? ''

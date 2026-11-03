@@ -5,6 +5,7 @@ import { feldLayout, feldCrowd, rideAt } from './feld-layout.js'
 import { createFeldExtras } from './feld-extras.js'
 import { dogAt, collectPfand } from './feld-activity.js'
 import { T, SOLID } from './tiles.js'
+import { drawSkater } from './ride-models.js'
 
 const fields = new WeakMap()
 const blankets = ['#dc665a', '#52a5ac', '#d7ae45', '#7970af', '#ded6b9', '#5975a9']
@@ -207,6 +208,11 @@ export function build({ world, chunk, gradient }) {
 		const down = lying ? Math.PI / 2 : ((p.lie ?? 0) * Math.PI) / 2 + (p.bend ?? 0) * 0.4
 		const ground = world.heightAt(p.x, p.y)
 		base(p.x, p.y, ground + (lying ? 0.09 : 0) + (riding ? 0.16 : skating ? 0.055 : 0), p.dir, grow, down)
+		if (skating && !p.dodge && !p.lie) {
+			base(p.x, p.y, ground, p.dir, grow)
+			drawSkater(box, p.kind, k, p.stride)
+			return
+		}
 		const hip = sitting ? 0.1 : 0.24,
 			chest = sitting ? 0.23 : 0.35,
 			head = sitting ? 0.43 : 0.55
@@ -265,11 +271,8 @@ export function build({ world, chunk, gradient }) {
 				local.makeTranslation(x, 0, 0.18)
 				wheels.setMatrixAt(wn++, matrix.multiplyMatrices(body, local))
 			}
-		} else if (skating) {
-			base(p.x, p.y, ground, p.dir, grow)
-			if (p.kind === 'skate' || p.kind === 'kite') box(0, 0, 0.045, 0.55, 0.17, 0.035, k.top)
-			for (const x of [-0.18, 0.18]) for (const side of [-1, 1]) box(x, side * 0.09, 0.035, 0.065, 0.045, 0.065, '#e1d4ac')
 		}
+
 		if (p.kind === 'collector') {
 			box(-0.08, -0.27, 0.18, 0.23, 0.2, 0.32, '#3c453d')
 			for (let i = 0; i < Math.min(5, p.collected); i++)

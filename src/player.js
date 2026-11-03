@@ -3,6 +3,8 @@ import { driveCar, speedOf, toWorld } from './car.js'
 import { HILLS } from './terrain.js'
 import { pushFromTrunks } from './trees.js'
 import { feelOn, surfaceAt } from './surface.js'
+import { RIDES, rideKind, rideSurface, kitePull, rideRattle, windAt } from './rides.js'
+import { kiteSpace } from './space.js'
 
 export const RADIUS = 0.3 // tiles
 const BIKE_REACH = 1.5 // how close you must be to hop on
@@ -17,7 +19,9 @@ export function createPlayer(start) {
 		speed: 0,
 		onBike: false,
 		car: null,
-		bike: { x: start.x + 1.2, y: start.y },
+		bike: { x: start.x + 1.2, y: start.y, kind: 'bike' },
+		pushPhase: 0,
+		kitePower: 0,
 		// How rough the ground under the bike is, set from the surface each frame.
 		rough: 0,
 	}
@@ -25,7 +29,17 @@ export function createPlayer(start) {
 
 export const nearBike = (p) => !p.onBike && !p.car && Math.hypot(p.bike.x - p.x, p.bike.y - p.y) < BIKE_REACH
 
+export function selectRide(p, kind) {
+	if (!RIDES[kind] || p.down || !nearBike(p)) return false
+	p.bike.kind = kind
+	p.speed = 0
+	p.pushPhase = 0
+	return true
+}
+
 export function toggleBike(p) {
+	p.speed = 0
+	p.kitePower = 0
 	if (p.onBike) {
 		p.onBike = false
 		p.bike.x = p.x
@@ -48,7 +62,8 @@ export function leaveCar(p, world) {
 	p.speed = 0
 }
 
-export function updatePlayer(p, input, world, dt) {
+export function updatePlayer(p, input, world, dt, wind = windAt(0)) {
+	p.wind = wind
 	if (p.car) {
 		const c = p.car
 		driveCar(c, input.drive(c), world, dt)
@@ -65,31 +80,51 @@ export function updatePlayer(p, input, world, dt) {
 	// Tiles per second. One tile is 3 m, and a thumbstick pushed only part
 	// of the way walks that much slower.
 	const push = steering ? Math.abs(axis.y) : Math.min(1, Math.hypot(axis.x, axis.y))
-	const felt = feelOn(null, surfaceAt(world, p.x, p.y))
-	let cap = (p.onBike ? 3.6 : 1.6) * (p.onBike ? felt.bike : felt.foot)
-	if (p.onBike && here === T.CYCLEWAY) cap *= 1.2
-	const back = steering && steering.y > 0 ? -1 : 1
+	const surface = surfaceAt(world, p.x, p.y)
+	const felt = feelOn(null, surface)
+	const kind = rideKind(p)
+	const ride = p.onBike ? RIDES[kind] : null
+	const wheels = ride && kind !== 'bike'
+	let cap = (ride?.speed ?? 1.6) * (wheels ? rideSurface(kind, surface) : p.onBike ? felt.bike : felt.foot)
+	if (p.onBike && kind === 'bike' && here === T.CYCLEWAY) cap *= 1.2
+	const back = !wheels && steering && steering.y > 0 ? -1 : 1
 	const [sx, sy] = world.slopeAt?.(p.x, p.y) ?? [0, 0]
 	const grade = (sx * Math.cos(p.dir) + sy * Math.sin(p.dir)) * back
 	const feel = p.onBike ? (grade > 0 ? HILLS.bikeUp : HILLS.bikeDown) : HILLS.walk
 	cap *= Math.max(HILLS.slowest, Math.min(HILLS.fastest, 1 - grade * feel))
 	const max = cap * push
 
-	if (steering) p.dir += steering.x * dt * (p.onBike ? 2.5 : 3.5)
+	if (steering) p.dir += steering.x * dt * (ride?.turn ?? 3.5)
 	const rolling = p.onBike && grade < 0
-	if (push) {
-		let diff = steering ? 0 : Math.atan2(axis.y, axis.x) - p.dir
-		diff = Math.atan2(Math.sin(diff), Math.cos(diff))
-		p.dir += diff * Math.min(1, dt * (p.onBike ? 6 : 14))
-		p.speed += dt * (p.onBike ? 4 : 12)
-		p.speed = Math.min(p.speed, Math.max(max, rolling ? Math.min(p.speed, cap) : 0))
+	if (wheels) {
+		const braking = input.brake?.() || (steering && steering.y > 0)
+		p.pushing = !!push && !braking
+		if (push && !steering) {
+			const diff = Math.atan2(Math.sin(Math.atan2(axis.y, axis.x) - p.dir), Math.cos(Math.atan2(axis.y, axis.x) - p.dir))
+			p.dir += diff * Math.min(1, dt * ride.turn * 2)
+		}
+		p.pushPhase += p.pushing ? dt * Math.PI * 2 * (ride.push ?? 1) : 0
+		p.kitePower = kind === 'kite' ? kitePull(p.dir, wind, kiteSpace(world, p.x, p.y)) : 0
+		const power = kind === 'kite' ? p.kitePower * 5 : push * Math.max(0, Math.cos(p.pushPhase)) * 7
+		if (kind === 'kite') cap *= p.kitePower
+		const drag = ride.drag / rideSurface(kind, surface)
+		const gravity = -grade * HILLS.coast
+		p.speed = Math.max(0, Math.min(cap, p.speed + dt * ((braking ? -8 : power) + gravity - drag)))
 	} else {
-		const pull = rolling ? -grade * HILLS.coast : 0
-		p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14)))
-		p.speed = Math.min(p.speed, rolling ? cap : max)
+		if (push) {
+			let diff = steering ? 0 : Math.atan2(axis.y, axis.x) - p.dir
+			diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+			p.dir += diff * Math.min(1, dt * (p.onBike ? 6 : 14))
+			p.speed += dt * (p.onBike ? 4 : 12)
+			p.speed = Math.min(p.speed, Math.max(max, rolling ? Math.min(p.speed, cap) : 0))
+		} else {
+			const pull = rolling ? -grade * HILLS.coast : 0
+			p.speed = Math.max(0, p.speed + dt * (pull - (p.onBike ? 3 : 14)))
+			p.speed = Math.min(p.speed, rolling ? cap : max)
+		}
 	}
 
-	const step = p.speed * dt * (steering ? -steering.y : 1)
+	const step = p.speed * dt * (wheels ? 1 : steering ? -steering.y : 1)
 	const fromX = p.x
 	const fromY = p.y
 	const n = Math.ceil(Math.abs(step) / SUBSTEP)
@@ -122,7 +157,8 @@ export function updatePlayer(p, input, world, dt) {
 	// and a bike grazing a wall would grind to a halt.
 	const made = Math.hypot(p.x - fromX, p.y - fromY)
 	if (dt > 0 && made < pace * 0.25) p.speed = Math.min(p.speed, made / dt)
-	p.rough = felt.rattle * (p.onBike ? 1 : 0.25) * Math.min(1, Math.abs(p.speed) / (p.onBike ? 2.5 : 4))
+	p.rough =
+		(wheels ? rideRattle(kind, surface, felt) : felt.rattle) * (p.onBike ? 1 : 0.25) * Math.min(1, Math.abs(p.speed) / (p.onBike ? 2.5 : 4))
 }
 
 // You're round: a wall pushes you straight out of it, and what's left of

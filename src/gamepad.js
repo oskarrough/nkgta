@@ -116,5 +116,6 @@ export function createGamepad(actions, blocked = () => false) {
 	return {
 		axis: () => stickOf(read()),
 		drive: (car) => padDrive(car, read()),
+		brake: () => pressed(read(), B),
 	}
 }
