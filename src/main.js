@@ -75,7 +75,10 @@ phase('createScene')
 loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const chatter = createChatter(world, shops)
-const busy = createBusyPlaces(world, pfand, (p) => chatter.shout(p))
+const busy = createBusyPlaces(world, pfand, (p, line) => {
+	chatter.shout(p)
+	if (line) hud.say(line)
+})
 busy.prepare(clock.hour, clock.day)
 const traffic = createTraffic(
 	world,

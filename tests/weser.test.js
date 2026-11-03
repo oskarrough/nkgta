@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { weserCrowd, weserLayout } from '../src/weser.js'
+import { weser, weserCrowd, weserLayout } from '../src/weser.js'
 import { createWorld } from '../src/world.js'
 import { decodeMap } from '../src/map-codec.js'
 import { createBusyPlaces, build } from '../src/busy-places.js'
@@ -25,6 +25,19 @@ test('nightlife follows the evening across midnight, with quieter weeknights and
 	expect(rain.every((g) => g.doorway)).toBe(true)
 })
 
+test('peak nights give every mapped venue 6–15 guests, with much smaller early and weekday crowds', () => {
+	const counts = new Map()
+	for (const g of layout.groups) counts.set(g.place, (counts.get(g.place) ?? 0) + g.people.length)
+	expect(counts.size).toBeGreaterThan(40)
+	for (const count of counts.values()) {
+		expect(count).toBeGreaterThanOrEqual(6)
+		expect(count).toBeLessThanOrEqual(15)
+	}
+	const countAt = (hour, day) => layout.groups.reduce((n, g) => n + (g.seed < weserCrowd(hour, 0, day) ? g.people.length : 0), 0)
+	expect(countAt(20, 4)).toBeLessThan(countAt(23, 4) * 0.6)
+	expect(countAt(23, 1)).toBeLessThan(countAt(23, 4) * 0.6)
+})
+
 test('mapped bar and Späti guests, bikes and their retreat space stay on pavements', () => {
 	expect(layout.groups.some((g) => g.place.name === 'Silverfuture')).toBe(true)
 	expect(layout.groups.some((g) => g.place.name === 'Späti International')).toBe(true)
@@ -46,8 +59,8 @@ test('open-door crowds react to a bicycle, drop collectible Pfand once, and clea
 	const w = { ...world },
 		opening = createOpening(),
 		pfand = createPfand(w)
-	let shouts = 0
-	const busy = createBusyPlaces(w, pfand, () => shouts++)
+	const shouts = []
+	const busy = createBusyPlaces(w, pfand, (person, line) => shouts.push({ person, line }))
 	const place = busy.places.find((p) => p.id === 'weser')
 	const group = place.groups.find((g) => g.place.name === 'Silverfuture' && !g.doorway)
 	const p = group.people.find((p) => p.bottle && p.kind === 'stand')
@@ -58,7 +71,8 @@ test('open-door crowds react to a bicycle, drop collectible Pfand once, and clea
 	p.look = 0
 	const before = pfand.bottles.length
 	for (let i = 0; i < 20; i++) place.update(0.05, player, view, 23, 0, true, false, 4)
-	expect(shouts).toBeGreaterThan(0)
+	expect(shouts.length).toBeGreaterThan(0)
+	for (const { line } of shouts) expect(weser.shouts).toContain(line)
 	expect(pfand.bottles.length).toBeGreaterThan(before)
 	const dropped = group.people.filter((p) => p.dropped)
 	expect(dropped.length).toBeGreaterThan(0)

@@ -50,46 +50,59 @@ export function weserLayout(world) {
 	}
 	const contains = (x, y) => pavement(world, x, y) && near(x, y)
 	if (!segments.length) return { groups, bounds, contains }
-	const occupied = []
-	let index = 0
-	for (const shop of shopsOf(world)) {
-		if (!['bar', 'spaeti'].includes(shop.kind) || !near(shop.x, shop.y)) continue
-		const seed = hash(index++),
-			angle = Math.atan2(shop.ny, shop.nx)
-		const local = (along, out) => ({ x: shop.x + shop.ex * along + shop.nx * out, y: shop.y + shop.ey * along + shop.ny * out })
-		const spots = []
-		for (const out of [0.5, 0.85, 1.25, 1.65, 2.05])
-			for (const along of [-0.8, 0.8, -1.5, 1.5, -2.1, 2.1]) {
-				if (Math.abs(along) > shop.room + 0.2) continue
-				const p = local(along, out)
-				if (contains(p.x, p.y)) spots.push({ ...p, out })
+	const venues = shopsOf(world)
+		.filter((shop) => ['bar', 'spaeti'].includes(shop.kind) && near(shop.x, shop.y))
+		.map((shop, index) => {
+			const seed = hash(index),
+				angle = Math.atan2(shop.ny, shop.nx)
+			const local = (along, out) => ({ x: shop.x + shop.ex * along + shop.nx * out, y: shop.y + shop.ey * along + shop.ny * out })
+			const spots = []
+			for (let row = 0; row < 8; row++) {
+				const out = 0.4 + row * 0.42
+				for (let col = -7; col <= 7; col++) {
+					const along = col * 0.46 + (row % 2) * 0.23
+					if (Math.abs(along) < 0.4 && out < 1) continue
+					const p = local(along, out)
+					if (contains(p.x, p.y)) spots.push({ ...p, out })
+				}
 			}
-		for (const doorway of [true, false]) {
+			return { shop, seed, angle, index, local, spots, target: shop.kind === 'bar' ? 12 + Math.floor(seed * 4) : 8 + Math.floor(seed * 5) }
+		})
+	const occupied = []
+	// Reserve each door's small group before neighbouring peak crowds take the pavement.
+	for (let stage = 0; stage < 3; stage++)
+		for (const venue of venues) {
+			const { shop, seed, angle, index, local, spots, target } = venue
+			const doorway = stage === 0
 			const g = {
 				x: shop.x,
 				y: shop.y,
 				angle,
-				seed: doorway ? seed * 0.07 : 0.3 + seed * 0.65,
+				seed: doorway ? seed * 0.07 : stage === 1 ? 0.25 + seed * 0.1 : 0.6 + seed * 0.35,
 				doorway,
 				place: shop.place,
 				people: [],
 				bikes: [],
 			}
-			const centre = local(seed < 0.5 ? -1.2 : 1.2, 1.65)
+			const centre = local((seed < 0.5 ? -1 : 1) * (stage === 2 ? -1.4 : 1.2), 1.7)
 			const candidates = doorway
 				? spots
 				: spots.toSorted((a, b) => Math.hypot(a.x - centre.x, a.y - centre.y) - Math.hypot(b.x - centre.x, b.y - centre.y))
+			const count = doorway ? 2 : stage === 1 ? 4 : target - 6
+			const doorDepth = spots[0]?.out ?? 0
 			for (const at of candidates) {
-				if (doorway && at.out > 0.85) continue
-				if (occupied.some((p) => Math.hypot(at.x - p.x, at.y - p.y) < 0.48)) continue
+				if (doorway && at.out > doorDepth + 0.43) continue
+				if (occupied.some((p) => Math.hypot(at.x - p.x, at.y - p.y) < 0.42)) continue
 				const j = g.people.length
 				const p = {
 					x: at.x,
 					y: at.y,
 					dir: angle + (j % 2 ? -0.7 : 0.7),
-					seed: hash(index * 17 + j),
+					seed: hash(index * 37 + stage * 11 + j),
 					kind:
-						!doorway && j === 0 && (seed > 0.82 || world.tileAt(at.x + shop.nx * 0.5, at.y + shop.ny * 0.5) === T.ROAD) ? 'sit' : 'stand',
+						stage === 1 && j === 0 && (seed > 0.82 || world.tileAt(at.x + shop.nx * 0.5, at.y + shop.ny * 0.5) === T.ROAD)
+							? 'sit'
+							: 'stand',
 					social: true,
 					v: 0,
 					stride: 0,
@@ -99,7 +112,7 @@ export function weserLayout(world) {
 				if (p.kind === 'sit' && seed > 0.82) p.seat = 0.18
 				g.people.push(p)
 				occupied.push(p)
-				if (g.people.length >= (doorway ? 2 : 4)) break
+				if (g.people.length >= count) break
 			}
 			if (!doorway && g.people.length > 1) {
 				const x = g.people.reduce((sum, p) => sum + p.x, 0) / g.people.length
@@ -120,7 +133,6 @@ export function weserLayout(world) {
 				}
 			if (g.people.length || g.bikes.length) groups.push(g)
 		}
-	}
 	return { groups, bounds, contains }
 }
 
@@ -129,7 +141,8 @@ export const weser = {
 	layout: weserLayout,
 	crowd: weserCrowd,
 	extras: createWeserExtras,
-	parts: 100,
+	parts: 170,
+	shouts: ['Ey, langsam!', 'Biste blind oder wat?', 'Pass ma uff!', 'Dit war mein Sterni!', 'Fahrradweg is woanders!', 'Meine Mate!'],
 	glow: '#55351b',
 	room: { ahead: 0, back: 0, step: 0.55 },
 }

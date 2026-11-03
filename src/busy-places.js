@@ -115,7 +115,8 @@ function createPlace(world, field, pfand, shout) {
 				p.dropped = true
 			}
 			if (cooldown <= 0) {
-				shout(p)
+				const lines = field.definition.shouts
+				shout(p, lines?.[Math.floor(Math.random() * lines.length)])
 				cooldown = 3
 			}
 		},
@@ -289,6 +290,13 @@ function buildPlace({ world, chunk, gradient, opening }, field) {
 				g.open = open
 			})
 	const material = inkOutside(new THREE.MeshToonMaterial({ gradientMap: gradient, emissive: field.definition.glow ?? '#000000' }))
+	if (field.definition.glow)
+		material.onBeforeCompile = (shader) => {
+			shader.fragmentShader = shader.fragmentShader.replace(
+				'#include <emissivemap_fragment>',
+				'#include <emissivemap_fragment>\n totalEmissiveRadiance *= diffuseColor.rgb;',
+			)
+		}
 	const mesh = new THREE.InstancedMesh(
 		new THREE.BoxGeometry(1, 1, 1),
 		material,
