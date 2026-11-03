@@ -6,4 +6,4 @@ orchestrator = "pi openai-codex/gpt-6.1-sol low"
 fix = "claude-code claude-opus-5-5 medium"
 verify = "claude-code claude-opus-5-5 medium"
 max_threads = 3
-lookback = "2 hours"   # schedule interval plus overlap
+lookback = "2 hours" # schedule interval plus overlap
