@@ -20,12 +20,15 @@ import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
+import { createBusyPlaces } from './busy-places.js'
 import { createTrafficLights } from './traffic-lights.js'
 
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
 import { createPocket } from './pocket.js'
 import { createPocketMap } from './pocket-map.js'
+import { createRideScreen } from './ride-screen.js'
+import { rideKind, skating } from './rides.js'
 import { createRacing } from './racing.js'
 import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
@@ -46,18 +49,25 @@ const map = await loadMap((text) => (loading.textContent = text)).catch((err) =>
 const world = createWorld(map)
 phase('createWorld')
 loading.textContent = 'Baue die Welt…'
-const player = createPlayer(world.startPoint(START))
+const URL_PARAMS = new URLSearchParams(location.search)
+const start = URL_PARAMS.has('weser')
+	? { lat: 52.48784, lon: 13.4304, dir: 0.52 }
+	: URL_PARAMS.has('maybach')
+		? { lat: 52.49525, lon: 13.4227, dir: 0.5 }
+		: URL_PARAMS.has('feld')
+			? { lat: 52.47572, lon: 13.4174, dir: Math.PI }
+			: START
+const player = createPlayer(world.startPoint(start))
 const pfand = createPfand(world)
 const camera = createCamera(world)
 // ?cam=chase starts in the chase camera; ?hour=11 sets the time of day and stops the clock.
-const URL_PARAMS = new URLSearchParams(location.search)
 if (URL_PARAMS.get('cam') === 'chase') camera.toggle(player)
 const canvas = document.getElementById('overlay')
 const shops = shopsOf(world)
 phase('shops')
 const opening = createOpening()
 const city3d = createScene(document.getElementById('city'), world, shops, opening)
-const clock = createClock()
+const clock = createClock(undefined, Number(URL_PARAMS.get('day') ?? 0))
 const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
@@ -65,6 +75,11 @@ phase('createScene')
 loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const chatter = createChatter(world, shops)
+const busy = createBusyPlaces(world, pfand, (p, line) => {
+	chatter.shout(p)
+	if (line) hud.say(line)
+})
+busy.prepare(clock.hour, clock.day)
 const traffic = createTraffic(
 	world,
 	(text) => hud.say(text),
@@ -140,6 +155,7 @@ let showMusic = recall('nk-musik-debug', false) === true
 function toggleMute() {
 	sound.toggleMute()
 }
+const rides = createRideScreen({ player, pocket, available: () => !visit.inside() && !wasted.active() && !police.active() })
 const actions = {
 	cameraActive: camera.active,
 	look: camera.look,
@@ -149,6 +165,9 @@ const actions = {
 		camera.toggle(player)
 	},
 	use,
+	openRides: () => {
+		if (menu.hidden) rides.open()
+	},
 	choose: (i) => visit.choose(i),
 	shiftChoice: (n) => visit.shiftChoice(n),
 	toggleMute,
@@ -195,7 +214,7 @@ const feedback = createFeedback({
 		y: player.y,
 		street: world.streetAt(player.x, player.y),
 		hour: clock.hour,
-		vehicle: player.car ? player.car.model.name : player.onBike ? 'bike' : 'foot',
+		vehicle: player.car ? player.car.model.name : player.onBike ? rideKind(player) : 'foot',
 		camera: camera.selected() ? 'third person' : 'overhead',
 		agent: shortAgent(navigator.userAgent, document.body.classList.contains('touch')),
 		version: typeof __GAME_VERSION__ === 'undefined' ? 'dev' : __GAME_VERSION__,
@@ -241,6 +260,13 @@ tuneClock(document.getElementById('clock'), clock)
 tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
 const menuItems = {
+	rides: [
+		() => {
+			showMenu(false)
+			rides.open()
+		},
+		() => null,
+	],
 	daily: [
 		() => {
 			showMenu(false)
@@ -386,9 +412,10 @@ let first = true
 function frame(now) {
 	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
+	busy.prepare(clock.hour, clock.day)
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
-	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt)
+	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
 	if (quiz.active()) quiz.tick(now, from)
 	else visit.update(dt, heading())
 	wasted.update(dt)
@@ -406,7 +433,8 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
-	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside })
+	busy.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside, clock.day, city3d.weather.temperature)
+	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, busy.people)
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
 	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()
@@ -431,7 +459,7 @@ function frame(now) {
 	const door = visit.hint()
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
-	input.setDriving(!!player.car)
+	input.setDriving(!!player.car || skating(player))
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
 	pocketMap.follow({
 		at: street,
@@ -487,6 +515,8 @@ if (import.meta.env.DEV)
 		music,
 		sound,
 		clock,
+		busy,
+		feld: busy.places.find((p) => p.id === 'feld'),
 		weather: city3d.weather,
 		racing,
 		police,

@@ -1,3 +1,5 @@
+import { RIDES } from './rides.js'
+import { drawSkater, createKites } from './ride-models.js'
 import * as THREE from 'three'
 import { MODELS } from './models.js'
 import { postsOf } from './race.js'
@@ -152,6 +154,25 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 			if (model) {
 				add(model.length, model.width, 0.3, 0, 0.06)
 				add(model.length * 0.55, model.width * 0.85, 0.2, -model.length * 0.08, 0.36)
+			} else if (RIDES[vehicle] && vehicle !== 'bike') {
+				drawSkater(
+					(x, y, z, l, w, h, _paint, tilt = 0) => {
+						const mesh = new THREE.Mesh(box, material)
+						mesh.position.set(x, y, z)
+						mesh.scale.set(l, w, h)
+						mesh.rotation.y = tilt
+						body.add(mesh)
+					},
+					vehicle,
+					{ build: 1 },
+				)
+				if (vehicle === 'kite') {
+					const kite = createKites(1, null, () => 0)
+					kite.reset(0)
+					kite.kite({ x: 0, y: 0 }, 0.4, true)
+					kite.finish()
+					body.add(...kite.meshes)
+				}
 			} else if (vehicle === 'bike') {
 				add(0.62, 0.1, 0.32, 0, 0.05)
 				add(0.18, 0.22, 0.42, -0.05, 0.37)

@@ -45,3 +45,16 @@ export function muffling(world, from, to) {
 		if (world.tileAt(from.x + (dx * d) / len, from.y + (dy * d) / len) === T.BUILDING) wall += STEP
 	return Math.min(1, wall / THICK)
 }
+
+// A kite needs grass around its runway and a clear launch radius, not just sky over a street.
+export function kiteSpace(world, x, y) {
+	let grass = 0
+	for (const radius of [2, 5, 9]) {
+		for (const a of ANGLES) {
+			const t = world.tileAt(x + Math.cos(a) * radius, y + Math.sin(a) * radius)
+			if (t === T.BUILDING || t === T.WATER || t === T.ROAD || t === T.PRIVATE) return false
+			if (t === T.GRASS || t === T.PITCH) grass++
+		}
+	}
+	return grass >= 8
+}

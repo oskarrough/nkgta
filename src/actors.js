@@ -6,6 +6,8 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { inkOutside } from './ink.js'
 import { createPetActors } from './pets.js'
+import { createRideActor } from './ride-models.js'
+import { rideKind, skating } from './rides.js'
 
 // What a person wears, from their seed. From above what shows is hair,
 // shoulders and the odd hat or backpack, so those vary the most. Nobody wears
@@ -156,7 +158,7 @@ const STRIDE = 0.55 // radians either way at the hip
 // look has them under two pixels deep.
 const OVERHEAD = 1.4
 
-// From straight above, people and the bike show through tree crowns and
+// From straight above, the player and bike show through tree crowns and
 // roofs, as the flat layer they replace did: like the clouds (see clouds.js)
 // they're drawn shrunk towards the camera, the same on screen but this much
 // nearer it. Their shadows fall from where they really are.
@@ -182,7 +184,6 @@ function crowd(material, size) {
 		mesh.castShadow = true
 		mesh.frustumCulled = false
 		mesh.count = 0
-		standOut(mesh)
 		group.add(mesh)
 		return mesh
 	})
@@ -246,8 +247,10 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	}
 
 	const people = inkOutside(new THREE.MeshToonMaterial({ gradientMap }))
-	const pets = createPetActors(root, people, standOut, heightAt)
+	const pets = createPetActors(root, people, heightAt)
+	const rideActor = createRideActor(root, gradientMap, heightAt, standOut)
 	const you = crowd(people, 1)
+	for (const mesh of you.meshes) standOut(mesh)
 	let crowds = crowd(people, 128)
 	root.add(crowds.group)
 	const looks = new WeakMap()
@@ -311,13 +314,14 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 				grow,
 				player.down ? 1 : 0,
 			)
-			done(you, shown ? 1 : 0)
+			done(you, shown && (!skating(player) || player.down) ? 1 : 0)
+			rideActor(player, rideKind(player), PLAYER_LOOK, grow, !room && (shown || !player.onBike), dt)
 			puddle.visible = !!player.down && !room
 			puddle.position.set(player.x, -player.y, ground + 0.004)
 			puddle.rotation.z = -player.dir
 			puddle.scale.set(0.75 * grow, 0.6 * grow, 1)
 
-			bike.visible = !room && (!player.down || !player.onBike)
+			bike.visible = rideKind(player) === 'bike' && !room && (!player.down || !player.onBike)
 			const on = player.onBike ? player : player.bike
 			bike.position.set(on.x, -on.y, heightAt(on.x, on.y) + (player.onBike ? bob : 0))
 			bike.rotation.z = player.onBike ? -player.dir + bob * 1.8 : 0

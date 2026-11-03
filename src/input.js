@@ -43,6 +43,7 @@ export function createInput(actions) {
 			actions.openFeedback()
 		}
 		if (key === 'r') actions.nextStation()
+		if (key === 'u') actions.openRides()
 		if (key === 'g') actions.placeGate()
 		if (key === 'f') actions.finishRace()
 		if (key === 'q' || key === 'Backspace') actions.restartRace()
@@ -113,6 +114,7 @@ export function createInput(actions) {
 				handbrake: pad.handbrake || thumb.handbrake,
 			}
 		},
+		brake: () => keys.has(' ') || gamepad.brake() || touch.brake(),
 		setUse: touch.setUse,
 		setDriving: touch.setDriving,
 	}

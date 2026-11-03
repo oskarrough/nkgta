@@ -1,3 +1,4 @@
+import { RIDES } from './rides.js'
 import './race-hud.css'
 import { MODELS } from './models.js'
 import { clock, gap, letter } from './race.js'
@@ -7,8 +8,8 @@ const SPLIT = 2.5 // seconds a split stays up
 const SHOWN = 6 // places on the finish card
 const CARD = 15 // seconds the finish card stays up
 
-const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
-const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
+const vehicleIcon = (v) => (v === 'foot' ? 'foot' : RIDES[v] ? `act-${v}` : 'act-car')
+const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : (RIDES[v]?.name ?? MODELS[v]?.name ?? 'Auto'))
 const vehicleTag = (v) =>
 	`<img class="icon" src="/icons/${vehicleIcon(v)}.png" alt="${vehicleName(v)}" title="${vehicleName(v)}">${MODELS[v] && v !== 'car' ? `<small>${vehicleName(v)}</small>` : ''}`
 

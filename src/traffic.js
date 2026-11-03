@@ -44,6 +44,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 	const blocked = noParking(world)
 	const spotsOf = new Map() // lane → its parking spots, worked out once it's near
 	let spots = [] // the spots in reach, nearest first
+	let closureVersion = -1
 	let spotsAt = null // where the player was when they were gathered
 
 	function pick(list, weight) {
@@ -62,7 +63,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			[-1, -1],
 		]) {
 			const [px, py] = toWorld(probe, (u * model.length) / 2, (v * model.width) / 2)
-			if (SOLID.has(world.tileAt(px, py))) return false
+			if (SOLID.has(world.tileAt(px, py)) || world.carClosed?.(px, py)) return false
 		}
 		return true
 	}
@@ -119,6 +120,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 		let best = null
 		let bestD = Infinity
 		for (const e of edges) {
+			if (e.closed) continue
 			if (Math.hypot(e.mid.x - car.x, e.mid.y - car.y) > e.len / 2 + 8) continue
 			const s = project(e.lane, car.x, car.y)
 			const p = pointAt(e.lane, s)
@@ -156,6 +158,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			spotsAt = { x: ring.x, y: ring.y, reach }
 		}
 		for (const spot of spots) {
+			if (world.carClosed?.(spot.x, spot.y)) continue
 			if ((spot.car && !spot.car.gone) || (started && inView(view, spot.x, spot.y, 2))) continue
 			const r = spotHash(spot.seed, 1)
 			const model = pickModel(false, r, true)
@@ -350,15 +353,15 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 	// car went; a car hunting for a point (`toward`) takes the turn that gets
 	// it nearest.
 	function nextEdge(edge, model, turns, toward = null) {
-		if (turns?.has(edge)) return turns.get(edge)
-		const out = edge.to.out.filter((e) => e !== edge.twin)
+		if (turns?.has(edge) && !turns.get(edge)?.closed) return turns.get(edge)
+		const out = edge.to.out.filter((e) => e !== edge.twin && !e.closed)
 		const onMap = out.filter((e) => !e.to.off)
 		let choices = onMap.length ? onMap : out
 		const big = choices.filter((e) => e.rank >= BIG_ROAD)
 		if (model === MODELS.bus && big.length) choices = big
 		const gain = (e) => Math.hypot(e.to.x - toward.x, e.to.y - toward.y)
 		if (toward && choices.length) choices = [choices.reduce((a, b) => (gain(b) < gain(a) ? b : a))]
-		const next = choices.length ? choices[Math.floor(Math.random() * choices.length)] : edge.twin
+		const next = choices.length ? choices[Math.floor(Math.random() * choices.length)] : edge.twin?.closed ? null : edge.twin
 		turns?.set(edge, next)
 		return next
 	}
@@ -370,13 +373,35 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 	}
 
 	function update(dt, player, view, hour = 11, day = 0) {
+		if (closureVersion !== (world.closureVersion ?? 0)) {
+			closureVersion = world.closureVersion ?? 0
+			for (const e of edges) {
+				e.closed = false
+				if (!world.carClosed) continue
+				for (let s = 0; s <= Math.ceil(e.len); s++) {
+					const p = pointAt(e.lane, Math.min(s, e.len))
+					if (world.carClosed(p.x, p.y)) {
+						e.closed = true
+						break
+					}
+				}
+			}
+			for (let i = cars.length - 1; i >= 0; i--) {
+				const c = cars[i]
+				if (c === player.car || c.kept) continue
+				if (world.carClosed?.(c.x, c.y)) {
+					c.gone = true
+					cars.splice(i, 1)
+				} else if (c.ai?.next?.closed) c.ai.next = nextEdge(c.ai.edge, c.model, c.convoy, c.hunt)
+			}
+		}
 		const first = !started
 		const ring = {
 			x: player.x,
 			y: player.y,
 			max: Math.hypot(view.x1 - view.x0, view.y1 - view.y0) / 2 + 20,
 		}
-		const near = edges.filter((e) => Math.hypot(e.mid.x - ring.x, e.mid.y - ring.y) < ring.max)
+		const near = edges.filter((e) => !e.closed && Math.hypot(e.mid.x - ring.x, e.mid.y - ring.y) < ring.max)
 		const laneLength = near.reduce((s, e) => s + e.len, 0)
 		scene = { near, ring, view }
 

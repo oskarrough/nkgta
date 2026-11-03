@@ -16,11 +16,17 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 - If that still reports EROFS, also set `BUN_INSTALL_CACHE_DIR` to a writable directory under `/tmp`.
 - `bun run check` lints and checks formatting; `bun run format` fixes formatting. The deploy runs it first, so a file that fails it (even in docs/) stops the site updating.
 - Test in a real browser with `agent-browser` (`agent-browser skills get core` for usage): one look at the view you changed, not a tour of every look and camera. The dev server usually already runs on :5277; reuse it rather than starting another.
+- In restricted worktrees, set `XDG_RUNTIME_DIR` to a writable directory under `/tmp` if agent-browser cannot create its socket in `/run/user/1000`.
+- If `agent-browser` returns to `about:blank` between commands, keep it in one persistent shell session so its daemon survives.
 - When moving the start, leave pavement 1.2 tiles east of the player too: that is where `createPlayer` puts the bike.
 - Headless frames are slow and `dt` is capped, so game-time timers (a job offer, the pay slip) take several times longer in real seconds, and `agent-browser` also throttles a headed window that isn't frontmost. Launch it with `--args "--disable-background-timer-throttling,--disable-backgrounding-occluded-windows,--disable-renderer-backgrounding"` to get roughly real time. To test a courier job, wait for `#pocket .app-job .offer` to be visible, press C, then set `nkgta.player` x/y to `nkgta.courier.target()` for the pickup and again for the door; to skip an offer wait, step `nkgta.courier.update(0.5, {})` until it appears.
 - Each feature's interface is a screen on the pocket device (`pocket.add`, see `src/pocket.js`), not a new fixed HUD box; the map is its home screen and there is no other minimap. Something urgent calls `pocket.alert(id)` and `pocket.release(id)` when it's over. Add a key (`key:` in `pocket.add`) only for things you don't need while riding; the device has two.
 - For phone HUD checks, enable touch input too: an `agent-browser` iPhone preset can leave `(pointer: coarse)` false.
+- WebGL shader compile failures appear in the browser console, not necessarily in page errors. Check the console for `Shader Error` after editing GLSL.
+- Transparent wisps such as smoke need the material's `INK_SKIP` define; otherwise the normal output gives every facet a solid outline even at low opacity.
 - Headless `agent-browser` renders in software here (SwiftShader), so its frame times mean nothing. For perf numbers run `bun run perf`: it starts its own Vite, launches chromium on the Radeon, opens the game with `?perf&hour=11&cam=top|chase` from the fixed start, settles 3 s, samples 10 s and prints the GPU plus median / p95 frame ms for the overhead and chase camera. `bun run perf hour=20` adds url params, `--cam chase` runs one view, `--url <base>` uses a running server instead. If the GPU line doesn't say Radeon, ignore the numbers. Run it before and after a drawing change, once each.
+- `bun run perf 'feld&hour=16&weather=dry' --shots /absolute/prefix` measures the Feld and saves both camera views; the phone ride also enters the Feld. Extra URL parameters reach the phone pass too.
+- Keep source files frozen during perf runs: even a comment edit can trigger a Vite reload and leave two worlds in the memory sample. Phone ground geometry uses a short-lived worker because polygon garbage otherwise raises the main heap peak; send only the chunk’s shapes.
 - `?perf` uses asynchronous GPU timer queries. GPU passes are exclusive (color excludes shadow); `work` is CPU wall time, which can overlap GPU work. Missing GPU timings mean unavailable, not zero. Only measure when no other worktree is using the GPU. Pedestrians and traffic are random, so expect a few ms of noise. `--profile <path-prefix>` saves a CPU profile per camera; `--settle 30` gives background loading longer before sampling.
 - Baseline (Radeon 780M, 1280×800, 11:00): both cameras hold 60 fps, chase CPU work ~13 ms. Keep it there; a change that drops a camera to 30 fps needs a reason.
 - Phone budget (390×844, DPR 3, one minute riding, #71): `bun run perf` also runs this phone pass and fails above 450 MiB main/worker JS plus backing stores, 256 MiB estimated WebGL, or 650 MiB combined; the original fix cut tracked CPU memory from 1112 to 364 MiB. #86 corrected double-counted mipmaps: WebGL now measures 206.5 MiB (204.5 at ac435df); earlier GPU estimates are inflated. These are desktop-emulation budgets, not an iOS kill threshold. `bun test` caps shipped JSON and roofs binary at 20 MiB total, with per-file limits in `tests/payload-size.test.js`.
@@ -31,6 +37,11 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 PLEASE, do not verify and visually screenshot everything single thing.
 
 - Force soaked rain with `?weather=rain&hour=11` (or `hour=22`); `nkgta.weather.setMode('rain')` instead wets gradually. Road nodes include curve points, so only the first and last node of a road should interrupt gutter puddles at junctions.
+- Warm fill on instanced people must multiply their diffuse colour; flat emissive light overwhelms skin and clothing at night.
+- For Weserstraße nightlife, use `?weser&hour=23&day=4&weather=dry`; `bun run perf` takes the phone ride through its bars too. Busy-place `room.step` can shorten the normal one-tile dodge on narrow pavements.
+- For a Maybachufer check, use `?maybach&day=4&hour=14&weather=dry` (Monday is 0); `hour=19.5` shows the canal crowd. Pass the same flags to `bun run perf` to ride Maybachufer in its phone pass. `temperature=5` forces a cold day.
+- Keep crowd decisions separate from drawing: interpolate nearby poses and redraw animated chunk features every frame even when their decisions run at 20 Hz.
+- Validate actor routes between OSM vertices against `world.tileAt`; a mapped centre line can cross grass in the raster even when every vertex is paved.
 - Test logic, not looks: no unit tests that assert HUD markup, DOM structure, CSS or what gets drawn. One look in the browser covers those. Keep tests for rules (traffic, races, songs, parsing, map building) and perf tripwires.
 - `bunx oxlint --deny no-unused-vars` exposes unused imports and parameters hidden by the quiet check.
 - Write few code comments: only the why the code can't say. No narrating what the next line does, no section banners, no comments restating a name.
@@ -41,6 +52,8 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the
 
 ## Map data
 
+- `bun run build-trees` caches Berlin’s street and park WFS layers separately in `data/trees/` and writes `public/trees.json`. A multi-layer GetFeature with BBOX is treated as a join and rejected by this WFS; request one layer at a time. Missing crown diameters are common: zero means unknown, not an empty tree pit.
+- The sandbox can hide `/dev/dri` even on office-linux. Run GPU benchmarks with host access if WebGL fails before the first frame.
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.
 - When `src/build-map.js` or `src/map-codec.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
 - `public/map.json` conflicts whenever two changes rebuild it: after a rebase, rerun `bun run build-map` instead of merging it by hand.
@@ -53,6 +66,10 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the
 - Anything standing in the city gets its z from `world.heightAt(x, y)` (tiles, 0 at the lowest point); slopes from `world.slopeAt`. Without terrain, e.g. picked areas, both return 0, so new code must work flat too.
 - Buildings stand on the lowest ground under their outline; walls reach a little below it. The overhead camera rises with the ground at the view's centre so the 2D overlay lines up there. Shop interiors stay flat (`cam.ground: 0`).
 - `RELIEF` in `src/terrain.js` exaggerates every slope; 1 is true to life.
+- Ground paint must follow `groundGeometry`'s grid triangles: bilinear `heightAt` between vertices can sink a decal into a hill. `src/ground-paint.js` clips to that grid with 0.002-tile fills and 0.015-tile paint; keep polygon operations in small patches so background chunk builds do not stall frames.
+- Ground surface coordinates are metres along the full source way, not chunk-local UVs; retain their phase through patch/chunk boundaries. Take shader derivatives before row staggering and fade subpixel stones to their average.
+- Project ground vertices into camera space before perspective (`projectionMatrix * (modelViewMatrix * position)`): combining projection and view first loses the tiny fill/terrain depth gap at large map coordinates, making triangles flicker in chase. Increasing shadow bias does not fix it.
+- Compose ground polygons on the integer lattice in `ground-paint.js`; repeated float cuts can break polygon-clipping on nearly coincident edges. Use a constant depth offset (factor 0): slope bias on narrow triangles tears paint edges in chase view. Before dropping static attribute arrays after upload, compute both bounds and arrange regeneration after context restoration.
 - `HILLS` in `src/terrain.js` is how hills feel without changing their height: walking and cycling pace up and down, freewheeling, gravity on cars, hill shading from above.
 
 ## Working in a worktree

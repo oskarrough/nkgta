@@ -147,6 +147,7 @@ const MAX_VOICES = 4
 const HEAR = { snippet: 5, calm: 7, angry: 9, shout: 16 } // tiles
 const LEVEL = 0.1 // a close voice at amp 1, before master
 const SCENE_EVERY = [30, 70] // seconds between one scene's turns at the same spot
+const NO_VISITORS = []
 const TICK = 0.3 // seconds between decisions about who talks
 
 // Sing one phrase from a place. Returns the handles to move it.
@@ -274,7 +275,7 @@ export function createChatter(world, shops) {
 		}
 	}
 
-	function update(audio, people, player, view, { inside = false } = {}) {
+	function update(audio, people, player, view, { inside = false } = {}, visitors = NO_VISITORS) {
 		if (!audio || audio.muted || audio.context.state !== 'running' || !audio.noise) return
 		audioOf = audio
 		const ctx = audio.context
@@ -302,13 +303,14 @@ export function createChatter(world, shops) {
 				if (Math.random() < 0.65) plan(scene, now)
 			}
 			if (now >= passAt) {
-				for (const p of people) {
-					if (!p.track || p.dodge || p.flee || near(p) > HEAR.snippet || now - (spoke.get(p) ?? -Infinity) < 40) continue
-					const phone = p.pause > 0 && !p.track.edge
+				for (let i = 0; i < people.length + visitors.length; i++) {
+					const p = i < people.length ? people[i] : visitors[i - people.length]
+					if ((!p.track && !p.social) || p.dodge || p.flee || near(p) > HEAR.snippet || now - (spoke.get(p) ?? -Infinity) < 40) continue
+					const phone = p.pause > 0 && !p.track?.edge
 					if (Math.random() > (phone ? 0.5 : 0.3)) continue
 					spoke.set(p, now)
 					passAt = now + 3 + Math.random() * 5
-					const mood = phone ? 'calm' : 'snippet'
+					const mood = phone || p.social ? 'calm' : 'snippet'
 					say(phrase(voiceOf(p.seed ?? 0.5).lang, Math.random, mood), p.seed ?? 0.5, p, HEAR[mood])
 					break
 				}

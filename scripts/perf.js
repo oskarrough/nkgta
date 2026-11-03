@@ -17,6 +17,7 @@ const flag = (name, fallback) => {
 }
 const base = flag('url')
 const screenshot = flag('screenshot')
+const shots = flag('shots')
 const only = flag('cam')
 const cpuProfile = flag('profile')
 const seconds = Number(flag('seconds', 10))
@@ -114,7 +115,10 @@ try {
 	const ms = (n) => (n == null ? 'n/a' : n.toFixed(1))
 	const PASSES = ['shadow', 'color', 'ink', 'blit']
 	for (const cam of views) {
-		const query = ['perf', 'hour=11', `cam=${cam === 'chase' ? 'chase' : 'top'}`, extra].filter(Boolean).join('&')
+		const query = new URLSearchParams(extra)
+		query.set('perf', '')
+		if (!query.has('hour')) query.set('hour', '11')
+		query.set('cam', cam === 'chase' ? 'chase' : 'top')
 		await send('Page.navigate', { url: `${url}?${query}` })
 		// Wait for the first frame (the map loads first), let it settle, then sample afresh.
 		for (let i = 0; ; i++) {
@@ -132,6 +136,10 @@ try {
 		if (cpuProfile) {
 			const { profile } = await send('Profiler.stop')
 			writeFileSync(`${cpuProfile}-${cam}.cpuprofile`, JSON.stringify(profile))
+		}
+		if (shots) {
+			const shot = await send('Page.captureScreenshot', { format: 'png' })
+			writeFileSync(`${shots}-${cam}.png`, Buffer.from(shot.data, 'base64'))
 		}
 		const frames = await run(
 			'perf.frames.map(f => ({ interval: f.interval, total: f.total, shadow: f.shadow, color: f.color, ink: f.ink, blit: f.blit, cpu: f.cpu }))',
@@ -156,6 +164,8 @@ const phone = Bun.spawn(
 		'bun',
 		new URL('./memory.js', import.meta.url).pathname,
 		...(base ? ['--url', base] : []),
+		'--params',
+		extra,
 		...(screenshot ? ['--screenshot', screenshot] : []),
 	],
 	{

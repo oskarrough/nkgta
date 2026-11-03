@@ -1,0 +1,32 @@
+#pocket .app-rides header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+#pocket .app-rides .choices {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.2rem;
+	margin: 0.3rem 0;
+}
+#pocket .app-rides button {
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid currentColor;
+	padding: 0.25rem;
+	cursor: pointer;
+}
+#pocket .app-rides button[aria-pressed='true'] {
+	background: var(--lcd-ink);
+	color: var(--lcd);
+}
+#pocket .app-rides button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+#pocket .app-rides small {
+	display: block;
+	font-size: 0.65rem;
+	line-height: 1.3;
+}

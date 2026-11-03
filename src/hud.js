@@ -1,3 +1,4 @@
+import { RIDES, rideKind } from './rides.js'
 import { badgeColor, nearestPlace, placeName } from './places.js'
 import { bottleIcon } from './sprites.js'
 import { nearBike } from './player.js'
@@ -7,7 +8,7 @@ import { T } from './tiles.js'
 export function useHint(player, car) {
 	if (player.car) return 'aussteigen'
 	if (player.onBike) return 'absteigen'
-	if (nearBike(player)) return 'aufs Fahrrad'
+	if (nearBike(player)) return rideKind(player) === 'bike' ? 'aufs Fahrrad' : `auf ${RIDES[rideKind(player)].name}`
 	if (car) return car.ai ? 'Auto klauen' : 'einsteigen'
 	return null
 }
@@ -15,7 +16,7 @@ export function useHint(player, car) {
 const ACTIONS = { aussteigen: 'exit', absteigen: 'exit', 'aufs Fahrrad': 'bike', 'Auto klauen': 'car', einsteigen: 'car' }
 export function useAction(door, hint) {
 	if (door) return door.action ?? null
-	return ACTIONS[hint] ?? null
+	return ACTIONS[hint] ?? Object.keys(RIDES).find((kind) => hint === `auf ${RIDES[kind].name}`) ?? null
 }
 
 const stopName = (s) => {

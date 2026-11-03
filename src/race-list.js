@@ -1,11 +1,12 @@
+import { RIDES } from './rides.js'
 import './race-list.css'
 import { MODELS } from './models.js'
 import { isDaily } from './daily.js'
 import { clock } from './race.js'
 import { nickname } from './race-share.js'
 
-const vehicleIcon = (v) => (v === 'foot' ? 'foot' : v === 'bike' ? 'act-bike' : 'act-car')
-const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : v === 'bike' ? 'Fahrrad' : (MODELS[v]?.name ?? 'Auto'))
+const vehicleIcon = (v) => (v === 'foot' ? 'foot' : RIDES[v] ? `act-${v}` : 'act-car')
+const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : (RIDES[v]?.name ?? MODELS[v]?.name ?? 'Auto'))
 
 // Pixel symbols on a 7×7 grid, drawn in the screen's ink.
 const PIXELS = {

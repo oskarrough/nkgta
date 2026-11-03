@@ -10,7 +10,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { createInk } from './ink.js'
 import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import * as bridges from './bridges.js'
+import * as roadPaint from './road-paint.js'
 import * as trees from './trees.js'
+import * as busyPlaces from './busy-places.js'
 import * as furniture from './street-furniture.js'
 import * as nightPools from './night-pools.js'
 import { createClouds, DECK } from './clouds.js'
@@ -35,7 +37,7 @@ const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
 // is a module whose build(ctx) returns { meshes, zoom?(scale), dispose?() },
 // or nothing, and may be a generator that yields between frames. To add
 // something to the city, write such a module and put it in this list.
-const FEATURES = [bridges, roofs, signs, fascia, frontPanels, trees, nightPools, furniture]
+const FEATURES = [bridges, roofs, signs, fascia, frontPanels, trees, nightPools, furniture, roadPaint, busyPlaces]
 
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
@@ -263,7 +265,18 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 		const paintings = murals.decals(houses)
 		if (paintings) group.add(paintings)
 		yield
-		const ctx = { world, chunk, shops, gradient, sky, weather, opening: chunkOpening, houses, ground: plane.material }
+		const ctx = {
+			world,
+			chunk,
+			shops,
+			gradient,
+			sky,
+			weather,
+			opening: chunkOpening,
+			houses,
+			ground: plane.material,
+			canvas: renderer.domElement,
+		}
 		const parts = []
 		for (const feature of FEATURES) {
 			let part = feature.build(ctx)
@@ -303,6 +316,7 @@ export function createCity(world, renderer, { shops = [], gradient, sky, time, w
 					return
 				}
 				plane.material.uniforms.map.value = texture
+				plane.material.uniforms.mapRect.value.set(area.x, area.y, area.w, area.h)
 				const at = plane.geometry.attributes.position
 				for (let i = 0; i < uv.count; i++) uv.setXY(i, (at.getX(i) - area.x) / area.w, 1 - (-at.getY(i) - area.y) / area.h)
 				uv.needsUpdate = true

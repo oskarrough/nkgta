@@ -5,6 +5,7 @@ import { areaFromUrl } from './area-url.js'
 import { TILE_M } from './default-area.js'
 import { phase } from './perf.js'
 import { applyMeasuredRoofs } from './measured-roofs.js'
+import { applyMeasuredTrees } from './measured-trees.js'
 
 // Bump when build-map.js or map-codec.js changes, so cached areas get rebuilt.
 const BUILD_VERSION = 17
@@ -16,6 +17,9 @@ export async function loadMap(onStatus) {
 		const roofs = fetch('/roofs.bin')
 			.then(async (res) => (res.ok ? decodeRoofs(await res.arrayBuffer()) : null))
 			.catch(() => null)
+		const trees = fetch('/trees.json')
+			.then((res) => (res.ok ? res.json() : null))
+			.catch(() => null)
 		const terrain = fetch('/terrain.json')
 			.then((res) => (res.ok ? res.json() : null))
 			.catch(() => null)
@@ -26,6 +30,7 @@ export async function loadMap(onStatus) {
 		const map = decodeMap(json)
 		phase('decode')
 		applyMeasuredRoofs(map, await roofs)
+		applyMeasuredTrees(map, await trees)
 		map.terrain = await terrain
 		return map
 	}

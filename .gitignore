@@ -5,3 +5,5 @@ data/pieces/
 data/dgm/
 data/terrain*
 data/lod2/
+data/trees/
+data/lamps-overpass.json

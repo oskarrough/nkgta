@@ -1,3 +1,4 @@
+import { RIDES, rideKind } from './rides.js'
 import { MODELS } from './models.js'
 import { SOLID } from './tiles.js'
 import { crossing, ghostAt, letter, loadRaces, makeGate, saveRaces, startRun, stepRun, submit } from './race.js'
@@ -96,7 +97,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 	}
 
 	const vehicleOf = () =>
-		player.car ? (Object.keys(MODELS).find((k) => MODELS[k] === player.car.model) ?? 'car') : player.onBike ? 'bike' : 'foot'
+		player.car ? (Object.keys(MODELS).find((k) => MODELS[k] === player.car.model) ?? 'car') : player.onBike ? rideKind(player) : 'foot'
 	const pose = () => ({ x: player.x, y: player.y, angle: player.car?.angle ?? player.dir, vehicle: vehicleOf() })
 
 	function placeGate() {
@@ -172,9 +173,10 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		if (car && !car.gone) {
 			player.car = car
 			player.onBike = false
-		} else if (start?.vehicle === 'bike') {
+		} else if (RIDES[start?.vehicle]) {
 			player.car = null
 			player.onBike = true
+			player.bike.kind = start.vehicle
 		} else if (start?.vehicle === 'foot') {
 			player.car = null
 			player.onBike = false

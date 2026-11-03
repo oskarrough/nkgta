@@ -8,7 +8,7 @@ https://nkgta.0sk.ar
 
 ## How is it made?
 
-Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3m tile grid that decides where you can walk.The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
+Streets, buildings, parks, shops, U-Bahn and bus stops come from OpenStreetMap. The default area’s trees come from Berlin’s Baumkataster: real positions, species and recorded sizes; picked areas use OSM trees. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3m tile grid that decides where you can walk.The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
 
 ## How to develop
 
@@ -16,6 +16,7 @@ Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from O
 bun install
 bun run fetch-osm   # data/osm.json from Overpass, for the default area in src/default-area.js
 bun run build-map   # public/map.json, the static default map
+bun run build-trees # public/trees.json, Berlin street and park trees; caches WFS data in data/trees/
 bun run build-roofs # public/roofs.bin, measured Berlin roofs; caches LoD2 tiles in data/lod2/
 bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
@@ -53,7 +54,7 @@ Picked areas (`/pick.html`, then `/?area=south,west,north,east`) are fetched fro
 - `src/scene.js`: the 3D city in three.js. Buildings are raised from their outlines, with windows drawn in the wall shader, under a perspective camera looking straight down.
 - `src/map-image.js`: the ground and roof textures, painted from the map's shapes, any part of the map at any sharpness.
 - `src/chunks.js`, `src/paint-worker.js`: the city in square chunks. Each has its own meshes, so only what's near the view gets drawn, and its own ground and roof textures, painted in workers as it comes near, as sharp as the zoom needs, and let go when it's far.
-- `src/actors.js`: people and the bike, the same figures from above and in the chase camera. Everyone on foot is dressed from their own seed; the player wears yellow. From above they show over tree crowns and roofs, a bit bigger than life, inked round the outside (see `src/ink.js`).
+- `src/actors.js`: people and the bike, the same figures from above and in the chase camera. Everyone on foot is dressed from their own seed; the player wears yellow. From above they're a bit bigger than life, inked round the outside (see `src/ink.js`). Only the player and bike show over tree crowns and roofs; other people and their pets pass beneath them.
 - `src/sprites.js`, `src/draw.js`, `src/hud.js`: the flat layer on top (places, stops, street names) and the text. `src/pocket.js`: the pocket device, its knob, keys and the screen running one thing at a time; `src/pocket-map.js` is its home screen, the map, and the courier, races and post bring their own screens (`courier-hud.js`, `race-list.js`, `feedback.js`).
 - `src/jobs.js`: courier jobs, the rules: which kitchen, which door, the time and the pay. `src/courier.js` plays them in the game, `src/courier-marks.js` stands the kitchen's badge and the house numbers in the city, `src/courier-hud.js` is its screen on the pocket device: the offer, the ride's clock and the pay slip. `src/addresses.js` finds every address's front door when the map is built.
 - `src/race.js`: races between gates, the rules and bookkeeping: crossing a gate, splits, the leaderboard and the ghost. `src/racing.js` plays them in the game, `src/race-gates.js` stands the gates and the ghost in the city, `src/race-hud.js` is the stopwatch, countdown and finish card, `src/race-share.js` turns a race and its ghost into a link and back. `src/daily.js` and `src/daily-panel.js`: today's race and quiz round from the date, and the Heute panel.
@@ -74,3 +75,5 @@ Every icon is its own PNG in `public/icons/`, 32×32 with a transparent backgrou
 - `foot.png`: on foot, beside a race time; `act-bike.png` and `act-car.png` stand for the bike and the cars there
 
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1; building roofs: LoD2, Geoportal Berlin, dl-de/zero-2-0.
+
+The default map loads `public/trees.json` from [Geoportal Berlin’s Straßen- und Anlagenbaumbestand](https://daten.berlin.de/datensaetze/baumbestand-berlin-wfs-48ad3a23), under [DL-DE-Zero-2.0](https://www.govdata.de/dl-de/zero-2-0). `bun run build-trees` fetches each WFS layer once for the default bbox and caches it in `data/trees/`; reruns work offline. Rebuild after changing the default area. The register covers street trees and part of the park stock, not every private or woodland tree. Recorded crown diameter, height and stem circumference set the sizes; missing crown diameters and heights are estimated from stem circumference, then recorded age if the stem is missing. Plane, linden, maple, chestnut, robinia and conifers have distinct crown shapes and colours; other genera share a mixed broadleaf crown. Missing or mismatched tree data falls back to the original OSM trees.

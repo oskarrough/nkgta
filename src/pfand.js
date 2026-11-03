@@ -37,6 +37,11 @@ export function createPfand(world) {
 		}
 	}
 
+	function drop(x, y) {
+		sound.clink()
+		bottles.push({ x, y, can: false })
+	}
+
 	function cashIn(shop, say) {
 		if (!bag.bottles) return
 		sound.till()
@@ -57,5 +62,5 @@ export function createPfand(world) {
 		bag.pending = 0
 	}
 
-	return { bottles, bag, update, cashIn, spill }
+	return { bottles, bag, update, cashIn, spill, drop }
 }
