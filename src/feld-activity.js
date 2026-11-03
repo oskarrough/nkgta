@@ -1,26 +1,26 @@
 import { T } from './tiles.js'
 
-export function dogAt(dog, time) {
+export function dogAt(dog, time, out = {}) {
 	const a = time * (0.38 + dog.seed * 0.22) + dog.seed * Math.PI * 2
-	return {
-		x: dog.home.x + Math.cos(a) * dog.radius,
-		y: dog.home.y + Math.sin(a) * dog.radius * 0.65,
-		dir: Math.atan2(Math.cos(a) * 0.65, -Math.sin(a)),
-		stride: time * 10,
-	}
+	out.x = dog.home.x + Math.cos(a) * dog.radius
+	out.y = dog.home.y + Math.sin(a) * dog.radius * 0.65
+	out.dir = Math.atan2(Math.cos(a) * 0.65, -Math.sin(a))
+	out.stride = time * 10
+	return out
 }
 
-export function gameAt(group, time) {
+export function gameAt(group, time, out = {}) {
 	const cycle = time / (group.game === 'frisbee' ? 3.5 : 2.5) + group.seed
 	const t = cycle % 1,
 		back = Math.floor(cycle) % 2
-	const a = group.people[back ? 1 : 0],
-		b = group.people[back ? 0 : 1]
-	return {
-		x: a.x + (b.x - a.x) * t,
-		y: a.y + (b.y - a.y) * t,
-		z: group.game === 'frisbee' ? 0.45 + Math.sin(t * Math.PI) * 1.1 : 0.13 + Math.abs(Math.sin(t * Math.PI * 3)) * 0.12,
-	}
+	const first = group.people[back ? 1 : 0],
+		second = group.people[back ? 0 : 1]
+	const a = first.render ?? first,
+		b = second.render ?? second
+	out.x = a.x + (b.x - a.x) * t
+	out.y = a.y + (b.y - a.y) * t
+	out.z = group.game === 'frisbee' ? 0.45 + Math.sin(t * Math.PI) * 1.1 : 0.13 + Math.abs(Math.sin(t * Math.PI * 3)) * 0.12
+	return out
 }
 
 export function collectPfand(p, bottles, dt, world) {
@@ -63,4 +63,16 @@ export function collectPfand(p, bottles, dt, world) {
 	p.stride += step * 11
 	p.x += (dx / d) * step
 	p.y += (dy / d) * step
+}
+
+export function interpolatePose(p, alpha) {
+	const from = p.previous,
+		out = p.render
+	out.x = from.x + (p.x - from.x) * alpha
+	out.y = from.y + (p.y - from.y) * alpha
+	out.dir = from.dir + Math.atan2(Math.sin(p.dir - from.dir), Math.cos(p.dir - from.dir)) * alpha
+	out.stride = from.stride + (p.stride - from.stride) * alpha
+	out.lie = from.lie + ((p.lie ?? 0) - from.lie) * alpha
+	out.bend = from.bend + ((p.bend ?? 0) - from.bend) * alpha
+	return out
 }

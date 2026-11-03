@@ -3,12 +3,21 @@ import { createPetActors } from './pets.js'
 import { gameAt } from './feld-activity.js'
 import { createKites } from './ride-models.js'
 
+const LEGS = [-0.13, 0.13]
+const GRATE = [-0.12, -0.04, 0.04, 0.12]
+const FOOD = [-0.09, 0.06]
+const BOTTLES = [0.44, 0.56, 0.68]
+const visible = (p, view, pad = 8) => !view || (p.x > view.x0 - pad && p.x < view.x1 + pad && p.y > view.y0 - pad && p.y < view.y1 + pad)
+const lookFor = (d) => d.appearance
+
 export function createFeldExtras({ world, chunk, field, groups, material, box, base }) {
 	const dogs = field.dogs.filter(
 		(d) => d.home.x >= chunk.x && d.home.x < chunk.x + chunk.w && d.home.y >= chunk.y && d.home.y < chunk.y + chunk.h,
 	)
 	const dogGroup = new THREE.Group()
-	const drawDogs = dogs.length ? createPetActors(dogGroup, material, world.heightAt) : null
+	const drawDogs = dogs.length ? createPetActors(dogGroup, material, world.heightAt, dogs.length) : null
+	const shownDogs = []
+	const ball = {}
 	const kites = createKites(groups.length + field.riders.length, material.gradientMap, world.heightAt)
 	// Airborne kites extend beyond the ground chunk even when first loaded in rain.
 	kites.meshes[0].boundingBox = new THREE.Box3(
@@ -48,27 +57,27 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 		round.setMatrixAt(balls, matrix)
 		round.setColorAt(balls++, paint.set(color))
 	}
-	const meshes = [smoke, round, ...kites.meshes, ...(dogs.length ? [dogGroup] : [])]
+	const movingMeshes = [smoke, round]
+	const meshes = [...movingMeshes, ...kites.meshes, ...(dogs.length ? [dogGroup] : [])]
 	return {
 		meshes,
 		draw(view, riders) {
 			smokes = balls = 0
 			kites.reset(field.time)
-			const visible = (p, pad = 8) => !view || (p.x > view.x0 - pad && p.x < view.x1 + pad && p.y > view.y0 - pad && p.y < view.y1 + pad)
 			for (const g of groups) {
-				if (g.seed >= field.density || !visible(g, 25)) continue
-				if (g.grill && visible(g.grill)) {
+				if (g.seed >= field.density || !visible(g, view, 25)) continue
+				if (g.grill && visible(g.grill, view)) {
 					const p = g.grill,
 						z = world.heightAt(p.x, p.y)
 					base(p.x, p.y, z, g.angle)
 					sphere(p.x, p.y, z + 0.37, 0.22, '#303638')
-					for (const x of [-0.13, 0.13]) for (const y of [-0.13, 0.13]) box(x, y, 0.15, 0.035, 0.035, 0.3, '#c5c1b2')
+					for (const x of LEGS) for (const y of LEGS) box(x, y, 0.15, 0.035, 0.035, 0.3, '#c5c1b2')
 					box(0, 0, 0.48, 0.35, 0.35, 0.025, '#8d7960')
-					for (const x of [-0.12, -0.04, 0.04, 0.12]) box(x, 0, 0.5, 0.015, 0.35, 0.015, '#d7d1bb')
-					for (const x of [-0.09, 0.06]) box(x, 0, 0.52, 0.07, 0.21, 0.04, '#aa5030')
+					for (const x of GRATE) box(x, 0, 0.5, 0.015, 0.35, 0.015, '#d7d1bb')
+					for (const x of FOOD) box(x, 0, 0.52, 0.07, 0.21, 0.04, '#aa5030')
 					box(0.55, 0, 0.15, 0.36, 0.27, 0.3, '#417044')
-					for (const x of [0.44, 0.56, 0.68]) box(x, 0, 0.35, 0.055, 0.07, 0.17, '#426d32')
-					if (field.wetness < 0.35)
+					for (const x of BOTTLES) box(x, 0, 0.35, 0.055, 0.07, 0.17, '#426d32')
+					if (field.wetness < 0.35 && field.hour >= 9 && field.hour < 21)
 						for (let i = 0; i < 3; i++) {
 							const f = (field.time * 0.32 + i / 3 + g.seed) % 1,
 								r = 0.045 + f * 0.075
@@ -78,10 +87,10 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 							smoke.setMatrixAt(smokes++, matrix)
 						}
 				}
-				if (g.kite && field.wetness < 0.5) kites.kite(g.people.find((p) => p.kind === 'stand') ?? g.people[0], g.seed)
-				if (g.game && visible(g)) {
-					const ball = gameAt(g, field.time),
-						z = world.heightAt(ball.x, ball.y) + ball.z
+				if (g.kite && field.wetness < 0.5) kites.kite(g.kiteHolder.render, g.seed)
+				if (g.game && visible(g, view)) {
+					gameAt(g, field.time, ball)
+					const z = world.heightAt(ball.x, ball.y) + ball.z
 					if (g.game === 'football') sphere(ball.x, ball.y, z, 0.12, '#eee5d2')
 					else {
 						base(ball.x, ball.y, z, field.time)
@@ -89,14 +98,13 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 					}
 				}
 			}
-			for (const p of riders) if (p.kind === 'kite' && field.wetness < 0.5) kites.kite(p, p.seed, true)
-			if (drawDogs)
-				drawDogs(
-					dogs.filter((d) => d.seed < field.density && visible(d.pet)),
-					field.grow,
-					(d) => d.appearance,
-				)
-			for (const mesh of [smoke, round]) {
+			for (const p of riders) if (p.kind === 'kite' && field.wetness < 0.5) kites.kite(p.render, p.seed, true)
+			if (drawDogs) {
+				shownDogs.length = 0
+				for (const d of dogs) if (d.seed < field.density && visible(d.pet, view)) shownDogs.push(d)
+				drawDogs(shownDogs, field.grow, lookFor)
+			}
+			for (const mesh of movingMeshes) {
 				mesh.count = mesh === smoke ? smokes : balls
 				mesh.instanceMatrix.needsUpdate = true
 				if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true

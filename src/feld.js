@@ -1,18 +1,35 @@
 import * as THREE from 'three'
 import { lookOf } from './actors.js'
+import { inkOutside } from './ink.js'
 import { glance, dodgeStep, keepClear } from './pedestrians.js'
 import { feldLayout, feldCrowd, rideAt } from './feld-layout.js'
 import { createFeldExtras } from './feld-extras.js'
-import { dogAt, collectPfand } from './feld-activity.js'
+import { dogAt, collectPfand, interpolatePose } from './feld-activity.js'
 import { T, SOLID } from './tiles.js'
 import { drawSkater } from './ride-models.js'
 
 const fields = new WeakMap()
+const PAVED = new Set([T.SIDEWALK, T.CYCLEWAY, T.GROUND])
+const GLANCE = { ahead: 0, back: 0 }
+const SIDES = [-1, 1]
+const WHEELS = [-0.28, 0.28]
+const STEP = 0.05
+const visible = (p, view, pad = 5) => p.x >= view.x0 - pad && p.x <= view.x1 + pad && p.y >= view.y0 - pad && p.y <= view.y1 + pad
+
+function remember(p) {
+	const prev = p.previous
+	prev.x = p.x
+	prev.y = p.y
+	prev.dir = p.dir
+	prev.stride = p.stride
+	prev.lie = p.lie ?? 0
+	prev.bend = p.bend ?? 0
+}
 const blankets = ['#dc665a', '#52a5ac', '#d7ae45', '#7970af', '#ded6b9', '#5975a9']
 function fieldOf(world) {
 	let field = fields.get(world)
 	if (!field) {
-		field = { ...feldLayout(world), chunks: new Set(), time: 0, density: 1, grow: 1.4, near: [] }
+		field = { ...feldLayout(world), chunks: new Set(), time: 0, density: 1, grow: 1.4, near: [], animate: [] }
 		for (const g of field.groups)
 			for (const p of g.people) {
 				p.home = { x: p.x, y: p.y, dir: p.dir }
@@ -22,6 +39,14 @@ function fieldOf(world) {
 			p.appearance = lookOf(p.seed)
 			if (p.path) Object.assign(p, rideAt(p, 0))
 			else p.home ??= { x: p.x, y: p.y, dir: p.dir }
+		}
+		for (const g of field.groups) g.kiteHolder = g.people.find((p) => p.kind === 'stand') ?? g.people[0]
+		for (const p of [...field.groups.flatMap((g) => g.people), ...field.riders, ...field.collectors]) {
+			p.home ??= { x: p.x, y: p.y, dir: p.dir }
+			p.previous = {}
+			p.render = {}
+			remember(p)
+			interpolatePose(p, 1)
 		}
 		fields.set(world, field)
 	}
@@ -33,6 +58,9 @@ export function createFeld(world, pfand, shout) {
 	for (const g of field.groups) pfand.bottles.push({ x: g.x + 1.4, y: g.y, can: false })
 	let tick = 0,
 		cooldown = 0
+	const at = {},
+		next = {}
+	const bicycle = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, model: { length: 0.5, width: 0.25 } }
 	const scare = {
 		threats: [],
 		ok: (x, y) => field.contains(x, y) && !SOLID.has(world.tileAt(x, y)),
@@ -58,68 +86,89 @@ export function createFeld(world, pfand, shout) {
 			field.wetness = wetness
 			field.x = player.x
 			field.y = player.y
-			if (tick < 0.05) return
-			const step = Math.min(tick, 0.15)
-			tick = 0
-			field.density = feldCrowd(hour, wetness)
-			field.near.length = 0
+			field.hour = hour
 			const b = field.bounds
-			if (view.x1 < b.x0 || view.x0 > b.x1 || view.y1 < b.y0 || view.y0 > b.y1) return
-			scare.threats.length = 0
-			if (!inside && player.onBike && player.speed > 0.8)
-				scare.threats.push({
-					x: player.x,
-					y: player.y,
-					vx: Math.cos(player.dir) * player.speed,
-					vy: Math.sin(player.dir) * player.speed,
-					angle: player.dir,
-					model: { length: 0.5, width: 0.25 },
-				})
-			if (!inside && player.car && Math.hypot(player.car.vx, player.car.vy) > 1.5) scare.threats.push(player.car)
-			const visible = (p, pad = 5) => p.x >= view.x0 - pad && p.x <= view.x1 + pad && p.y >= view.y0 - pad && p.y <= view.y1 + pad
-			for (const p of field.riders) {
-				const at = rideAt(p, field.time)
-				p.active =
-					p.seed < field.density && field.contains(at.x, at.y) && [T.SIDEWALK, T.CYCLEWAY, T.GROUND].includes(world.tileAt(at.x, at.y))
-				if (!p.active || !visible(at, 15)) {
-					Object.assign(p, at)
-					p.dodge = null
-					p.lie = 0
-					p.alert = 0
-					continue
+			if (view.x1 < b.x0 || view.x0 > b.x1 || view.y1 < b.y0 || view.y0 > b.y1) {
+				field.near.length = field.animate.length = 0
+				tick = 0
+				return
+			}
+			if (tick + 1e-9 >= STEP) {
+				const elapsed = Math.floor((tick + 1e-9) / STEP) * STEP
+				tick = Math.max(0, tick - elapsed)
+				const step = Math.min(elapsed, 0.15),
+					time = field.time - tick
+				field.density = feldCrowd(hour, wetness)
+				field.near.length = field.animate.length = 0
+				scare.threats.length = 0
+				if (!inside && player.onBike && player.speed > 0.8) {
+					bicycle.x = player.x
+					bicycle.y = player.y
+					bicycle.vx = Math.cos(player.dir) * player.speed
+					bicycle.vy = Math.sin(player.dir) * player.speed
+					bicycle.angle = player.dir
+					scare.threats.push(bicycle)
 				}
-				const next = rideAt(p, field.time + 0.1)
-				p.dir = Math.atan2(next.y - at.y, next.x - at.x)
-				p.v = p.speed
-				p.home = { ...at, dir: p.dir }
-				react(p, step, scare)
-				p.stride = field.time * p.speed * 7
-				if (p.active && visible(p)) field.near.push(p)
+				if (!inside && player.car && Math.hypot(player.car.vx, player.car.vy) > 1.5) scare.threats.push(player.car)
+				for (const p of field.riders) {
+					rideAt(p, time, at)
+					p.active = p.seed < field.density && field.contains(at.x, at.y) && PAVED.has(world.tileAt(at.x, at.y))
+					if (!p.active || !visible(at, view, 25)) {
+						p.x = at.x
+						p.y = at.y
+						p.dodge = null
+						p.lie = p.alert = 0
+						remember(p)
+						interpolatePose(p, 1)
+						continue
+					}
+					remember(p)
+					rideAt(p, time + 0.1, next)
+					p.dir = Math.atan2(next.y - at.y, next.x - at.x)
+					p.v = p.speed
+					p.home.x = at.x
+					p.home.y = at.y
+					p.home.dir = p.dir
+					react(p, step, scare)
+					p.stride = time * p.speed * 7
+					field.animate.push(p)
+					if (visible(p, view)) field.near.push(p)
+				}
+				for (const p of field.collectors) {
+					if (p.seed >= field.density || !visible(p, view, 25)) continue
+					remember(p)
+					collectPfand(p, pfand.bottles, step, world)
+					p.home.x = p.x
+					p.home.y = p.y
+					p.home.dir = p.dir
+					react(p, step, scare)
+					field.animate.push(p)
+					field.near.push(p)
+				}
+				for (const chunk of field.chunks) {
+					const c = chunk.chunk
+					if (c.x > view.x1 + 25 || c.x + c.w < view.x0 - 25 || c.y > view.y1 + 25 || c.y + c.h < view.y0 - 25) continue
+					for (const g of chunk.groups) {
+						if (g.seed >= field.density || !visible(g, view, 10)) continue
+						for (const p of g.people) {
+							remember(p)
+							react(p, step, scare)
+							field.animate.push(p)
+							field.near.push(p)
+						}
+					}
+				}
 			}
+			// Blend only the drawing pose; reactions and bottle collection keep their 20 Hz state.
+			for (const p of field.animate) interpolatePose(p, tick / STEP)
 			for (const d of field.dogs) {
-				if (d.seed >= field.density || !visible(d.home, 20)) continue
-				Object.assign(d.pet, dogAt(d, field.time))
-				const near = Math.hypot(d.pet.x - player.x, d.pet.y - player.y) < 2.5
-				d.pet.bark = near && scare.threats.length ? 0.5 : 0
+				if (d.seed >= field.density || !visible(d.home, view, 20)) continue
+				dogAt(d, field.time, d.pet)
+				d.pet.bark = Math.hypot(d.pet.x - player.x, d.pet.y - player.y) < 2.5 && scare.threats.length ? 0.5 : 0
 			}
-			for (const p of field.collectors) {
-				if (p.seed >= field.density || !visible(p, 15)) continue
-				collectPfand(p, pfand.bottles, step, world)
-				p.home = { x: p.x, y: p.y, dir: p.dir }
-				react(p, step, scare)
-				field.near.push(p)
-			}
-
 			for (const chunk of field.chunks) {
 				const c = chunk.chunk
 				if (c.x > view.x1 + 25 || c.x + c.w < view.x0 - 25 || c.y > view.y1 + 25 || c.y + c.h < view.y0 - 25) continue
-				for (const g of chunk.groups) {
-					if (g.seed >= field.density || !visible(g, 10)) continue
-					for (const p of g.people) {
-						react(p, step, scare)
-						field.near.push(p)
-					}
-				}
 				chunk.draw(view)
 			}
 		},
@@ -129,7 +178,7 @@ export function createFeld(world, pfand, shout) {
 function react(p, dt, scare) {
 	if (p.dodge) dodgeStep(p, dt, scare)
 	else {
-		glance(p, dt, scare, { ahead: 0, back: 0 })
+		glance(p, dt, scare, GLANCE)
 		if (p.dodge) {
 			scare.shout(p)
 			p.alert = 2.5
@@ -163,7 +212,7 @@ export function build({ world, chunk, gradient }) {
 	})
 	const hasDogs = field.dogs.some((d) => owns(d.home))
 	if (!groups.length && !possible && !hasDogs) return
-	const material = new THREE.MeshToonMaterial({ gradientMap: gradient })
+	const material = inkOutside(new THREE.MeshToonMaterial({ gradientMap: gradient }))
 	const mesh = new THREE.InstancedMesh(
 		new THREE.BoxGeometry(1, 1, 1),
 		material,
@@ -198,19 +247,20 @@ export function build({ world, chunk, gradient }) {
 		body.compose(pos.set(x, -y, z), turn.setFromEuler(euler.set(0, down, -dir)), scale.setScalar(grow))
 	}
 	function person(p) {
-		const k = p.appearance,
+		const pose = p.render,
+			k = p.appearance,
 			small = p.kind === 'child' ? 0.65 : 1,
 			grow = field.grow * small * (p.path && field.grow > 1 ? 1.3 : 1)
-		const riding = ['bike', 'child'].includes(p.kind),
-			skating = ['skate', 'roller', 'kite'].includes(p.kind)
+		const riding = p.kind === 'bike' || p.kind === 'child',
+			skating = p.kind === 'skate' || p.kind === 'roller' || p.kind === 'kite'
 		const sitting = p.kind === 'sit' && !p.alert && !p.dodge,
 			lying = p.kind === 'lie' && !p.alert && !p.dodge
-		const down = lying ? Math.PI / 2 : ((p.lie ?? 0) * Math.PI) / 2 + (p.bend ?? 0) * 0.4
-		const ground = world.heightAt(p.x, p.y)
-		base(p.x, p.y, ground + (lying ? 0.09 : 0) + (riding ? 0.16 : skating ? 0.055 : 0), p.dir, grow, down)
-		if (skating && !p.dodge && !p.lie) {
-			base(p.x, p.y, ground, p.dir, grow)
-			drawSkater(box, p.kind, k, p.stride)
+		const down = lying ? Math.PI / 2 : ((pose.lie ?? 0) * Math.PI) / 2 + (pose.bend ?? 0) * 0.4
+		const ground = world.heightAt(pose.x, pose.y)
+		base(pose.x, pose.y, ground + (lying ? 0.09 : 0) + (riding ? 0.16 : skating ? 0.055 : 0), pose.dir, grow, down)
+		if (skating && !p.dodge && !pose.lie) {
+			base(pose.x, pose.y, ground, pose.dir, grow)
+			drawSkater(box, p.kind, k, pose.stride)
 			return
 		}
 		const hip = sitting ? 0.1 : 0.24,
@@ -219,17 +269,17 @@ export function build({ world, chunk, gradient }) {
 		box(0, 0, chest, 0.17, 0.26 * k.build, 0.25, k.top)
 		box(0.02, 0, head, 0.13, 0.135, 0.14, k.skin)
 		box(-0.01, 0, head + 0.075, 0.14, 0.15, 0.045, k.hat ?? k.hair)
-		const detailed = field.detail && Math.hypot(p.x - field.x, p.y - field.y) < 90
+		const detailed = field.detail && Math.hypot(pose.x - field.x, pose.y - field.y) < 90
 		if (!detailed && !p.path && p.kind !== 'collector') return
 		const moving = riding || skating || p.kind === 'collector',
 			swing =
 				p.game === 'football'
 					? Math.max(0, Math.sin((field.time / 2.5 + p.playSeed + p.volley) * Math.PI)) * 0.8
 					: moving
-						? Math.sin(p.stride) * 0.35
+						? Math.sin(pose.stride) * 0.35
 						: 0
 		if (detailed)
-			for (const side of [-1, 1]) {
+			for (const side of SIDES) {
 				box(
 					sitting ? 0.12 : 0,
 					side * 0.065,
@@ -262,12 +312,12 @@ export function build({ world, chunk, gradient }) {
 		if (p.alert) box(0.02, 0.22, head + 0.08, 0.07, 0.07, 0.18, k.skin, -0.3)
 		if (p.dodge) return
 		if (riding) {
-			base(p.x, p.y, ground, p.dir, grow)
+			base(pose.x, pose.y, ground, pose.dir, grow)
 			box(0, 0, 0.24, 0.56, 0.06, 0.06, k.top, -0.35)
 			box(0.22, 0, 0.32, 0.05, 0.055, 0.28, '#c7c4b8', -0.2)
 			box(0.24, 0, 0.46, 0.055, 0.32, 0.04, '#33363a')
 			box(-0.12, 0, 0.38, 0.18, 0.12, 0.045, '#33363a')
-			for (const x of [-0.28, 0.28]) {
+			for (const x of WHEELS) {
 				local.makeTranslation(x, 0, 0.18)
 				wheels.setMatrixAt(wn++, matrix.multiplyMatrices(body, local))
 			}
@@ -279,6 +329,7 @@ export function build({ world, chunk, gradient }) {
 				box(-0.14 + (i % 2) * 0.09, -0.27, 0.37 + Math.floor(i / 2) * 0.03, 0.06, 0.06, 0.19, '#4c783e')
 		}
 	}
+	const riders = []
 	const extras = createFeldExtras({ world, chunk, field, groups, material, box, base })
 	const part = {
 		chunk,
@@ -293,17 +344,20 @@ export function build({ world, chunk, gradient }) {
 				base(g.x, g.y, world.heightAt(g.x, g.y) + 0.025, g.angle)
 				const paint = blankets[Math.floor(g.seed * blankets.length)]
 				box(0, 0, 0, g.people.length > 7 ? 2.6 : 2.1, g.people.length > 7 ? 2 : 1.5, 0.035, paint)
-				for (const side of [-1, 1]) box(side * 0.8, 0, 0.022, 0.1, 1.5, 0.015, '#eadbb5')
+				for (const side of SIDES) box(side * 0.8, 0, 0.022, 0.1, 1.5, 0.015, '#eadbb5')
 				box(0.5, 0.35, 0.12, 0.32, 0.25, 0.24, g.seed < 0.5 ? '#ad423a' : '#377584')
 				box(0.5, 0.35, 0.255, 0.34, 0.27, 0.04, '#eee3c6')
 				box(-0.4, 0.4, 0.085, 0.28, 0.2, 0.17, '#bf964f')
 				for (const p of g.people) person(p)
 			}
-			const riders = field.riders.filter(
-				(p) => p.active && owns(p) && (!view || (p.x > view.x0 - 25 && p.x < view.x1 + 25 && p.y > view.y0 - 25 && p.y < view.y1 + 25)),
-			)
-			for (const p of riders) person(p)
-			for (const p of field.collectors) if (p.seed < field.density && owns(p)) person(p)
+			riders.length = 0
+			for (const p of field.riders) {
+				const shown = p.render
+				if (!p.active || !owns(shown) || (view && !visible(shown, view, 25))) continue
+				riders.push(p)
+				person(p)
+			}
+			for (const p of field.collectors) if (p.seed < field.density && owns(p.render) && (!view || visible(p.render, view, 25))) person(p)
 			extras.draw(view, riders)
 			mesh.count = n
 			wheels.count = wn

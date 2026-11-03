@@ -5,6 +5,9 @@ import { pointsGrid } from './kerbs.js'
 import { T, SOLID } from './tiles.js'
 import { pushFromTrunks } from './trees.js'
 
+const SIDES = [-1, 1]
+const COATS = ['#a87947', '#e3d2ac', '#443a33', '#b0a69a']
+
 export function petOf(seed) {
 	return seed < 0.28 ? 'dog' : seed < 0.31 ? 'cat' : seed < 0.335 ? 'ferret' : seed < 0.36 ? 'parrot' : null
 }
@@ -71,8 +74,8 @@ export function createPets(world) {
 }
 
 // All coats, leads and moving legs share a single instanced box draw call.
-export function createPetActors(root, material, heightAt) {
-	const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, 4096)
+export function createPetActors(root, material, heightAt, capacity = 256) {
+	const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, capacity * 16)
 	mesh.frustumCulled = false
 	mesh.castShadow = true
 	root.add(mesh)
@@ -87,9 +90,10 @@ export function createPetActors(root, material, heightAt) {
 	const barkGeo = mergeGeometries(
 		[-1, 0, 1].map((i) => new THREE.BoxGeometry(0.07, 0.014, 0.014).rotateZ(i * 0.6).translate(0.39, i * 0.1, 0.37)),
 	)
-	const barks = new THREE.InstancedMesh(barkGeo, material, 128)
+	const barks = new THREE.InstancedMesh(barkGeo, material, capacity)
 	barks.frustumCulled = false
 	root.add(barks)
+	const meshes = [mesh, barks]
 	return (people, grow, lookFor) => {
 		let n = 0,
 			barking = 0
@@ -106,13 +110,7 @@ export function createPetActors(root, material, heightAt) {
 			const dir = bird ? p.dir : pet.dir
 			const c = Math.cos(dir),
 				s = Math.sin(dir)
-			const coat = bird
-				? '#459747'
-				: cat
-					? '#8c8e92'
-					: ferret
-						? '#b7a07d'
-						: ['#a87947', '#e3d2ac', '#443a33', '#b0a69a'][Math.floor(p.seed * 1000) % 4]
+			const coat = bird ? '#459747' : cat ? '#8c8e92' : ferret ? '#b7a07d' : COATS[Math.floor(p.seed * 1000) % 4]
 			const small = cat ? 0.8 : ferret ? 0.65 : 0.9 + ((p.seed * 91) % 1) * 0.4
 			function box(a, b, h, l, w, tall, paint) {
 				position.set(x + (c * a - s * b) * grow * small, -y - (s * a + c * b) * grow * small, z + h * grow * small)
@@ -130,9 +128,9 @@ export function createPetActors(root, material, heightAt) {
 				box(0, 0, 0.17, ferret ? 0.37 : 0.31, 0.14, 0.15, coat)
 				box(0.18, 0, pet.sniff ? 0.14 : 0.25, 0.14, 0.14, 0.14, coat)
 				box(0.27, 0, pet.sniff ? 0.11 : 0.22, 0.08, 0.09, 0.065, '#302b29')
-				for (const side of [-1, 1]) {
+				for (const side of SIDES) {
 					box(0.15, side * 0.065, cat ? 0.36 : 0.29, 0.07, 0.045, cat ? 0.1 : 0.13, coat)
-					for (const end of [-1, 1])
+					for (const end of SIDES)
 						box(end * 0.11 + Math.sin(pet.stride + (side === end ? 0 : Math.PI)) * 0.035, side * 0.055, 0.055, 0.045, 0.04, 0.11, coat)
 				}
 				box(-0.22, Math.sin(pet.stride * 0.5) * 0.045, cat ? 0.31 : 0.23, 0.19, 0.035, cat ? 0.12 : 0.045, coat)
@@ -161,7 +159,7 @@ export function createPetActors(root, material, heightAt) {
 		}
 		mesh.count = n
 		barks.count = barking
-		for (const m of [mesh, barks]) {
+		for (const m of meshes) {
 			m.instanceMatrix.needsUpdate = true
 			if (m.instanceColor) m.instanceColor.needsUpdate = true
 		}

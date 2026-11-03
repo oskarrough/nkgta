@@ -422,7 +422,7 @@ function frame(now) {
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
 	feld.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside)
-	chatter.update(sound.audio(), feld.people.length ? [...traffic.peds, ...feld.people] : traffic.peds, street, streetView, { inside })
+	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, feld.people)
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
 	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()

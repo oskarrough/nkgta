@@ -1,9 +1,12 @@
 import * as THREE from 'three'
 
+const SIDES = [-1, 1]
+const AXLES = [-0.18, 0.18]
+
 export function drawWheels(box, kind, color, phase = 0) {
 	if (kind !== 'roller') box(0, 0, 0.045, 0.55, 0.17, 0.035, color)
-	for (const x of [-0.18, 0.18])
-		for (const side of [-1, 1]) {
+	for (const x of AXLES)
+		for (const side of SIDES) {
 			const stride = kind === 'roller' ? Math.sin(phase) * side : 0
 			box(kind === 'roller' ? x * 0.35 + stride * 0.07 : x, side * (0.09 + Math.abs(stride) * 0.035), 0.035, 0.065, 0.045, 0.065, '#e1d4ac')
 		}
@@ -14,7 +17,7 @@ export function drawSkater(box, kind, look, phase = 0) {
 	box(0, 0, 0.405, 0.17, 0.26 * look.build, 0.25, look.top)
 	box(0.02, 0, 0.605, 0.13, 0.135, 0.14, look.skin)
 	box(-0.01, 0, 0.68, 0.14, 0.15, 0.045, look.hat ?? look.hair)
-	for (const side of [-1, 1]) {
+	for (const side of SIDES) {
 		const kick = kind === 'roller' ? stride * side * 0.35 : kind === 'skate' && side === -1 ? Math.max(0, stride) * 0.65 : 0
 		const spread = side * (0.065 + (kind === 'roller' ? Math.abs(stride) * 0.035 : 0))
 		box(0, spread, 0.175, 0.1, 0.09, 0.24, look.trousers, kick)
@@ -56,31 +59,41 @@ export function createKites(count, gradientMap, heightAt) {
 	let knots = 0,
 		segments = 0,
 		time = 0
-	function line(a, b) {
-		vertices.set([a.x, -a.y, a.z, b.x, -b.y, b.z], segments++ * 6)
+	function line(ax, ay, az, bx, by, bz) {
+		let at = segments++ * 6
+		vertices[at++] = ax
+		vertices[at++] = -ay
+		vertices[at++] = az
+		vertices[at++] = bx
+		vertices[at++] = -by
+		vertices[at] = bz
 	}
 	function kite(p, seed, power = false, wind = null) {
 		const t = time,
 			ground = heightAt(p.x, p.y)
-		const sky = {
-			x: p.x + (wind ? wind.x * 5 : 3) + Math.sin(t * 0.3 + seed * 8) * 1.4,
-			y: p.y + (wind ? wind.y * 5 : -3) + Math.cos(t * 0.25 + seed * 6),
-			z: ground + 8 + seed * 4,
-		}
+		const x = p.x + (wind ? wind.x * 5 : 3) + Math.sin(t * 0.3 + seed * 8) * 1.4,
+			y = p.y + (wind ? wind.y * 5 : -3) + Math.cos(t * 0.25 + seed * 6),
+			z = ground + 8 + seed * 4
 		const size = power ? 1.5 : 1
 		matrix.compose(
-			pos.set(sky.x, -sky.y, sky.z),
+			pos.set(x, -y, z),
 			rotation.setFromEuler(euler.set(0.4 + Math.sin(t * 0.4 + seed) * 0.15, 0.1, t * 0.04 + seed * 6)),
 			scale.set(size, size, 1),
 		)
 		kites.setMatrixAt(knots++, matrix)
-		line({ x: p.x, y: p.y, z: ground + 0.45 }, sky)
-		if (power) line({ x: p.x + 0.2, y: p.y + 0.2, z: ground + 0.45 }, { ...sky, x: sky.x + 0.5 })
-		let previous = sky
+		line(p.x, p.y, ground + 0.45, x, y, z)
+		if (power) line(p.x + 0.2, p.y + 0.2, ground + 0.45, x + 0.5, y, z)
+		let px = x,
+			py = y,
+			pz = z
 		for (let i = 1; i < 5; i++) {
-			const next = { x: sky.x - i * 0.45, y: sky.y + Math.sin(t * 2 - i + seed * 10) * 0.25, z: sky.z - i * 0.25 }
-			line(previous, next)
-			previous = next
+			const nx = x - i * 0.45,
+				ny = y + Math.sin(t * 2 - i + seed * 10) * 0.25,
+				nz = z - i * 0.25
+			line(px, py, pz, nx, ny, nz)
+			px = nx
+			py = ny
+			pz = nz
 		}
 	}
 	return {

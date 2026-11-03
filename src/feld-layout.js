@@ -174,7 +174,7 @@ export function feldLayout(world) {
 	return { groups, riders, dogs, collectors, contains, canGrill, project, bounds }
 }
 
-export function rideAt(p, time) {
+export function rideAt(p, time, out = {}) {
 	const length = p.path.length - 10
 	// A stadium lap: separate lanes, with a rounded turn at either end.
 	const radius = p.lane,
@@ -208,5 +208,7 @@ export function rideAt(p, time) {
 		dir = Math.atan2(b.y - a.y, b.x - a.x)
 	const nx = a.nx === undefined ? -Math.sin(dir) : a.nx + (b.nx - a.nx) * t,
 		ny = a.ny === undefined ? Math.cos(dir) : a.ny + (b.ny - a.ny) * t
-	return { x: a.x + (b.x - a.x) * t + nx * side * p.way, y: a.y + (b.y - a.y) * t + ny * side * p.way }
+	out.x = a.x + (b.x - a.x) * t + nx * side * p.way
+	out.y = a.y + (b.y - a.y) * t + ny * side * p.way
+	return out
 }

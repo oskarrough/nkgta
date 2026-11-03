@@ -3,7 +3,7 @@ import { feldCrowd, feldLayout, rideAt } from '../src/feld-layout.js'
 import { createFeld, build } from '../src/feld.js'
 import { createWorld } from '../src/world.js'
 import { decodeMap } from '../src/map-codec.js'
-import { dogAt, collectPfand } from '../src/feld-activity.js'
+import { dogAt, collectPfand, interpolatePose } from '../src/feld-activity.js'
 import { T } from '../src/tiles.js'
 
 const world = createWorld(decodeMap(await Bun.file(new URL('../public/map.json', import.meta.url)).json()))
@@ -125,4 +125,47 @@ test('collectors pick up real bottles without crossing obstacles or stealing a r
 	const blocked = { x: 0, y: 0, stride: 0 }
 	collectPfand(blocked, [{ x: 2, y: 0 }], 1, { tileAt: (x) => (x > 0.5 && x < 1.5 ? T.WATER : T.GRASS) })
 	expect(blocked.x).toBe(0)
+})
+
+test('nearby motion advances between decisions without changing the 20 Hz simulation', () => {
+	const feld = createFeld({ ...world }, { bottles: [] }, () => {})
+	const p = feld.riders[0],
+		home = p.home,
+		drawn = p.render
+	const view = { x0: p.x - 20, y0: p.y - 20, x1: p.x + 20, y1: p.y + 20 }
+	const player = { x: p.x, y: p.y, dir: 0, speed: 0 }
+	feld.update(0.05, player, view, 16, 0, true, false)
+	const x = p.x,
+		y = p.y,
+		renderedX = drawn.x,
+		renderedY = drawn.y
+	feld.update(0.01, player, view, 16, 0, true, false)
+	expect(p.x).toBe(x)
+	expect(p.y).toBe(y)
+	expect(Math.hypot(drawn.x - renderedX, drawn.y - renderedY)).toBeGreaterThan(0)
+	const firstX = drawn.x,
+		firstY = drawn.y
+	feld.update(0.01, player, view, 16, 0, true, false)
+	expect(Math.hypot(drawn.x - firstX, drawn.y - firstY)).toBeGreaterThan(0)
+	expect(p.home).toBe(home)
+	expect(p.render).toBe(drawn)
+})
+
+test('pose interpolation takes the short turn across north and leaves simulation intact', () => {
+	const p = {
+		x: 2,
+		y: 4,
+		dir: -Math.PI + 0.1,
+		stride: 1,
+		lie: 0,
+		bend: 0,
+		previous: { x: 0, y: 0, dir: Math.PI - 0.1, stride: 0, lie: 0, bend: 0 },
+		render: {},
+	}
+	const drawn = interpolatePose(p, 0.5)
+	expect(drawn).toBe(p.render)
+	expect(drawn.x).toBe(1)
+	expect(drawn.y).toBe(2)
+	expect(drawn.dir).toBeCloseTo(Math.PI)
+	expect(p.x).toBe(2)
 })
