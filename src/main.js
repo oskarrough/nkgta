@@ -50,11 +50,13 @@ const world = createWorld(map)
 phase('createWorld')
 loading.textContent = 'Baue die Welt…'
 const URL_PARAMS = new URLSearchParams(location.search)
-const start = URL_PARAMS.has('maybach')
-	? { lat: 52.49525, lon: 13.4227, dir: 0.5 }
-	: URL_PARAMS.has('feld')
-		? { lat: 52.47572, lon: 13.4174, dir: Math.PI }
-		: START
+const start = URL_PARAMS.has('weser')
+	? { lat: 52.48784, lon: 13.4304, dir: 0.52 }
+	: URL_PARAMS.has('maybach')
+		? { lat: 52.49525, lon: 13.4227, dir: 0.5 }
+		: URL_PARAMS.has('feld')
+			? { lat: 52.47572, lon: 13.4174, dir: Math.PI }
+			: START
 const player = createPlayer(world.startPoint(start))
 const pfand = createPfand(world)
 const camera = createCamera(world)

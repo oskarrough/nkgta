@@ -5,6 +5,7 @@ import { glance, dodgeStep, keepClear } from './pedestrians.js'
 import { rideAt } from './feld-layout.js'
 import { feld } from './feld.js'
 import { market, canal } from './maybach.js'
+import { weser } from './weser.js'
 import { dogAt, collectPfand, interpolatePose, walkAt } from './feld-activity.js'
 import { T, SOLID } from './tiles.js'
 import { drawSkater } from './ride-models.js'
@@ -29,7 +30,7 @@ function remember(p) {
 function placesOf(world) {
 	let places = fields.get(world)
 	if (!places) {
-		places = [feld, market, canal].map((definition) => {
+		places = [feld, market, canal, weser].map((definition) => {
 			const field = {
 				riders: [],
 				dogs: [],
@@ -105,9 +106,14 @@ function createPlace(world, field, pfand, shout) {
 		next = {}
 	const bicycle = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, model: { length: 0.5, width: 0.25 } }
 	const scare = {
+		room: field.definition.room ?? GLANCE,
 		threats: [],
 		ok: (x, y) => field.contains(x, y) && !SOLID.has(world.tileAt(x, y)),
 		shout: (p) => {
+			if (p.bottle && !p.dropped) {
+				pfand.drop(p.x, p.y)
+				p.dropped = true
+			}
 			if (cooldown <= 0) {
 				shout(p)
 				cooldown = 3
@@ -194,7 +200,7 @@ function createPlace(world, field, pfand, shout) {
 					const c = chunk.chunk
 					if (c.x > view.x1 + 25 || c.x + c.w < view.x0 - 25 || c.y > view.y1 + 25 || c.y + c.h < view.y0 - 25) continue
 					for (const g of chunk.groups) {
-						if (g.seed >= field.density || !visible(g, view, 10)) continue
+						if (g.open === false || g.seed >= field.density || !visible(g, view, 10)) continue
 						for (const p of g.people) {
 							remember(p)
 							if (p.route) {
@@ -231,7 +237,7 @@ function createPlace(world, field, pfand, shout) {
 function react(p, dt, scare) {
 	if (p.dodge) dodgeStep(p, dt, scare)
 	else {
-		glance(p, dt, scare, GLANCE)
+		glance(p, dt, scare, scare.room)
 		if (p.dodge) {
 			scare.shout(p)
 			p.alert = 2.5
@@ -263,7 +269,7 @@ export function build(ctx) {
 	}
 }
 
-function buildPlace({ world, chunk, gradient }, field) {
+function buildPlace({ world, chunk, gradient, opening }, field) {
 	const owns = (p) => p.x >= chunk.x && p.x < chunk.x + chunk.w && p.y >= chunk.y && p.y < chunk.y + chunk.h
 	const groups = field.groups.filter(owns)
 	const possible = field.riders.some((p) => {
@@ -277,7 +283,12 @@ function buildPlace({ world, chunk, gradient }, field) {
 	})
 	const hasDogs = field.dogs.some((d) => owns(d.home))
 	if (!groups.length && !possible && !hasDogs) return
-	const material = inkOutside(new THREE.MeshToonMaterial({ gradientMap: gradient }))
+	for (const g of groups)
+		if (g.place)
+			opening.watch(g.place, (open) => {
+				g.open = open
+			})
+	const material = inkOutside(new THREE.MeshToonMaterial({ gradientMap: gradient, emissive: field.definition.glow ?? '#000000' }))
 	const mesh = new THREE.InstancedMesh(
 		new THREE.BoxGeometry(1, 1, 1),
 		material,
@@ -322,7 +333,7 @@ function buildPlace({ world, chunk, gradient }, field) {
 		const sitting = (p.kind === 'sit' || quay) && !p.alert && !p.dodge,
 			lying = p.kind === 'lie' && !p.alert && !p.dodge
 		const down = lying ? Math.PI / 2 : ((pose.lie ?? 0) * Math.PI) / 2 + (pose.bend ?? 0) * 0.4
-		const ground = world.heightAt(pose.x, pose.y) + (quay ? 0.38 : 0)
+		const ground = world.heightAt(pose.x, pose.y) + (quay ? 0.38 : sitting ? (p.seat ?? 0) : 0)
 		base(pose.x, pose.y, ground + (lying ? 0.09 : 0) + (riding ? 0.16 : skating ? 0.055 : 0), pose.dir, grow, down)
 		if (skating && !p.dodge && !pose.lie) {
 			base(pose.x, pose.y, ground, pose.dir, grow)
@@ -344,6 +355,7 @@ function buildPlace({ world, chunk, gradient }, field) {
 					: moving
 						? Math.sin(pose.stride) * 0.35
 						: 0
+		p.smoking = p.smoker && !p.alert && !p.dodge && Math.sin(field.time * 0.7 + p.seed * 30) > 0.2
 		if (detailed || quay)
 			for (const side of SIDES) {
 				box(
@@ -366,15 +378,25 @@ function buildPlace({ world, chunk, gradient }, field) {
 					0.075,
 					0.24,
 					k.sleeves,
-					p.game === 'frisbee'
-						? -Math.max(0, Math.sin((field.time / 3.5 + p.playSeed + p.volley) * Math.PI)) * 1.2
-						: riding
-							? -0.8
-							: skating
-								? side * 0.35
-								: Math.sin(field.time * 0.7 + p.seed * 30) * 0.12,
+					p.smoking && side === 1
+						? -1.8
+						: p.game === 'frisbee'
+							? -Math.max(0, Math.sin((field.time / 3.5 + p.playSeed + p.volley) * Math.PI)) * 1.2
+							: riding
+								? -0.8
+								: skating
+									? side * 0.35
+									: Math.sin(field.time * 0.7 + p.seed * 30) * 0.12,
 				)
-				box(riding ? 0.17 : 0.015, side * 0.17, chest - 0.17, 0.065, 0.065, 0.06, k.skin)
+				box(
+					p.smoking && side === 1 ? 0.12 : riding ? 0.17 : 0.015,
+					side * 0.17,
+					p.smoking && side === 1 ? 0.49 : chest - 0.17,
+					0.065,
+					0.065,
+					0.06,
+					k.skin,
+				)
 			}
 		if (p.alert) box(0.02, 0.22, head + 0.08, 0.07, 0.07, 0.18, k.skin, -0.3)
 		if (p.dodge) return
@@ -406,7 +428,11 @@ function buildPlace({ world, chunk, gradient }, field) {
 			n = 0
 			wn = 0
 			for (const g of groups) {
-				if (g.seed >= field.density || (view && (g.x < view.x0 - 5 || g.x > view.x1 + 5 || g.y < view.y0 - 5 || g.y > view.y1 + 5)))
+				if (
+					g.open === false ||
+					g.seed >= field.density ||
+					(view && (g.x < view.x0 - 5 || g.x > view.x1 + 5 || g.y < view.y0 - 5 || g.y > view.y1 + 5))
+				)
 					continue
 
 				for (const p of g.people) person(p)

@@ -309,7 +309,7 @@ export function dodge(from, heading, speed, room, threats, ok = () => true) {
 	if (room.ahead > 0.5) options.push({ kind: 'ahead', legs: [[hx * RUSH, hy * RUSH, room.ahead / RUSH]] })
 	if (room.back > 0.5) options.push({ kind: 'back', legs: [[-hx * RUSH, -hy * RUSH, room.back / RUSH]] })
 	for (const [kind, spec, axis] of [
-		['step', STEP, [-hy, hx]],
+		['step', room.step ? { ...STEP, dist: room.step } : STEP, [-hy, hx]],
 		['dive', DIVE, lateral],
 	])
 		for (const k of [1, -1]) {

@@ -37,6 +37,7 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 PLEASE, do not verify and visually screenshot everything single thing.
 
 - Force soaked rain with `?weather=rain&hour=11` (or `hour=22`); `nkgta.weather.setMode('rain')` instead wets gradually. Road nodes include curve points, so only the first and last node of a road should interrupt gutter puddles at junctions.
+- For Weserstraße nightlife, use `?weser&hour=23&day=4&weather=dry`; `bun run perf` takes the phone ride through its bars too. Busy-place `room.step` can shorten the normal one-tile dodge on narrow pavements.
 - For a Maybachufer check, use `?maybach&day=4&hour=14&weather=dry` (Monday is 0); `hour=19.5` shows the canal crowd. Pass the same flags to `bun run perf` to ride Maybachufer in its phone pass. `temperature=5` forces a cold day.
 - Keep crowd decisions separate from drawing: interpolate nearby poses and redraw animated chunk features every frame even when their decisions run at 20 Hz.
 - Validate actor routes between OSM vertices against `world.tileAt`; a mapped centre line can cross grass in the raster even when every vertex is paved.

@@ -171,23 +171,29 @@ try {
 	// position is driven so random traffic cannot change texture coverage.
 	await run(`(() => {
 		const points = ${JSON.stringify(
-			params.has('maybach')
+			params.has('weser')
 				? [
-						{ lat: 52.49555, lon: 13.4212 },
-						{ lat: 52.4951, lon: 13.4231 },
-						{ lat: 52.4942, lon: 13.4255 },
+						{ lat: 52.48784, lon: 13.4304 },
+						{ lat: 52.4869, lon: 13.4331 },
+						{ lat: 52.4853, lon: 13.4362 },
 					]
-				: params.has('feld')
+				: params.has('maybach')
 					? [
-							{ lat: 52.4752, lon: 13.4193 },
-							{ lat: 52.47562, lon: 13.4176 },
-							{ lat: 52.47539, lon: 13.4125 },
+							{ lat: 52.49555, lon: 13.4212 },
+							{ lat: 52.4951, lon: 13.4231 },
+							{ lat: 52.4942, lon: 13.4255 },
 						]
-					: [
-							{ lat: 52.4764, lon: 13.4397 },
-							{ lat: 52.4784, lon: 13.4379 },
-							{ lat: 52.481, lon: 13.4347 },
-						],
+					: params.has('feld')
+						? [
+								{ lat: 52.4752, lon: 13.4193 },
+								{ lat: 52.47562, lon: 13.4176 },
+								{ lat: 52.47539, lon: 13.4125 },
+							]
+						: [
+								{ lat: 52.4764, lon: 13.4397 },
+								{ lat: 52.4784, lon: 13.4379 },
+								{ lat: 52.481, lon: 13.4347 },
+							],
 		)}.map(p => game.world.startPoint(p))
 		const start = performance.now()
 		globalThis.memoryRide = setInterval(() => {
