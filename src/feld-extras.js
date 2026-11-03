@@ -31,11 +31,24 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 		new THREE.Vector3(chunk.x - 20, -chunk.y - chunk.h - 20, 0),
 		new THREE.Vector3(chunk.x + chunk.w + 20, -chunk.y + 20, world.heightAt(chunk.x, chunk.y) + 25),
 	)
-	const smoke = new THREE.InstancedMesh(
-		new THREE.IcosahedronGeometry(1, 0),
-		new THREE.MeshBasicMaterial({ color: '#ded9ca', transparent: true, opacity: 0.26, depthWrite: false }),
-		Math.max(1, groups.length * 5),
+	const smokeGeometry = new THREE.IcosahedronGeometry(1, 0)
+	const smokeAlpha = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, groups.length * 3)), 1).setUsage(
+		THREE.DynamicDrawUsage,
 	)
+	smokeGeometry.setAttribute('smokeAlpha', smokeAlpha)
+	const smokeMaterial = new THREE.MeshBasicMaterial({ color: '#ded9ca', transparent: true, depthWrite: false })
+	// Smoke must leave the ink normals behind it intact, or its facets become solid outlines.
+	smokeMaterial.defines = { INK_SKIP: '' }
+	smokeMaterial.allowOverride = false
+	smokeMaterial.onBeforeCompile = (shader) => {
+		shader.vertexShader =
+			'attribute float smokeAlpha;\nvarying float vSmokeAlpha;\n' +
+			shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSmokeAlpha = smokeAlpha;')
+		shader.fragmentShader =
+			'varying float vSmokeAlpha;\n' +
+			shader.fragmentShader.replace('#include <opaque_fragment>', 'diffuseColor.a *= vSmokeAlpha;\n#include <opaque_fragment>')
+	}
+	const smoke = new THREE.InstancedMesh(smokeGeometry, smokeMaterial, smokeAlpha.count)
 	smoke.frustumCulled = false
 	smoke.count = 0
 	const round = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), material, Math.max(1, groups.length * 3))
@@ -105,10 +118,12 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 					box(0.55, 0, 0.15, 0.36, 0.27, 0.3, '#417044')
 					for (const x of [0.44, 0.56, 0.68]) box(x, 0, 0.35, 0.055, 0.07, 0.17, '#426d32')
 					if (field.wetness < 0.35)
-						for (let i = 0; i < 5; i++) {
-							const f = (field.time * 0.23 + i / 5 + g.seed) % 1,
-								r = 0.16 + f * 0.5
-							matrix.makeScale(r, r * 0.8, r * 0.7).setPosition(p.x + f * 0.9, -p.y + f * 0.35, z + 0.6 + f * 2.3)
+						for (let i = 0; i < 3; i++) {
+							const f = (field.time * 0.32 + i / 3 + g.seed) % 1,
+								r = 0.045 + f * 0.075
+							const drift = Math.sin(field.time * 1.2 + g.seed * 8 + i) * f * 0.035
+							matrix.makeScale(r, r * 0.7, r * 0.8).setPosition(p.x + f * 0.28 + drift, -p.y + f * 0.1, z + 0.55 + f * 0.4)
+							smokeAlpha.setX(smokes, 0.22 * Math.min(1, f * 8) * (1 - f))
 							smoke.setMatrixAt(smokes++, matrix)
 						}
 				}
@@ -135,6 +150,7 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 				mesh.instanceMatrix.needsUpdate = true
 				if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
 			}
+			smokeAlpha.needsUpdate = true
 			linesGeometry.setDrawRange(0, segments * 2)
 			linesGeometry.attributes.position.needsUpdate = true
 		},
