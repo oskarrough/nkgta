@@ -45,6 +45,84 @@ function nameTag(name) {
 	return material
 }
 
+// A see-through figure of whatever someone rode, posed by { x, y, angle, vehicle }
+// or hidden by null; `named` adds a tag over it.
+export function createGhost(root, heightAt, color, named, opacity = GHOST.opacity) {
+	const box = new THREE.BoxGeometry(1, 1, 1)
+	const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false })
+	const group = new THREE.Group()
+	group.visible = false
+	root.add(group)
+	const body = new THREE.Group()
+	group.add(body)
+	let label = null
+	let kind = null
+	let shownName = null
+	function shape(vehicle) {
+		body.clear()
+		const add = (l, w, h, x = 0, z = 0) => {
+			const mesh = new THREE.Mesh(box, material)
+			mesh.scale.set(l, w, h)
+			mesh.position.set(x, 0, z + h / 2)
+			body.add(mesh)
+		}
+		const model = MODELS[vehicle]
+		if (model) {
+			add(model.length, model.width, 0.3, 0, 0.06)
+			add(model.length * 0.55, model.width * 0.85, 0.2, -model.length * 0.08, 0.36)
+		} else if (RIDES[vehicle] && vehicle !== 'bike') {
+			drawSkater(
+				(x, y, z, l, w, h, _paint, tilt = 0) => {
+					const mesh = new THREE.Mesh(box, material)
+					mesh.position.set(x, y, z)
+					mesh.scale.set(l, w, h)
+					mesh.rotation.y = tilt
+					body.add(mesh)
+				},
+				vehicle,
+				{ build: 1 },
+			)
+			if (vehicle === 'kite') {
+				const kite = createKites(1, null, () => 0)
+				kite.reset(0)
+				kite.kite({ x: 0, y: 0 }, 0.4, true)
+				kite.finish()
+				body.add(...kite.meshes)
+			}
+		} else if (vehicle === 'bike') {
+			add(0.62, 0.1, 0.32, 0, 0.05)
+			add(0.18, 0.22, 0.42, -0.05, 0.37)
+			add(0.14, 0.14, 0.14, -0.02, 0.8)
+		} else {
+			add(0.22, 0.3, 0.5, 0, 0)
+			add(0.16, 0.16, 0.16, 0, 0.52)
+		}
+		kind = vehicle
+	}
+	const show = (pose, name) => {
+		group.visible = !!pose
+		if (!pose) return
+		if (pose.vehicle !== kind) shape(pose.vehicle)
+		if (named && name !== shownName) {
+			shownName = name
+			if (label) group.remove(label)
+			label = new THREE.Sprite(nameTag(name))
+			label.renderOrder = 10
+			label.scale.set(NAME.width, NAME.width / 4, 1)
+			label.position.set(0, 0, NAME.lift)
+			group.add(label)
+		}
+		group.position.set(pose.x, -pose.y, heightAt(pose.x, pose.y))
+		group.rotation.z = -pose.angle
+	}
+	show.dispose = () => {
+		root.remove(group)
+		box.dispose()
+		material.dispose()
+	}
+	return show
+}
+
 // Tile (x, y) sits at (x, -y) in the scene, as everywhere else, so headings turn the other way.
 export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 	const root = new THREE.Group()
@@ -132,76 +210,8 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		items = []
 	}
 
-	function createGhost(color, named) {
-		const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: GHOST.opacity, depthWrite: false })
-		const group = new THREE.Group()
-		group.visible = false
-		root.add(group)
-		const body = new THREE.Group()
-		group.add(body)
-		let label = null
-		let kind = null
-		let shownName = null
-		function shape(vehicle) {
-			body.clear()
-			const add = (l, w, h, x = 0, z = 0) => {
-				const mesh = new THREE.Mesh(box, material)
-				mesh.scale.set(l, w, h)
-				mesh.position.set(x, 0, z + h / 2)
-				body.add(mesh)
-			}
-			const model = MODELS[vehicle]
-			if (model) {
-				add(model.length, model.width, 0.3, 0, 0.06)
-				add(model.length * 0.55, model.width * 0.85, 0.2, -model.length * 0.08, 0.36)
-			} else if (RIDES[vehicle] && vehicle !== 'bike') {
-				drawSkater(
-					(x, y, z, l, w, h, _paint, tilt = 0) => {
-						const mesh = new THREE.Mesh(box, material)
-						mesh.position.set(x, y, z)
-						mesh.scale.set(l, w, h)
-						mesh.rotation.y = tilt
-						body.add(mesh)
-					},
-					vehicle,
-					{ build: 1 },
-				)
-				if (vehicle === 'kite') {
-					const kite = createKites(1, null, () => 0)
-					kite.reset(0)
-					kite.kite({ x: 0, y: 0 }, 0.4, true)
-					kite.finish()
-					body.add(...kite.meshes)
-				}
-			} else if (vehicle === 'bike') {
-				add(0.62, 0.1, 0.32, 0, 0.05)
-				add(0.18, 0.22, 0.42, -0.05, 0.37)
-				add(0.14, 0.14, 0.14, -0.02, 0.8)
-			} else {
-				add(0.22, 0.3, 0.5, 0, 0)
-				add(0.16, 0.16, 0.16, 0, 0.52)
-			}
-			kind = vehicle
-		}
-		return (pose, name) => {
-			group.visible = !!pose
-			if (!pose) return
-			if (pose.vehicle !== kind) shape(pose.vehicle)
-			if (named && name !== shownName) {
-				shownName = name
-				if (label) group.remove(label)
-				label = new THREE.Sprite(nameTag(name))
-				label.renderOrder = 10
-				label.scale.set(NAME.width, NAME.width / 4, 1)
-				label.position.set(0, 0, NAME.lift)
-				group.add(label)
-			}
-			group.position.set(pose.x, -pose.y, heightAt(pose.x, pose.y))
-			group.rotation.z = -pose.angle
-		}
-	}
-	const showGhost = createGhost(GHOST.color, false)
-	const showRival = createGhost(GHOST.rival, true)
+	const showGhost = createGhost(root, heightAt, GHOST.color, false)
+	const showRival = createGhost(root, heightAt, GHOST.rival, true)
 
 	let pulse = 0
 	return {

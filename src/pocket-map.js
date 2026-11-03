@@ -9,6 +9,7 @@ const INK = '#1f2d1b'
 const BAR = 22 // px the goal bar takes off the map's bottom edge
 const PAPER = [185, 207, 164] // the LCD, --lcd in pocket.css
 const DARK = [31, 45, 27] // its ink
+const FRIEND = `rgb(${PAPER})` // other players: a hollow ring, the LCD has one ink
 const ROUTE_EVERY = 1500 // ms between route searches
 const OFF_ROUTE = 6 // tiles from the line before it's drawn again
 const GAP = 11 // px between pictograms; the later one is left out
@@ -123,7 +124,7 @@ export function createPocketMap({ world, pocket }) {
 	}
 
 	function draw() {
-		const { at, heading, chase, gate, job } = state
+		const { at, heading, chase, gate, job, friends = [] } = state
 		showGoal(job)
 		const w = canvas.clientWidth
 		const h = canvas.clientHeight
@@ -198,6 +199,17 @@ export function createPocketMap({ world, pocket }) {
 			ctx.strokeText(gate.label, p.x + SIZE / 2 + 2, p.y)
 			ctx.fillText(gate.label, p.x + SIZE / 2 + 2, p.y)
 		}
+		for (const f of friends) {
+			const p = pin(toScreen(f), w, h, job ? BAR : 8)
+			ctx.beginPath()
+			ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2)
+			ctx.fillStyle = FRIEND
+			ctx.fill()
+			ctx.lineWidth = 1.5
+			ctx.strokeStyle = INK
+			ctx.stroke()
+		}
+		ctx.fillStyle = INK
 		if (turn) {
 			const n = { x: w / 2 + Math.sin(turn) * (h / 2 - 7), y: h / 2 - Math.cos(turn) * (h / 2 - 7) }
 			ctx.font = 'bold 8px monospace'
