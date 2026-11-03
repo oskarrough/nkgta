@@ -30,6 +30,7 @@ import { createPocketMap } from './pocket-map.js'
 import { createRideScreen } from './ride-screen.js'
 import { rideKind, skating } from './rides.js'
 import { createRacing } from './racing.js'
+import { createSpray } from './spray.js'
 import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
 import { createDailyPanel } from './daily-panel.js'
@@ -146,6 +147,12 @@ const racing = createRacing({
 	say: hud.say,
 	snapCamera: () => camera.snap(player),
 })
+const spray = createSpray({
+	world,
+	scene: city3d.scene,
+	pocket,
+	area: areaFromUrl() && Object.values(areaFromUrl()).join(','),
+})
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
 let showTransit = true
@@ -189,7 +196,9 @@ const actions = {
 	toggleDebug: () => showDebug(debug.hidden),
 	placeGate: () => racing.placeGate(),
 	finishRace: () => racing.finish(),
-	restartRace: () => racing.restart(),
+	restartRace: () => (spray.active() ? spray.undo() : racing.restart()),
+	toggleSpray: () => spray.toggle(player, !player.car && !player.onBike && !visit.busy() && !quiz.active()),
+	nextPaint: () => spray.nextPaint(),
 	acceptJob: () => courier.accept(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 	openFeedback() {
@@ -335,6 +344,8 @@ const GAME_KEYS = new Set([
 	'f',
 	'q',
 	'c',
+	'x',
+	'z',
 	'Backspace',
 ])
 addEventListener(
@@ -415,7 +426,10 @@ function frame(now) {
 	busy.prepare(clock.hour, clock.day)
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
-	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
+	if (player.car || player.onBike || visit.busy() || wasted.active() || police.active()) spray.lower()
+	if (spray.active()) spray.update(dt, input.push(), input.brake())
+	else if (!wasted.active() && !police.active() && !visit.warping())
+		updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
 	if (quiz.active()) quiz.tick(now, from)
 	else visit.update(dt, heading())
 	wasted.update(dt)
@@ -521,5 +535,6 @@ if (import.meta.env.DEV)
 		racing,
 		police,
 		courier,
+		spray,
 		city3d,
 	}

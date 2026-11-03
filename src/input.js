@@ -13,6 +13,13 @@ const clamp = (v) => Math.max(-1, Math.min(1, v))
 // together they sum, and a source that isn't pushing adds nothing.
 const mix = (...axes) => ({ x: clamp(axes.reduce((x, a) => x + a.x, 0)), y: clamp(axes.reduce((y, a) => y + a.y, 0)) })
 
+const keyAxisOf = (keys) => {
+	const held = (...ks) => ks.some((k) => keys.has(k))
+	return { x: held('ArrowRight', 'd') - held('ArrowLeft', 'a'), y: held('ArrowDown', 's') - held('ArrowUp', 'w') }
+}
+// What the keys and sticks push, as pressed: up is up, whatever the camera does.
+export const pushOf = (keys, ...sticks) => mix(keyAxisOf(keys), ...sticks)
+
 export function createInput(actions) {
 	const keys = new Set()
 	const touch = createTouch(actions)
@@ -48,6 +55,8 @@ export function createInput(actions) {
 		if (key === 'f') actions.finishRace()
 		if (key === 'q' || key === 'Backspace') actions.restartRace()
 		if (key === 'c') actions.acceptJob()
+		if (key === 'x') actions.toggleSpray()
+		if (key === 'z') actions.nextPaint()
 		if (e.code === 'Backquote' || key === '`') actions.toggleDebug()
 	})
 	addEventListener('blur', () => keys.clear())
@@ -79,11 +88,7 @@ export function createInput(actions) {
 	addEventListener('keyup', (e) => keys.delete(norm(e.key)))
 	addEventListener('wheel', (e) => actions.zoom(e.deltaY < 0 ? 1.1 : 0.9), { passive: true })
 
-	const held = (...ks) => ks.some((k) => keys.has(k))
-	const keyAxis = () => ({
-		x: held('ArrowRight', 'd') - held('ArrowLeft', 'a'),
-		y: held('ArrowDown', 's') - held('ArrowUp', 'w'),
-	})
+	const keyAxis = () => keyAxisOf(keys)
 	const keyDown = () => keyAxis().x !== 0 || keyAxis().y !== 0
 
 	return {
@@ -91,10 +96,9 @@ export function createInput(actions) {
 		release: () => keys.clear(),
 		// Direction the player is pushing, each axis -1…1. Keys push all or
 		// nothing; the sticks add their analogue deflection on top.
-		axis: () => {
-			const pushed = keyDown() ? keyAxis() : { x: 0, y: 0 }
-			return actions.move(mix(pushed, touch.axis(), gamepad.axis()))
-		},
+		axis: () => actions.move(pushOf(keys, touch.axis(), gamepad.axis())),
+		// Unturned by the camera, for steering something you face, like the spray can's nozzle.
+		push: () => pushOf(keys, touch.axis(), gamepad.axis()),
 		// Overhead keyboard movement follows the player; the sticks stay
 		// directional, pointing where you want to go.
 		steer: () => (!actions.cameraActive() && keyDown() ? keyAxis() : null),
