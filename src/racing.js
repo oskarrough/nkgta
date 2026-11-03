@@ -227,6 +227,8 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 	addEventListener('hashchange', openLink)
 
 	return {
+		pose,
+		name: myName,
 		placeGate,
 		finish,
 		restart,

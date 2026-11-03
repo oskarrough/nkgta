@@ -30,6 +30,7 @@ import { createPocketMap } from './pocket-map.js'
 import { createRideScreen } from './ride-screen.js'
 import { rideKind, skating } from './rides.js'
 import { createRacing } from './racing.js'
+import { createTogether } from './together.js'
 import { createCourier } from './courier.js'
 import { createFeedback, shortAgent } from './feedback.js'
 import { createDailyPanel } from './daily-panel.js'
@@ -145,6 +146,13 @@ const racing = createRacing({
 	area: areaFromUrl() && Object.values(areaFromUrl()).join(','),
 	say: hud.say,
 	snapCamera: () => camera.snap(player),
+})
+const together = createTogether({
+	scene: city3d.scene,
+	heightAt: world.heightAt,
+	room: (areaFromUrl() && Object.values(areaFromUrl()).join(',')) || 'default',
+	pose: racing.pose,
+	name: racing.name,
 })
 if (PERF) globalThis.game = { world, player, city3d, traffic }
 let showStreetNames = true
@@ -461,12 +469,14 @@ function frame(now) {
 	input.setUse(action)
 	input.setDriving(!!player.car || skating(player))
 	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
+	together.update({ hidden: visit.busy() })
 	pocketMap.follow({
 		at: street,
 		heading: player.car?.angle ?? player.dir,
 		chase: !!cam.third,
 		gate: racing.target(),
 		job: courier.target(),
+		friends: together.friends(),
 	})
 	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car, hour: clock.hour }, dt)
 	courier.update(dt, { inside: visit.busy() || quiz.active(), busy: !!racing.target(), down: wasted.active() })
