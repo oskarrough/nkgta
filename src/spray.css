@@ -1,0 +1,28 @@
+#pocket .app-spray {
+	padding: 0.4rem;
+	font-size: 0.7rem;
+	color: var(--lcd-ink);
+}
+#pocket .app-spray .paints {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 0.25rem;
+}
+#pocket .app-spray [data-paint] {
+	height: 1.3rem;
+	border: 2px solid var(--lcd-dim);
+	border-radius: 0.3rem;
+}
+#pocket .app-spray [data-paint].on {
+	border-color: var(--lcd-ink);
+}
+#pocket .app-spray p {
+	margin: 0.35rem 0 0;
+}
+#pocket .app-spray p button {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: 1px solid var(--lcd-ink);
+	border-radius: 0.2rem;
+}
