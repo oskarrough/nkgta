@@ -3,6 +3,7 @@ import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
 import { shopAt } from './shops.js'
 import { createDoener } from './doener.js'
+import { createBikePaintScreen } from './bike-paint-screen.js'
 
 const RADIUS = 1.25 // half-height of the open tear, tiles
 const TILT = (60 * Math.PI) / 180 // leaning back against the wall, from upright, so the camera sees it
@@ -16,9 +17,10 @@ const smooth = (t) => t * t * (3 - 2 * t)
 const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-export function createVisit({ city3d, shops, player, pfand, say, heightAt = () => 0, opening }) {
+export function createVisit({ city3d, shops, player, pfand, pocket, say, heightAt = () => 0, opening }) {
 	const interior = createInterior(city3d.gradient)
 	const doener = createDoener(pfand.bag, say)
+	const bikePaint = createBikePaintScreen({ player, pocket })
 	const portal = createPortal(city3d.renderer, {
 		radius: RADIUS,
 		up: Z,
@@ -114,8 +116,8 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		warping: () => !!warp,
 		indoors: () => inside || (!!warp && warp.t > 0.4),
 		shop: () => (inside ? shop : null),
-		choose: doener.choose,
-		shiftChoice: (n) => doener.shift(n),
+		choose: (i) => bikePaint.choose(i) || doener.choose(i),
+		shiftChoice: (n) => bikePaint.shift(n) || doener.shift(n),
 		room: () => (inside ? interior.scene : null),
 		world: (city) => (inside ? interior.world : city),
 		street: () => (inside ? standIn : player),
@@ -137,7 +139,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		use() {
 			if (warp) return true
 			if (inside) {
-				if (doener.use()) return true
+				if (bikePaint.use() || doener.use()) return true
 				startWarp()
 				return true
 			}
@@ -156,6 +158,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		update(dt, axis) {
 			if (warp) {
 				doener.update(false)
+				bikePaint.update(null)
 				warp.t += dt / WARP
 				const k = Math.min(1, warp.t)
 				const anchor = near().anchor
@@ -172,7 +175,9 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 			}
 			const pushing = (n) => -(axis.x * n.x + axis.y * n.y) > 0.3
 			if (inside) {
-				doener.update(shop.kind === 'doener' && interior.atCounter(player.x, player.y))
+				const atCounter = interior.atCounter(player.x, player.y)
+				doener.update(shop.kind === 'doener' && atCounter)
+				bikePaint.update(shop.kind === 'bikeshop' && atCounter ? shop : null)
 				const out = pushing({ x: DOOR.nx, y: DOOR.ny })
 				if (!out) armed = true
 				const dx = player.x - DOOR.x
@@ -218,7 +223,7 @@ export function createVisit({ city3d, shops, player, pfand, say, heightAt = () =
 		hint() {
 			if (warp) return null
 			if (inside) {
-				if (doener.active()) return null
+				if (doener.active() || bikePaint.active()) return null
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y))
 					return pfand.bag.bottles ? null : { note: 'Pfand? Erst sammeln.' }
 				return { action: 'exit' }

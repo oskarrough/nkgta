@@ -321,6 +321,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			puddle.rotation.z = -player.dir
 			puddle.scale.set(0.75 * grow, 0.6 * grow, 1)
 
+			frame.color.set(player.bike.color ?? '#d23c3c')
 			bike.visible = rideKind(player) === 'bike' && !room && (!player.down || !player.onBike)
 			const on = player.onBike ? player : player.bike
 			bike.position.set(on.x, -on.y, heightAt(on.x, on.y) + (player.onBike ? bob : 0))

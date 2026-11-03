@@ -1,0 +1,37 @@
+#pocket .app-bike-paint header {
+	font-size: 0.75rem;
+	font-weight: 800;
+}
+#pocket .app-bike-paint > div {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.15rem;
+	margin: 0.2rem 0;
+}
+#pocket .app-bike-paint button {
+	padding: 0.13rem 0.05rem;
+	border: 1px solid currentColor;
+	border-top: 0.2rem solid var(--paint);
+	background: transparent;
+	color: inherit;
+	font:
+		700 0.6rem / 1 system-ui,
+		sans-serif;
+}
+#pocket .app-bike-paint button[aria-pressed='true'] {
+	background: var(--lcd-ink);
+	color: var(--lcd);
+}
+#pocket .app-bike-paint button[data-selected] {
+	outline: 1px dashed var(--lcd-ink);
+	outline-offset: 1px;
+}
+#pocket .app-bike-paint button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+#pocket .app-bike-paint small {
+	display: block;
+	font-size: 0.6rem;
+	line-height: 1.25;
+}
