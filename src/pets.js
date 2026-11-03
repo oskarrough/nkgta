@@ -137,19 +137,21 @@ export function createPetActors(root, material, heightAt) {
 				}
 				box(-0.22, Math.sin(pet.stride * 0.5) * 0.045, cat ? 0.31 : 0.23, 0.19, 0.035, cat ? 0.12 : 0.045, coat)
 				box(0.12, 0, 0.21, 0.035, 0.16, 0.12, '#ba4340')
-				// Lead from the owner's hand to the collar, in world coordinates.
-				position.set(
-					p.x + Math.sin(p.dir) * 0.16 * grow,
-					-p.y + Math.cos(p.dir) * 0.16 * grow,
-					heightAt(p.x, p.y) + (0.23 - 0.16 * (p.lie ?? 0)) * grow,
-				)
-				delta.set(x, -y, z + 0.24 * grow * small).sub(position)
-				const length = delta.length()
-				rotation.setFromUnitVectors(axis, delta.normalize())
-				position.addScaledVector(delta, length / 2)
-				matrix.compose(position, rotation, scale.set(0.012 * grow, 0.012 * grow, length))
-				mesh.setMatrixAt(n, matrix)
-				mesh.setColorAt(n++, color.set('#514039'))
+				if (!pet.free) {
+					// Lead from the owner's hand to the collar, in world coordinates.
+					position.set(
+						p.x + Math.sin(p.dir) * 0.16 * grow,
+						-p.y + Math.cos(p.dir) * 0.16 * grow,
+						heightAt(p.x, p.y) + (0.23 - 0.16 * (p.lie ?? 0)) * grow,
+					)
+					delta.set(x, -y, z + 0.24 * grow * small).sub(position)
+					const length = delta.length()
+					rotation.setFromUnitVectors(axis, delta.normalize())
+					position.addScaledVector(delta, length / 2)
+					matrix.compose(position, rotation, scale.set(0.012 * grow, 0.012 * grow, length))
+					mesh.setMatrixAt(n, matrix)
+					mesh.setColorAt(n++, color.set('#514039'))
+				}
 				if (pet.bark > 0) {
 					matrix.makeRotationZ(-dir).setPosition(x, -y, z)
 					barks.setMatrixAt(barking, matrix)

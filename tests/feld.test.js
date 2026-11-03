@@ -3,6 +3,7 @@ import { feldCrowd, feldLayout, rideAt } from '../src/feld-layout.js'
 import { createFeld, build } from '../src/feld.js'
 import { createWorld } from '../src/world.js'
 import { decodeMap } from '../src/map-codec.js'
+import { dogAt, collectPfand } from '../src/feld-activity.js'
 import { T } from '../src/tiles.js'
 
 const world = createWorld(decodeMap(await Bun.file(new URL('../public/map.json', import.meta.url)).json()))
@@ -18,8 +19,8 @@ test('a warm afternoon fills the Feld; rain, dawn and night thin it', () => {
 })
 
 test('hundreds of picnic guests stay on grass inside the actual Feld', () => {
-	expect(layout.groups.length).toBe(100)
-	expect(layout.groups.reduce((n, g) => n + g.people.length, 0)).toBeGreaterThan(450)
+	expect(layout.groups.length).toBeGreaterThan(60)
+	expect(layout.groups.reduce((n, g) => n + g.people.length, 0)).toBeGreaterThan(500)
 	for (const g of layout.groups)
 		for (const p of g.people) {
 			expect(layout.contains(p.x, p.y)).toBe(true)
@@ -64,7 +65,7 @@ test('a runway rider dodges a fast bicycle and recovers', () => {
 test('a bike on the lawn makes seated guests stand and dodge', () => {
 	const shouted = []
 	const feld = createFeld(world, { bottles: [] }, (p) => shouted.push(p))
-	const group = feld.groups.find((g) => g.x > 743 && g.x < 747 && g.y > 761 && g.y < 765)
+	const group = feld.groups.find((g) => g.people.length > 7 && g.x > 700 && g.y < 768)
 	const p = group.people[2],
 		start = { x: p.x, y: p.y }
 	const part = build({ world, chunk: { x: 640, y: 640, w: 128, h: 128 }, gradient: null })
@@ -80,8 +81,48 @@ test('a bike on the lawn makes seated guests stand and dodge', () => {
 	expect(p.alert).toBeGreaterThan(0)
 	part.dispose()
 	for (const mesh of part.meshes) {
-		mesh.geometry.dispose()
-		mesh.material.dispose()
-		mesh.dispose()
+		mesh.traverse((part) => {
+			part.geometry?.dispose()
+			part.material?.dispose()
+		})
+		mesh.dispose?.()
 	}
+})
+
+test('entrance crowds contain close neighbours, big circles and loners', () => {
+	expect(layout.groups.filter((g) => g.people.length >= 8).length).toBeGreaterThan(20)
+	expect(layout.groups.some((g) => g.people.length === 1)).toBe(true)
+	const neighbours = layout.groups.filter((g) => layout.groups.some((other) => g !== other && Math.hypot(g.x - other.x, g.y - other.y) < 5))
+	expect(neighbours.length / layout.groups.length).toBeGreaterThan(0.7)
+})
+
+test('barbecues stay within designated grill areas and loose dogs stay on grass', () => {
+	const grills = layout.groups.filter((g) => g.grill)
+	expect(grills.length).toBeGreaterThan(10)
+	for (const g of grills) expect(layout.canGrill(g.grill.x, g.grill.y)).toBe(true)
+	expect(layout.dogs.length).toBeGreaterThan(10)
+	for (const dog of layout.dogs)
+		for (let t = 0; t < 60; t += 0.5) {
+			const p = dogAt(dog, t)
+			expect(layout.contains(p.x, p.y)).toBe(true)
+			expect(world.tileAt(p.x, p.y)).toBe(T.GRASS)
+		}
+})
+
+test('collectors pick up real bottles without crossing obstacles or stealing a removed target', () => {
+	const grass = { tileAt: () => T.GRASS }
+	const collector = { x: 0, y: 0, stride: 0 }
+	const bottles = [
+		{ x: 1, y: 0 },
+		{ x: 20, y: 0 },
+	]
+	for (let i = 0; i < 40; i++) collectPfand(collector, bottles, 0.1, grass)
+	expect(bottles).toHaveLength(1)
+	expect(collector.collected).toBe(1)
+	collector.target = { x: 1, y: 0 }
+	collectPfand(collector, bottles, 0.1, grass)
+	expect(bottles).toHaveLength(1)
+	const blocked = { x: 0, y: 0, stride: 0 }
+	collectPfand(blocked, [{ x: 2, y: 0 }], 1, { tileAt: (x) => (x > 0.5 && x < 1.5 ? T.WATER : T.GRASS) })
+	expect(blocked.x).toBe(0)
 })
