@@ -118,6 +118,7 @@ export function feldLayout(world) {
 					Object.assign(group.people[1], b, { kind: 'play', dir: Math.PI, game: group.game, playSeed: seed, volley: 1 })
 				}
 			}
+			group.pfand = { x: group.x + 1.4, y: group.y }
 			groups.push(group)
 			population += count
 		}

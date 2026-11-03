@@ -147,8 +147,8 @@ export function daylight(hour) {
 	}
 }
 
-export function createClock(hour = START_HOUR) {
-	let day = 0 // Monday
+export function createClock(hour = START_HOUR, startDay = 0) {
+	let day = Number.isFinite(startDay) ? ((Math.floor(startDay) % 7) + 7) % 7 : 0 // Monday
 	return {
 		get hour() {
 			return hour
@@ -159,7 +159,8 @@ export function createClock(hour = START_HOUR) {
 		get elapsedDays() {
 			return day
 		},
-		set(h) {
+		set(h, weekday) {
+			if (Number.isFinite(weekday)) day = ((Math.floor(weekday) % 7) + 7) % 7
 			hour = ((h % 24) + 24) % 24
 		},
 		tick(dt) {

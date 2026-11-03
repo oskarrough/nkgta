@@ -76,3 +76,17 @@ export function interpolatePose(p, alpha) {
 	out.bend = from.bend + ((p.bend ?? 0) - from.bend) * alpha
 	return out
 }
+
+export function walkAt(p, time, out) {
+	const r = p.route,
+		period = r.travel + r.pause
+	const t = (time + p.seed * period * 2) % (period * 2),
+		back = t >= period
+	const f = Math.min(1, (t % period) / r.travel),
+		u = back ? 1 - f : f
+	out.moving = t % period < r.travel
+	out.x = r.ax + (r.bx - r.ax) * u
+	out.y = r.ay + (r.by - r.ay) * u
+	out.dir = Math.atan2(r.by - r.ay, r.bx - r.ax) + (back ? Math.PI : 0)
+	return out
+}

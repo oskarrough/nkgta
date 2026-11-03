@@ -3,6 +3,8 @@ import { createPetActors } from './pets.js'
 import { gameAt } from './feld-activity.js'
 import { createKites } from './ride-models.js'
 
+const blankets = ['#dc665a', '#52a5ac', '#d7ae45', '#7970af', '#ded6b9', '#5975a9']
+const SIDES = [-1, 1]
 const LEGS = [-0.13, 0.13]
 const GRATE = [-0.12, -0.04, 0.04, 0.12]
 const FOOD = [-0.09, 0.06]
@@ -66,6 +68,15 @@ export function createFeldExtras({ world, chunk, field, groups, material, box, b
 			kites.reset(field.time)
 			for (const g of groups) {
 				if (g.seed >= field.density || !visible(g, view, 25)) continue
+				if (visible(g, view, 5)) {
+					base(g.x, g.y, world.heightAt(g.x, g.y) + 0.025, g.angle)
+					const paint = blankets[Math.floor(g.seed * blankets.length)]
+					box(0, 0, 0, g.people.length > 7 ? 2.6 : 2.1, g.people.length > 7 ? 2 : 1.5, 0.035, paint)
+					for (const side of SIDES) box(side * 0.8, 0, 0.022, 0.1, 1.5, 0.015, '#eadbb5')
+					box(0.5, 0.35, 0.12, 0.32, 0.25, 0.24, g.seed < 0.5 ? '#ad423a' : '#377584')
+					box(0.5, 0.35, 0.255, 0.34, 0.27, 0.04, '#eee3c6')
+					box(-0.4, 0.4, 0.085, 0.28, 0.2, 0.17, '#bf964f')
+				}
 				if (g.grill && visible(g.grill, view)) {
 					const p = g.grill,
 						z = world.heightAt(p.x, p.y)

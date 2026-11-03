@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { feldCrowd, feldLayout, rideAt } from '../src/feld-layout.js'
-import { createFeld, build } from '../src/feld.js'
+import { createBusyPlaces, build } from '../src/busy-places.js'
+const createFeld = (...args) => createBusyPlaces(...args).places.find((p) => p.id === 'feld')
 import { createWorld } from '../src/world.js'
 import { decodeMap } from '../src/map-codec.js'
 import { dogAt, collectPfand, interpolatePose } from '../src/feld-activity.js'

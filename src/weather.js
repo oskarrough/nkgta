@@ -12,6 +12,7 @@ const hash = (n) => ((Math.imul(n + 1, 2654435761) >>> 0) % 10007) / 10007
 
 export function createWeather(world, shops, night, search = location.search, opening) {
 	const query = new URLSearchParams(search)
+	const temperature = Number(query.get('temperature') ?? 22)
 	let mode = query.get('weather') === 'rain' ? 'rain' : query.get('weather') === 'dry' ? 'dry' : 'auto'
 	let raining = mode === 'rain'
 	let remaining = 45 + Math.random() * 90
@@ -51,6 +52,9 @@ export function createWeather(world, shops, night, search = location.search, ope
 
 	return {
 		streaks,
+		get temperature() {
+			return (Number.isFinite(temperature) ? temperature : 22) - wetness * 7 - night.value * 5
+		},
 		get wind() {
 			return windAt(elapsed)
 		},

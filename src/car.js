@@ -145,6 +145,8 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 		torque += (px - c.x) * ty - (py - c.y) * tx
 	}
 
+	// A car already inside a newly opened market can still leave.
+	const leavingClosure = world.carClosed?.(c.x, c.y)
 	// Semi-implicit Euler: velocity first, then position.
 	c.vx += fx * dt
 	c.vy += fy * dt
@@ -152,13 +154,13 @@ function step(c, { throttle = 0, turn = 0, handbrake = false, hold = false }, wo
 	c.x += c.vx * dt
 	c.y += c.vy * dt
 	c.angle += c.spin * dt
-	hitWalls(c, world)
+	hitWalls(c, world, leavingClosure)
 }
 
 // Push the hull out of buildings and water, tile by tile, with a bounce that
 // accounts for where it hit, so clipping a corner spins the car.
-function hitWalls(c, world) {
-	const solid = (x, y) => SOLID.has(world.tileAt(x, y))
+function hitWalls(c, world, leavingClosure) {
+	const solid = (x, y) => SOLID.has(world.tileAt(x, y)) || (!leavingClosure && world.carClosed?.(x, y))
 	for (let pass = 0; pass < 3; pass++) {
 		let hit = false
 		for (const [lx, ly] of c.shape.hull) {

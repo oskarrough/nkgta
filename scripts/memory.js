@@ -167,21 +167,27 @@ try {
 	}
 	if (!loaded) throw new Error('Never loaded')
 	console.log('phone    390×844 @ DPR 3, sampling a 60-second ride…')
-	// A fixed 60-second bicycle-speed route along Karl-Marx-Strasse or onto the Feld. The
+	// A fixed 60-second bicycle-speed route through the selected area. The
 	// position is driven so random traffic cannot change texture coverage.
 	await run(`(() => {
 		const points = ${JSON.stringify(
-			params.has('feld')
+			params.has('maybach')
 				? [
-						{ lat: 52.4752, lon: 13.4193 },
-						{ lat: 52.47562, lon: 13.4176 },
-						{ lat: 52.47539, lon: 13.4125 },
+						{ lat: 52.49555, lon: 13.4212 },
+						{ lat: 52.4951, lon: 13.4231 },
+						{ lat: 52.4942, lon: 13.4255 },
 					]
-				: [
-						{ lat: 52.4764, lon: 13.4397 },
-						{ lat: 52.4784, lon: 13.4379 },
-						{ lat: 52.481, lon: 13.4347 },
-					],
+				: params.has('feld')
+					? [
+							{ lat: 52.4752, lon: 13.4193 },
+							{ lat: 52.47562, lon: 13.4176 },
+							{ lat: 52.47539, lon: 13.4125 },
+						]
+					: [
+							{ lat: 52.4764, lon: 13.4397 },
+							{ lat: 52.4784, lon: 13.4379 },
+							{ lat: 52.481, lon: 13.4347 },
+						],
 		)}.map(p => game.world.startPoint(p))
 		const start = performance.now()
 		globalThis.memoryRide = setInterval(() => {

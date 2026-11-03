@@ -20,7 +20,7 @@ import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
-import { createFeld } from './feld.js'
+import { createBusyPlaces } from './busy-places.js'
 import { createTrafficLights } from './traffic-lights.js'
 
 import { sound } from './sound.js'
@@ -50,7 +50,12 @@ const world = createWorld(map)
 phase('createWorld')
 loading.textContent = 'Baue die Welt…'
 const URL_PARAMS = new URLSearchParams(location.search)
-const player = createPlayer(world.startPoint(URL_PARAMS.has('feld') ? { lat: 52.47572, lon: 13.4174, dir: Math.PI } : START))
+const start = URL_PARAMS.has('maybach')
+	? { lat: 52.49525, lon: 13.4227, dir: 0.5 }
+	: URL_PARAMS.has('feld')
+		? { lat: 52.47572, lon: 13.4174, dir: Math.PI }
+		: START
+const player = createPlayer(world.startPoint(start))
 const pfand = createPfand(world)
 const camera = createCamera(world)
 // ?cam=chase starts in the chase camera; ?hour=11 sets the time of day and stops the clock.
@@ -60,7 +65,7 @@ const shops = shopsOf(world)
 phase('shops')
 const opening = createOpening()
 const city3d = createScene(document.getElementById('city'), world, shops, opening)
-const clock = createClock()
+const clock = createClock(undefined, Number(URL_PARAMS.get('day') ?? 0))
 const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
@@ -68,7 +73,8 @@ phase('createScene')
 loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const chatter = createChatter(world, shops)
-const feld = createFeld(world, pfand, (p) => chatter.shout(p))
+const busy = createBusyPlaces(world, pfand, (p) => chatter.shout(p))
+busy.prepare(clock.hour, clock.day)
 const traffic = createTraffic(
 	world,
 	(text) => hud.say(text),
@@ -401,6 +407,7 @@ let first = true
 function frame(now) {
 	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
+	busy.prepare(clock.hour, clock.day)
 	camera.suspend(visit.busy())
 	const from = { x: player.x, y: player.y }
 	if (!wasted.active() && !police.active() && !visit.warping()) updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
@@ -421,8 +428,8 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
-	feld.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside)
-	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, feld.people)
+	busy.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside, clock.day, city3d.weather.temperature)
+	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, busy.people)
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
 	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()
@@ -503,7 +510,8 @@ if (import.meta.env.DEV)
 		music,
 		sound,
 		clock,
-		feld,
+		busy,
+		feld: busy.places.find((p) => p.id === 'feld'),
 		weather: city3d.weather,
 		racing,
 		police,
