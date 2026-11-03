@@ -99,7 +99,7 @@ Questions of taste or opinion for Oskar go in an issue assigned to him (`--assig
 
 This repo uses jj (colocated with git). Commit messages say what changed for the player, not how.
 
-Pushing `main` deploys to nkgta.0sk.ar automatically via Cloudflare Workers CI.
+Pushing `main` deploys to nkgta.0sk.ar automatically via Cloudflare Workers CI. To read a failed deploy's log, find nkgta's tag with `CLOUDFLARE_ACCOUNT_ID=<the account that owns nkgta> cf workers list`, list its builds with `cf builds list --external-script-id <tag>`, then print one with `cf builds logs get <build-uuid>`.
 
 ## Pull requests
 
