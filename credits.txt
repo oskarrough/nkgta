@@ -18,6 +18,14 @@ Overpass API
   - overpass.private.coffee
   - overpass.kumi.systems
 
+Trees
+-----
+Geoportal Berlin / Baumbestand Berlin (Straßenbäume und Anlagenbäume)
+  Senatsverwaltung für Mobilität, Verkehr, Klimaschutz und Umwelt Berlin.
+  Datenlizenz Deutschland – Zero – Version 2.0 (DL-DE-Zero-2.0).
+  https://daten.berlin.de/datensaetze/baumbestand-berlin-wfs-48ad3a23
+  https://www.govdata.de/dl-de/zero-2-0
+
 Terrain
 -------
 Berlin elevation model ATKIS DGM1

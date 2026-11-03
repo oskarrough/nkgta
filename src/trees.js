@@ -6,6 +6,17 @@ import { pointsGrid } from './kerbs.js'
 import { DETAIL_PX } from './chunks.js'
 
 const CROWNS = ['#4c6f32', '#5e8636', '#365b25']
+// Same group order as the Baumkataster payload: mixed, plane, linden,
+// maple, chestnut, robinia, conifer. Depth is the leafy share of the height.
+const SPECIES = [
+	{ color: '#4c6f32', depth: 0.7, spread: 0.32, blob: 0.68 },
+	{ color: '#728647', depth: 0.56, spread: 0.42, blob: 0.58 },
+	{ color: '#608438', depth: 0.78, spread: 0.32, blob: 0.68 },
+	{ color: '#4f7839', depth: 0.68, spread: 0.36, blob: 0.64 },
+	{ color: '#365d30', depth: 0.72, spread: 0.27, blob: 0.73 },
+	{ color: '#82945b', depth: 0.64, spread: 0.52, blob: 0.48 },
+	{ color: '#35584b', depth: 0.88, spread: 0, blob: 1 },
+]
 const BOTTOM = 3 // metres from the ground to the underside of the crown
 const SQUASH = 0.9 // a little flatter than a sphere
 const BLOBS_MIN = 3
@@ -34,7 +45,7 @@ function trunkGrid(world) {
 }
 
 function trunkRadius(t, tileM) {
-	return mix(TRUNK_RADIUS, Math.min(1, Math.max(0, (t.crown - 4) / 10))) / tileM
+	return (t.stem ?? mix(TRUNK_RADIUS, Math.min(1, Math.max(0, (t.crown - 4) / 10)))) / tileM
 }
 
 // Decoration trunks aren't on the tile grid; nudge feet off the stem visually.
@@ -42,7 +53,7 @@ export function pushFromTrunks(p, world, body = TRUNK_BODY) {
 	const trees = world.trees
 	if (!trees?.length) return
 	const tileM = world.tileM
-	const reach = 0.6
+	const reach = 2 / tileM + body
 	trunkGrid(world).each(p.x, p.y, reach, (t) => {
 		let dx = p.x - t.x
 		let dy = p.y - t.y
@@ -90,28 +101,43 @@ function createTrees(world, gradient, pick = (world.trees ?? []).keys(), simple 
 		const r = t.crown / 2 / tileM
 		const { half, cz } = crownOf(t, tileM, world)
 		const base = Math.floor(hash(i * 5 + 1) * CROWNS.length)
+		const species = SPECIES[t.species]
+		const color = species?.color ?? CROWNS[base]
 		const tone = TREE_TONE_MIN + hash(i * 3 + 7) * (TREE_TONE_MAX - TREE_TONE_MIN)
 		if (simple) {
 			pos.set(t.x, -t.y, cz)
 			scale.set(r * SIMPLE_RADIUS, r * SIMPLE_RADIUS, half)
 			mesh.setMatrixAt(n, m.compose(pos, q, scale))
-			mesh.setColorAt(n++, c.set(CROWNS[base]).multiplyScalar(tone))
+			mesh.setColorAt(n++, c.set(color).multiplyScalar(tone))
 			continue
 		}
 		const phase = hash(i * 11 + 3) * Math.PI * 2
 		const count = blobCount(i)
 		for (let b = 0; b < count; b++) {
 			const s = i * 97 + b * 23
-			const br = r * mix(BLOB_RADIUS, hash(s + 1))
-			const spread = r * mix(BLOB_SPREAD, hash(s + 2))
+			let br = r * (species?.blob ?? mix(BLOB_RADIUS, hash(s + 1)))
+			let spread = r * (species?.spread ?? mix(BLOB_SPREAD, hash(s + 2)))
 			const a = phase + (b / count) * Math.PI * 2 + (hash(s + 3) - 0.5) * 0.9
-			const bh = half * mix(BLOB_HEIGHT, hash(s + 4))
-			const dz = (hash(s + 5) - 0.5) * 2 * (half - bh) * BLOB_LIFT
+			let bh = half * mix(BLOB_HEIGHT, hash(s + 4))
+			let dz = (hash(s + 5) - 0.5) * 2 * (half - bh) * BLOB_LIFT
+			if (species) {
+				bh = half * (b === 0 ? 0.72 : 0.78)
+				dz = half * (b === 0 ? 0.28 : -0.22)
+				if (b === 0) spread = 0
+				if (t.species === 2 && b === 0) br = r * 0.5
+				if (t.species === 5) dz += half * (hash(s + 5) - 0.5) * 0.3
+				if (t.species === 6) {
+					const level = b / (count - 1)
+					br = r * (1 - level * 0.8)
+					bh = half * 0.4
+					dz = half * (-0.6 + level * 1.2)
+				}
+			}
 			pos.set(t.x + Math.cos(a) * spread, -t.y + Math.sin(a) * spread, cz + dz)
 			scale.set(br, br, bh)
 			m.compose(pos, q, scale)
 			mesh.setMatrixAt(n, m)
-			c.set(CROWNS[base]).multiplyScalar(tone * mix(BLOB_TONE, hash(s + 6)))
+			c.set(color).multiplyScalar(tone * mix(BLOB_TONE, hash(s + 6)))
 			mesh.setColorAt(n, c)
 			n++
 		}
@@ -122,6 +148,12 @@ function createTrees(world, gradient, pick = (world.trees ?? []).keys(), simple 
 }
 
 function crownOf(t, tileM, world) {
+	const species = SPECIES[t.species]
+	if (species) {
+		const top = t.top / tileM
+		const bottom = Math.max(Math.min(BOTTOM / tileM, top * 0.35), top * (1 - species.depth))
+		return { half: (top - bottom) / 2, cz: (top + bottom) / 2 + world.heightAt(t.x, t.y) }
+	}
 	const bottom = BOTTOM / tileM
 	const top = Math.max(bottom + 1.5, t.top / tileM)
 	const half = ((top - bottom) / 2) * SQUASH
@@ -146,7 +178,7 @@ function createTrunks(world, gradient, pick = (world.trees ?? []).keys()) {
 		const t = trees[i]
 		const { cz } = crownOf(t, tileM, world)
 		const ground = world.heightAt(t.x, t.y) - 0.3 / tileM
-		const r = mix(TRUNK_RADIUS, Math.min(1, Math.max(0, (t.crown - 4) / 10))) / tileM
+		const r = trunkRadius(t, tileM)
 		pos.set(t.x, -t.y, ground)
 		scale.set(r, r, cz - ground)
 		mesh.setMatrixAt(n, m.compose(pos, q, scale))

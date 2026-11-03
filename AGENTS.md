@@ -48,6 +48,8 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the
 
 ## Map data
 
+- `bun run build-trees` caches Berlin’s street and park WFS layers separately in `data/trees/` and writes `public/trees.json`. A multi-layer GetFeature with BBOX is treated as a join and rejected by this WFS; request one layer at a time. Missing crown diameters are common: zero means unknown, not an empty tree pit.
+- The sandbox can hide `/dev/dri` even on office-linux. Run GPU benchmarks with host access if WebGL fails before the first frame.
 - `public/map.json` is the committed default map. Regenerate with `bun run fetch-osm && bun run build-map` after changing `src/default-area.js`, `src/overpass.js` or `src/build-map.js`.
 - When `src/build-map.js` or `src/map-codec.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
 - `public/map.json` conflicts whenever two changes rebuild it: after a rebase, rerun `bun run build-map` instead of merging it by hand.

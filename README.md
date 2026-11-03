@@ -8,7 +8,7 @@ https://nkgta.0sk.ar
 
 ## How is it made?
 
-Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from OpenStreetMap. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3m tile grid that decides where you can walk.The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
+Streets, buildings, parks, shops, U-Bahn and bus stops come from OpenStreetMap. The default area’s trees come from Berlin’s Baumkataster: real positions, species and recorded sizes; picked areas use OSM trees. Buildings stand up in 3D at their mapped number of storeys; underneath, everything is also rasterised onto a 3m tile grid that decides where you can walk.The ground rises and falls with the real land, from Berlin's elevation model: up the Rollberg, round the Hasenheide hill. Uphill is slower, on the bike especially.
 
 ## How to develop
 
@@ -16,6 +16,7 @@ Streets, buildings, street trees, parks, shops, U-Bahn and bus stops come from O
 bun install
 bun run fetch-osm   # data/osm.json from Overpass, for the default area in src/default-area.js
 bun run build-map   # public/map.json, the static default map
+bun run build-trees # public/trees.json, Berlin street and park trees; caches WFS data in data/trees/
 bun run build-roofs # public/roofs.bin, measured Berlin roofs; caches LoD2 tiles in data/lod2/
 bun run build-terrain # public/terrain.json, the ground's heights
 bun run dev
@@ -74,3 +75,5 @@ Every icon is its own PNG in `public/icons/`, 32×32 with a transparent backgrou
 - `foot.png`: on foot, beside a race time; `act-bike.png` and `act-car.png` stand for the bike and the cars there
 
 Map data © OpenStreetMap contributors, ODbL. Elevation: ATKIS® DGM1; building roofs: LoD2, Geoportal Berlin, dl-de/zero-2-0.
+
+The default map loads `public/trees.json` from [Geoportal Berlin’s Straßen- und Anlagenbaumbestand](https://daten.berlin.de/datensaetze/baumbestand-berlin-wfs-48ad3a23), under [DL-DE-Zero-2.0](https://www.govdata.de/dl-de/zero-2-0). `bun run build-trees` fetches each WFS layer once for the default bbox and caches it in `data/trees/`; reruns work offline. Rebuild after changing the default area. The register covers street trees and part of the park stock, not every private or woodland tree. Recorded crown diameter, height and stem circumference set the sizes; missing crown diameters and heights are estimated from stem circumference, then recorded age if the stem is missing. Plane, linden, maple, chestnut, robinia and conifers have distinct crown shapes and colours; other genera share a mixed broadleaf crown. Missing or mismatched tree data falls back to the original OSM trees.
