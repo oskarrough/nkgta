@@ -32,22 +32,22 @@ test('songs marked for other games stay out of the Kiez', () => {
 })
 
 describe('songs belong to streets', () => {
-	const streets = { sonnenallee: { street: 'Sonnenallee', at: [] }, 'sonnenallee-nacht': { street: 'Sonnenallee', at: [] } }
+	const streets = { sonnenallee: { street: 'Sonnenallee', at: [] }, 'sonnenallee-bei-nacht': { street: 'Sonnenallee', at: [] } }
 	const picks = (street) => Array.from({ length: 600 }, (_, i) => pickScore(streets, street, '', i))
 	const share = (list, names) => list.filter((n) => names.includes(n)).length / list.length
 
 	test("on its street, a source plays one of that street's songs about two times in three", () => {
 		const there = picks('Sonnenallee')
 		// two in three by choice, plus the odd one from the whole pool
-		expect(share(there, ['sonnenallee', 'sonnenallee-nacht'])).toBeGreaterThan(0.6)
-		expect(share(there, ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.85)
+		expect(share(there, ['sonnenallee', 'sonnenallee-bei-nacht'])).toBeGreaterThan(0.6)
+		expect(share(there, ['sonnenallee', 'sonnenallee-bei-nacht'])).toBeLessThan(0.85)
 		expect(new Set(there).size).toBe(SCORES.length - 1) // all but the convoy's
 	})
 
 	test('everywhere else, any song', () => {
 		for (const street of ['Weserstraße', '']) {
 			const elsewhere = picks(street)
-			expect(share(elsewhere, ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.4)
+			expect(share(elsewhere, ['sonnenallee', 'sonnenallee-bei-nacht'])).toBeLessThan(0.4)
 			expect(new Set(elsewhere).size).toBe(SCORES.length - 1)
 		}
 	})
@@ -66,8 +66,8 @@ describe('songs belong to streets', () => {
 		const onIt = { buildings: [], streetAt: (x, y) => ((y | 0) === 0 ? 'Sonnenallee' : '') }
 		const elsewhere = { buildings: [], streetAt: (x, y) => ((y | 0) === 0 ? 'Karl-Marx-Straße' : '') }
 		const scores = (world) => placeSources(world, shops, streets).map((s) => s.score)
-		expect(share(scores(onIt), ['sonnenallee', 'sonnenallee-nacht'])).toBeGreaterThan(0.6)
-		expect(share(scores(elsewhere), ['sonnenallee', 'sonnenallee-nacht'])).toBeLessThan(0.4)
+		expect(share(scores(onIt), ['sonnenallee', 'sonnenallee-bei-nacht'])).toBeGreaterThan(0.6)
+		expect(share(scores(elsewhere), ['sonnenallee', 'sonnenallee-bei-nacht'])).toBeLessThan(0.4)
 	})
 })
 
@@ -153,25 +153,25 @@ describe('music in the street', () => {
 })
 
 describe('songs belong to kinds of places', () => {
-	const homes = { wriezener: { street: '', at: ['doener'] }, hasenheide: { street: '', at: ['cafe'] } }
+	const homes = { 'wriezener-bahnhof': { street: '', at: ['doener'] }, hasenheide: { street: '', at: ['cafe'] } }
 	const share = (list, name) => list.filter((n) => n === name).length / list.length
 
 	test('döner shops mostly play the döner song, cafés the café song, Spätis anything', () => {
 		const shops = Array.from({ length: 1800 }, (_, i) => ({ kind: ['doener', 'cafe', 'spaeti'][i % 3], x: i, y: 0 }))
 		const sources = placeSources({ buildings: [] }, shops, homes)
 		const at = (kind) => sources.filter((s) => shops.find((shop) => shop.x === s.x).kind === kind).map((s) => s.score)
-		expect(share(at('doener'), 'wriezener')).toBeGreaterThan(0.6)
-		expect(share(at('doener'), 'wriezener')).toBeLessThan(0.85)
+		expect(share(at('doener'), 'wriezener-bahnhof')).toBeGreaterThan(0.6)
+		expect(share(at('doener'), 'wriezener-bahnhof')).toBeLessThan(0.85)
 		expect(share(at('cafe'), 'hasenheide')).toBeGreaterThan(0.6)
-		expect(share(at('spaeti'), 'wriezener')).toBeLessThan(0.25)
+		expect(share(at('spaeti'), 'wriezener-bahnhof')).toBeLessThan(0.25)
 		expect(at('cafe').length).toBeGreaterThan(60)
 	})
 
 	test('a street and a place both count', () => {
 		const both = { ...homes, sonnenallee: { street: 'Sonnenallee', at: [] } }
 		const picks = Array.from({ length: 600 }, (_, i) => pickScore(both, 'Sonnenallee', 'doener', i))
-		expect(share(picks, 'wriezener') + share(picks, 'sonnenallee')).toBeGreaterThan(0.6)
-		expect(share(picks, 'wriezener')).toBeGreaterThan(0.2)
+		expect(share(picks, 'wriezener-bahnhof') + share(picks, 'sonnenallee')).toBeGreaterThan(0.6)
+		expect(share(picks, 'wriezener-bahnhof')).toBeGreaterThan(0.2)
 		expect(share(picks, 'sonnenallee')).toBeGreaterThan(0.2)
 	})
 
@@ -183,7 +183,7 @@ describe('songs belong to kinds of places', () => {
 	test('the songs say where they belong', () => {
 		expect(score('konvoi').at).toEqual([])
 		expect(score('hasenheide').at).toEqual(['cafe'])
-		for (const name of ['tempelhof', 'luftbruecke']) expect(score(name).at).toEqual(['feld'])
+		for (const name of ['tempelhofer-feld', 'luftbruecke']) expect(score(name).at).toEqual(['feld'])
 		expect(compile('at Doener  cafe\nvoice a sine\npattern A\na | C4 |').at).toEqual(['doener', 'cafe'])
 	})
 })

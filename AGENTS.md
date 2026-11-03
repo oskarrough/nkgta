@@ -48,7 +48,7 @@ PLEASE, do not verify and visually screenshot everything single thing.
 
 ## Music
 
-Songs are composed in oskarrough/jukebox (its compose-song skill), not here; the score format, synth and player come from there too, as the `jukebox` dependency. `bun update jukebox` picks up new songs and fixes. A song's `street` and `at` heads say where it plays; `src/music.js` only decides what they mean on the map. Don't edit `node_modules/jukebox`; change it in the jukebox repo, push, then update. The jukebox itself is at https://jukebox.0sk.ar. `bun test` reads the songs off disk through `tests/songs-preload.js`, since `jukebox/songs` needs Vite.
+Songs are composed in oskarrough/jukebox (its compose-song skill), not here; `src/` never names a song, but `tests/music.test.js` does, so after a jukebox rename run `bun update jukebox` and grep the tests for the old names; the score format, synth and player come from there too, as the `jukebox` dependency. `bun update jukebox` picks up new songs and fixes. A song's `street` and `at` heads say where it plays; `src/music.js` only decides what they mean on the map. Don't edit `node_modules/jukebox`; change it in the jukebox repo, push, then update. The jukebox itself is at https://jukebox.0sk.ar. `bun test` reads the songs off disk through `tests/songs-preload.js`, since `jukebox/songs` needs Vite.
 
 ## Map data
 
