@@ -1,3 +1,9 @@
-# Settings for arbe-file-as-issues: player feedback from the game's inkast list becomes GitHub issues.
+# Settings for arbe-file-as-issues, arbe-create-threads-from-issues and arbe-autobot.
 repo = "oskarrough/nkgta"
 inbox = { inkast = "n3fnd6j6", key = "~/.config/inkast/nkgta.env", label = "player-feedback" }
+bb = { project = "proj_frgr3hhnmj", machine = "office-linux" }
+orchestrator = "pi openai-codex/gpt-6.1-sol low"
+fix = "claude-code claude-opus-5-5 medium"
+verify = "claude-code claude-opus-5-5 medium"
+max_threads = 3
+lookback = "2 hours"   # schedule interval plus overlap
