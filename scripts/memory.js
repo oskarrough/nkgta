@@ -16,6 +16,9 @@ const MiB = 2 ** 20
 const BUDGET = { cpu: 450 * MiB, gpu: 256 * MiB, total: 650 * MiB }
 const base = flag('url')
 const screenshot = flag('screenshot')
+const params = new URLSearchParams(flag('params', ''))
+params.set('perf', '')
+if (!params.has('hour')) params.set('hour', '11')
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
 async function freePort() {
@@ -122,7 +125,7 @@ try {
 	await send('Emulation.setTouchEmulationEnabled', { enabled: true })
 	await send('Emulation.setHardwareConcurrencyOverride', { hardwareConcurrency: 6 })
 	await send('Page.addScriptToEvaluateOnNewDocument', { source: readFileSync(new URL('./memory-probe.js', import.meta.url), 'utf8') })
-	await send('Page.navigate', { url: `${url}?perf&hour=11` })
+	await send('Page.navigate', { url: `${url}?${params}` })
 	const samples = []
 	const workerHeap = async () => {
 		const heaps = []
@@ -164,10 +167,22 @@ try {
 	}
 	if (!loaded) throw new Error('Never loaded')
 	console.log('phone    390×844 @ DPR 3, sampling a 60-second ride…')
-	// A fixed 60-second bicycle-speed route along Karl-Marx-Strasse. The
+	// A fixed 60-second bicycle-speed route along Karl-Marx-Strasse or onto the Feld. The
 	// position is driven so random traffic cannot change texture coverage.
 	await run(`(() => {
-		const points = [{lat:52.4764,lon:13.4397},{lat:52.4784,lon:13.4379},{lat:52.4810,lon:13.4347}].map(p => game.world.startPoint(p))
+		const points = ${JSON.stringify(
+			params.has('feld')
+				? [
+						{ lat: 52.4752, lon: 13.4193 },
+						{ lat: 52.47562, lon: 13.4176 },
+						{ lat: 52.47539, lon: 13.4125 },
+					]
+				: [
+						{ lat: 52.4764, lon: 13.4397 },
+						{ lat: 52.4784, lon: 13.4379 },
+						{ lat: 52.481, lon: 13.4347 },
+					],
+		)}.map(p => game.world.startPoint(p))
 		const start = performance.now()
 		globalThis.memoryRide = setInterval(() => {
 			const f = Math.min(1,(performance.now()-start)/60000)*2

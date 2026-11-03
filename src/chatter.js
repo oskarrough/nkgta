@@ -303,12 +303,12 @@ export function createChatter(world, shops) {
 			}
 			if (now >= passAt) {
 				for (const p of people) {
-					if (!p.track || p.dodge || p.flee || near(p) > HEAR.snippet || now - (spoke.get(p) ?? -Infinity) < 40) continue
-					const phone = p.pause > 0 && !p.track.edge
+					if ((!p.track && !p.social) || p.dodge || p.flee || near(p) > HEAR.snippet || now - (spoke.get(p) ?? -Infinity) < 40) continue
+					const phone = p.pause > 0 && !p.track?.edge
 					if (Math.random() > (phone ? 0.5 : 0.3)) continue
 					spoke.set(p, now)
 					passAt = now + 3 + Math.random() * 5
-					const mood = phone ? 'calm' : 'snippet'
+					const mood = phone || p.social ? 'calm' : 'snippet'
 					say(phrase(voiceOf(p.seed ?? 0.5).lang, Math.random, mood), p.seed ?? 0.5, p, HEAR[mood])
 					break
 				}

@@ -20,6 +20,7 @@ import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
 import { createActors } from './actors.js'
+import { createFeld } from './feld.js'
 import { createTrafficLights } from './traffic-lights.js'
 
 import { sound } from './sound.js'
@@ -46,11 +47,11 @@ const map = await loadMap((text) => (loading.textContent = text)).catch((err) =>
 const world = createWorld(map)
 phase('createWorld')
 loading.textContent = 'Baue die Welt…'
-const player = createPlayer(world.startPoint(START))
+const URL_PARAMS = new URLSearchParams(location.search)
+const player = createPlayer(world.startPoint(URL_PARAMS.has('feld') ? { lat: 52.47572, lon: 13.4174, dir: Math.PI } : START))
 const pfand = createPfand(world)
 const camera = createCamera(world)
 // ?cam=chase starts in the chase camera; ?hour=11 sets the time of day and stops the clock.
-const URL_PARAMS = new URLSearchParams(location.search)
 if (URL_PARAMS.get('cam') === 'chase') camera.toggle(player)
 const canvas = document.getElementById('overlay')
 const shops = shopsOf(world)
@@ -65,6 +66,7 @@ phase('createScene')
 loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const chatter = createChatter(world, shops)
+const feld = createFeld(world, pfand, (p) => chatter.shout(p))
 const traffic = createTraffic(
 	world,
 	(text) => hud.say(text),
@@ -406,7 +408,8 @@ function frame(now) {
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
-	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside })
+	feld.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside)
+	chatter.update(sound.audio(), feld.people.length ? [...traffic.peds, ...feld.people] : traffic.peds, street, streetView, { inside })
 	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
 	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()
@@ -487,6 +490,7 @@ if (import.meta.env.DEV)
 		music,
 		sound,
 		clock,
+		feld,
 		weather: city3d.weather,
 		racing,
 		police,

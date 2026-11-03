@@ -12,6 +12,7 @@ import { DEFAULT_LOOK, LOOKS, nextLook, upscaleOf } from './looks.js'
 import * as bridges from './bridges.js'
 import * as roadPaint from './road-paint.js'
 import * as trees from './trees.js'
+import * as feld from './feld.js'
 import * as furniture from './street-furniture.js'
 import * as nightPools from './night-pools.js'
 import { createClouds, DECK } from './clouds.js'
@@ -36,7 +37,7 @@ const TOON_BANDS = [0.3, 0.55, 0.8, 1.0]
 // is a module whose build(ctx) returns { meshes, zoom?(scale), dispose?() },
 // or nothing, and may be a generator that yields between frames. To add
 // something to the city, write such a module and put it in this list.
-const FEATURES = [bridges, roofs, signs, fascia, frontPanels, trees, nightPools, furniture, roadPaint]
+const FEATURES = [bridges, roofs, signs, fascia, frontPanels, trees, nightPools, furniture, roadPaint, feld]
 
 // Narrow, so the camera sits high and walls lean gently, like GTA 1.
 const FOV = 40
