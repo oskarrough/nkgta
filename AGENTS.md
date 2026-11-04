@@ -107,3 +107,5 @@ Pushing `main` deploys to nkgta.0sk.ar automatically via Cloudflare Workers CI. 
 ## Pull requests
 
 If the change shows on screen, attach a before/after: `gh pr edit <n> --attach './before.png#Alt text'`. Otherwise skip screenshots.
+
+Feedback loop: arbe-orchestrate's loop.md. Checks: `bun run check`. Base: main.
