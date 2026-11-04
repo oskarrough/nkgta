@@ -25,6 +25,7 @@ import { createTrafficLights } from './traffic-lights.js'
 
 import { sound } from './sound.js'
 import { createMusic } from './music.js'
+import { createMenu } from './menu.js'
 import { createPocket } from './pocket.js'
 import { createPocketMap } from './pocket-map.js'
 import { createRideScreen } from './ride-screen.js'
@@ -173,7 +174,7 @@ const actions = {
 	},
 	use,
 	openRides: () => {
-		if (menu.hidden) rides.open()
+		if (!menu.isOpen()) rides.open()
 	},
 	choose: (i) => visit.choose(i),
 	shiftChoice: (n) => visit.shiftChoice(n),
@@ -191,9 +192,9 @@ const actions = {
 		showWalls = city3d.showsWalls()
 	},
 	nextStation: () => music.nextStation(!!player.car),
-	menuOpen: () => !menu.hidden || dailyPanel.isOpen(),
-	toggleMenu: () => showMenu(menu.hidden),
-	toggleDebug: () => showDebug(debug.hidden),
+	menuOpen: () => menu.isOpen() || dailyPanel.isOpen(),
+	toggleMenu: () => menu.toggle(),
+	toggleDebug: () => menu.toggleDebug(),
 	placeGate: () => racing.placeGate(),
 	finishRace: () => racing.finish(),
 	restartRace: () => (spray.active() ? spray.undo() : racing.restart()),
@@ -202,7 +203,7 @@ const actions = {
 	acceptJob: () => courier.accept(),
 	pickArea: () => (location.href = `/pick.html${location.search}`),
 	openFeedback() {
-		showMenu(false)
+		menu.close()
 		feedback.open()
 	},
 }
@@ -241,8 +242,8 @@ const quiz = createQuiz({
 			hud.say('Geh erst zurück auf die Straße.')
 			return false
 		}
-		showMenu(false)
-		showDebug(false)
+		menu.close()
+		menu.showDebug(false)
 		racing.abort()
 		input.release()
 		return true
@@ -262,106 +263,36 @@ const quizInput = Object.fromEntries(
 )
 const input = createInput(quizInput)
 
-const menu = document.getElementById('menu')
-const menuButton = document.getElementById('menu-button')
-const debug = document.getElementById('debug')
+const menu = createMenu({ input, keysElsewhere: () => feedback.isOpen() || quiz.active() })
 tuneClock(document.getElementById('clock'), clock)
 tuneWeather(document.getElementById('clock'), city3d.weather)
 tuneZoom(document.getElementById('tune'), ZOOM, camera, player)
-const menuItems = {
-	rides: [
-		() => {
-			showMenu(false)
-			rides.open()
-		},
-		() => null,
-	],
-	daily: [
-		() => {
-			showMenu(false)
-			dailyPanel.open()
-		},
-		() => null,
-	],
-	quiz: [() => quiz.start(), () => null],
-	streets: [actions.toggleStreetNames, () => showStreetNames],
-	transit: [actions.toggleTransit, () => showTransit],
-	walls: [actions.toggleWalls, () => showWalls],
-	look: [actions.cycleLook, () => null],
-	camera: [actions.toggleCamera, () => camera.selected()],
-	music: [actions.toggleMusicDebug, () => showMusic],
-	sound: [toggleMute, () => !sound.isMuted()],
-	area: [actions.pickArea, () => null],
-}
-function showMenuState() {
-	for (const button of document.querySelectorAll('.panel button[data-action]')) {
-		const on = menuItems[button.dataset.action][1]()
-		button.classList.toggle('on', on === true)
-		button.classList.toggle('off', on === false)
-		button.ariaPressed = on === null ? null : String(on)
-	}
-	menu.querySelector('[data-action=sound] img').src = `/icons/${sound.isMuted() ? 'speaker-off' : 'speaker'}.png`
-	menu.querySelector('[data-action=look]').title = `Look: ${city3d.look()} (P)`
-}
-function showMenu(open) {
-	menu.hidden = !open
-	menuButton.ariaExpanded = String(open)
-	input.release()
-	if (open) showMenuState()
-	else document.activeElement?.blur()
-}
-function showDebug(open) {
-	debug.hidden = !open
-	if (open) showMenuState()
-}
-if (new URLSearchParams(location.search).has('tune')) showDebug(true)
-for (const panel of [menu, debug]) {
-	panel.addEventListener('click', (e) => {
-		const button = e.target.closest('button[data-action]')
-		if (!button) return
-		menuItems[button.dataset.action][0]()
-		showMenuState()
-		button.blur()
-	})
-}
-menuButton.addEventListener('click', () => {
-	showMenu(menu.hidden)
-	menuButton.blur()
-})
-const GAME_KEYS = new Set([
-	'ArrowUp',
-	'ArrowDown',
-	'ArrowLeft',
-	'ArrowRight',
-	'w',
-	'a',
-	's',
-	'd',
-	' ',
-	'e',
-	'Enter',
-	'g',
-	'f',
-	'q',
-	'c',
-	'x',
-	'z',
-	'Backspace',
-])
-addEventListener(
-	'keydown',
-	(e) => {
-		if (feedback.isOpen() || quiz.active() || e.target.matches?.('input, textarea')) return
-		if (e.key === 'Escape') {
-			showMenu(menu.hidden)
-		} else if (!menu.hidden && GAME_KEYS.has(e.key.length === 1 ? e.key.toLowerCase() : e.key)) e.stopPropagation()
-		else if (!menu.hidden || !debug.hidden) setTimeout(showMenuState)
+menu.add('rides', {
+	run() {
+		menu.close()
+		rides.open()
 	},
-	{ capture: true },
-)
-addEventListener('pointerdown', (e) => {
-	if (!menu.hidden && !e.target.closest('#menu, #menu-button')) showMenu(false)
 })
+menu.add('daily', {
+	run() {
+		menu.close()
+		dailyPanel.open()
+	},
+})
+menu.add('quiz', { run: () => quiz.start() })
+menu.add('streets', { run: actions.toggleStreetNames, on: () => showStreetNames })
+menu.add('transit', { run: actions.toggleTransit, on: () => showTransit })
+menu.add('walls', { run: actions.toggleWalls, on: () => showWalls })
+menu.add('look', { run: actions.cycleLook, paint: (el) => (el.title = `Look: ${city3d.look()} (P)`) })
+menu.add('camera', { run: actions.toggleCamera, on: () => camera.selected() })
+menu.add('music', { run: actions.toggleMusicDebug, on: () => showMusic })
+menu.add('sound', {
+	run: toggleMute,
+	on: () => !sound.isMuted(),
+	paint: (el) => (el.querySelector('img').src = `/icons/${sound.isMuted() ? 'speaker-off' : 'speaker'}.png`),
+})
+menu.add('area', { run: actions.pickArea })
+if (URL_PARAMS.has('tune')) menu.showDebug(true)
 
 function use() {
 	if (wasted.active() || police.active() || visit.use()) return
