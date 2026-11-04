@@ -108,4 +108,4 @@ Pushing `main` deploys to nkgta.0sk.ar automatically via Cloudflare Workers CI. 
 
 If the change shows on screen, attach a before/after: `gh pr edit <n> --attach './before.png#Alt text'`. Otherwise skip screenshots.
 
-Feedback: `autobot.toml`, read by arbe-file-as-issues and arbe-autobot. Checks: `bun run check`. Base: main.
+Feedback: `autobot.toml`, read by arbe-inkast-to-issues and arbe-autobot. Checks: `bun run check`. Base: main.
