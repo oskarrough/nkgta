@@ -1,4 +1,4 @@
-# Settings for the feedback loop (arbe-orchestrate's loop.md) and arbe-autobot.
+# Settings for arbe-file-as-issues and arbe-autobot.
 repo = "oskarrough/nkgta"
 inbox = { inkast = "n3fnd6j6", key = "~/.config/inkast/nkgta.env", label = "player-feedback" }
 bb = { project = "proj_frgr3hhnmj", machine = "office-linux" }
