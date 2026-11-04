@@ -6,9 +6,9 @@ const sha = (bytes) => new Bun.CryptoHasher('sha256').update(bytes).digest('hex'
 
 test('the default map walks exactly as it did when split streets narrowed to their lanes', async () => {
 	const map = await defaultMap()
-	// Hashes of the grids as shipped when split streets narrowed (#19).
-	expect(sha(map.tiles)).toBe('d9f342125a7e9ff25dc988046d6948b8793ed0133c74403d9cdbb16660ad2c0d')
-	expect(sha(new Uint8Array(map.streetOf.buffer))).toBe('a9374cfbddc5b9c95d2bdda59c608eef71c77a27a134cbfc1eaf7a553613f231')
+	// Hashes of the grids as shipped since the fresh OSM fetch (#55). Only a new map build may change them.
+	expect(sha(map.tiles)).toBe('cf7f25843a44d4b4462ba912c63b73e37bd77ce0ecfa93c9dfd81bea6db8896e')
+	expect(sha(new Uint8Array(map.streetOf.buffer))).toBe('ec7fdf21bf6d621fa5cdb8ae1b128ea08249a7dad852201d1d1073df18275ee2')
 })
 
 test('a map comes back from JSON exactly as it went in', () => {
