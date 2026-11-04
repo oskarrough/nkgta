@@ -283,18 +283,139 @@ export const MODELS = {
 			['roofbox', 0.12, 0.4, 0.06, 0.2, 0.92],
 		],
 	},
+	dhl: {
+		name: 'DHL-Transporter',
+		noun: 'Paketwagen',
+		pace: 1,
+		driver: { a: 0.8, b: 1.2, T: 1, s0: 0.5 },
+		length: 2,
+		width: 0.74,
+		mass: 2.3,
+		engine: 4,
+		brake: 5,
+		rolling: 0.055,
+		drag: 0.03,
+		lateral: 1.35,
+		steer: 0.55,
+		steerFade: 0.15,
+		colors: ['#ffcc00'], // DHL yellow, the red band round the box
+		look: [
+			// A Sprinter in yellow, a red band round the box, a bare roof.
+			['paint', 1, 0.94, 0.4, 0, 0.08],
+			['tyre', 0.16, 1.08, 0.2, 0.32, 0],
+			['tyre', 0.16, 1.08, 0.2, -0.3, 0],
+			['red', 0.72, 0.96, 0.07, -0.13, 0.3],
+			['glass', 0.22, 0.9, 0.12, 0.32, 0.46],
+			['paint', 0.76, 0.94, 0.08, -0.12, 0.48],
+		],
+	},
+	merc190: {
+		name: 'Mercedes 190',
+		noun: 'Benz',
+		pace: 1.05,
+		driver: { a: 0.9, b: 1.2, T: 0.9, s0: 0.5 },
+		length: 1.5,
+		width: 0.66,
+		mass: 1.3,
+		engine: 4.8,
+		brake: 5.5,
+		rolling: 0.05,
+		drag: 0.027,
+		lateral: 1.45,
+		steer: 0.6,
+		steerFade: 0.15,
+		colors: ['#e9e4d6', '#1d1f22', '#7d1d1d', '#5c6b74', '#c9c6bd'],
+		look: [
+			// The old saloon: a low box, flat bonnet and boot, a square cabin
+			// in the middle, a little red flag clipped to the back window.
+			['paint', 1, 0.92, 0.2, 0, 0.07],
+			['tyre', 0.2, 1.1, 0.15, 0.3, 0],
+			['tyre', 0.2, 1.1, 0.15, -0.3, 0],
+			['glass', 0.42, 0.88, 0.18, -0.03, 0.27],
+			['paint', 0.34, 0.9, 0.03, -0.03, 0.45],
+			['red', 0.1, 0.03, 0.07, -0.16, 0.38, 0.5],
+		],
+	},
+	smart: {
+		name: 'Smart',
+		noun: 'Smart',
+		pace: 1,
+		driver: { a: 0.9, b: 1.2, T: 1, s0: 0.4 },
+		length: 0.9,
+		width: 0.6,
+		mass: 0.75,
+		engine: 4.6,
+		brake: 6,
+		rolling: 0.05,
+		drag: 0.03,
+		lateral: 1.3,
+		steer: 0.7,
+		steerFade: 0.12,
+		colors: ['#e8e8e4', '#d92b2b', '#ffd400', '#3a7bd5', '#1d1f22'],
+		look: [
+			// Two seats and no more: a tall stub in a silver cage.
+			['paint', 1, 0.92, 0.26, 0, 0.07],
+			['tyre', 0.24, 1.1, 0.16, 0.3, 0],
+			['tyre', 0.24, 1.1, 0.16, -0.3, 0],
+			['roofbox', 0.62, 0.92, 0.22, -0.1, 0.32],
+			['glass', 0.66, 0.84, 0.2, -0.08, 0.33],
+			['paint', 0.5, 0.88, 0.03, -0.12, 0.54],
+		],
+	},
+	cargo: {
+		name: 'Lastenrad',
+		noun: 'Lastenrad',
+		pace: 0.45,
+		driver: { a: 0.5, b: 1, T: 1.2, s0: 0.4 },
+		length: 0.9,
+		width: 0.3,
+		mass: 0.35,
+		engine: 2.4,
+		brake: 4,
+		rolling: 0.05,
+		drag: 0.05,
+		lateral: 1.6,
+		steer: 0.75,
+		steerFade: 0.1,
+		colors: ['#a87a4a', '#2f4a3a', '#23365c', '#d8d2c0'],
+		look: [
+			// A long low frame, the box out front with a kid's head or a crate
+			// in it, the rider up on the saddle behind.
+			['tyre', 1, 0.25, 0.03, 0, 0.12],
+			['tyre', 0.18, 0.3, 0.13, 0.4, 0],
+			['tyre', 0.18, 0.3, 0.13, -0.4, 0],
+			['paint', 0.42, 1, 0.18, 0.2, 0.08],
+			['glass', 0.22, 0.8, 0.3, -0.24, 0.18],
+		],
+	},
 }
 
-// One in so many cars that pass is something special. Parked cars choose
-// the same way from their own roll, and leave out the ones that don't park.
-export function pickModel(bigRoad, r = Math.random(), parked = false) {
-	if (bigRoad && !parked && r < 0.08) return MODELS.bus
-	if (r < 0.12) return MODELS.suv
-	if (r < 0.15) return MODELS.lambo
-	if (r < 0.25) return MODELS.golf
-	if (r < 0.32) return MODELS.sprinter
-	if (r < (bigRoad ? 0.4 : 0.36)) return MODELS.taxi
-	if (r < 0.39 && !parked) return MODELS.bsr
-	if (r < 0.43) return MODELS.trabi
+// What drives past, as shares of all cars: the plain Kleinwagen takes what's
+// left. Vans come out to deliver in the morning, taxis wait by the U-Bahn,
+// buses, cops and bin lorries keep to the big roads, cargo bikes to the small.
+// Parked cars leave out what doesn't park.
+const MORNING = [6, 11] // hours vans are out in force
+function mixOf({ bigRoad = false, parked = false, hour = 12, station = false } = {}) {
+	const morning = hour >= MORNING[0] && hour < MORNING[1]
+	const moving = !parked
+	return [
+		[MODELS.bus, bigRoad && moving ? 0.08 : 0],
+		[MODELS.police, bigRoad && moving ? 0.015 : 0],
+		[MODELS.bsr, moving ? 0.025 : 0],
+		[MODELS.cargo, moving ? (bigRoad ? 0.015 : 0.04) : 0],
+		[MODELS.taxi, (bigRoad ? 0.07 : 0.035) * (station ? 3 : 1)],
+		[MODELS.sprinter, morning ? 0.15 : 0.06],
+		[MODELS.dhl, morning ? 0.07 : 0.025],
+		[MODELS.suv, 0.11],
+		[MODELS.lambo, 0.025],
+		[MODELS.golf, 0.1],
+		[MODELS.trabi, 0.03],
+		[MODELS.merc190, 0.04],
+		[MODELS.smart, 0.045],
+	]
+}
+
+export function pickModel(r = Math.random(), where = {}) {
+	for (const [model, share] of mixOf(where)) if ((r -= share) < 0) return model
 	return MODELS.car
 }

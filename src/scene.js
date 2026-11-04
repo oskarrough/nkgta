@@ -338,7 +338,7 @@ function carMaterial(kind, gradient) {
 // (see models.js), plus brake lights, headlights and an ink rim on the road
 // round it. Boxes of one kind are merged, so it's one instanced mesh each.
 const MAX_CARS = 256
-const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', sign: '#f2d13a', tyre: '#303231', blue: '#1f4db0' }
+const FIXED = { glass: '#2a3540', roofbox: '#9a9a96', sign: '#f2d13a', tyre: '#303231', blue: '#1f4db0', red: '#d40511' }
 const BEACON = { on: new THREE.Color('#5cb8ff'), off: new THREE.Color('#1b2b6b') }
 const CAR_HEADLIGHT = '#fff3c8'
 // Cars are too low for the ink pass to find their edges, so they sit on a

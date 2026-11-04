@@ -18,6 +18,7 @@ const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein
 const DIVE_SHOUTS = ['Ey!', 'Alter!', 'Spinnst du?']
 const SHOUT_RANGE = 12 // tiles: further than this you wouldn't hear it
 const BIG_ROAD = 4 // tiles wide: buses keep to these
+const STATION = 12 // tiles from a U-Bahn entrance that taxis wait within
 const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', '#b8bcc2'] }
 // Dodging the player: seconds ahead a driver sees it coming, seconds it keeps
 // up what it decided, and tiles/s the player must be doing to count as a
@@ -33,6 +34,9 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 	const cars = []
 	const busStops = (world.transit ?? []).filter((t) => t.kind === 'bus')
 	const busLines = [...new Set(busStops.flatMap((t) => t.lines))]
+	const stations = (world.transit ?? []).filter((t) => t.kind === 'ubahn')
+	const byStation = (x, y) => stations.some((t) => Math.hypot(t.x - x, t.y - y) < STATION)
+	let now = 11 // the hour, for what's out on the road
 	const walkers = createPedestrians(world, junctions)
 	const runners = [] // drivers thrown out of their cars, running off
 	const peds = [] // everyone on foot, for drawing
@@ -92,7 +96,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			const p = pointAt(edge.lane, s)
 			const d = Math.hypot(p.x - ring.x, p.y - ring.y)
 			if (d > ring.max || d < 3 || (started && inView(view, p.x, p.y, 2))) continue
-			const model = wanted ?? pickModel(edge.rank >= BIG_ROAD)
+			const model = wanted ?? pickModel(Math.random(), { bigRoad: edge.rank >= BIG_ROAD, hour: now, station: byStation(p.x, p.y) })
 			if (!fits(p.x, p.y, p.dir, model)) continue
 			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: edge.speed * 0.8 })
 			if (model === MODELS.bus && busLines.length) car.line = busLines[Math.floor(Math.random() * busLines.length)]
@@ -161,7 +165,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			if (world.carClosed?.(spot.x, spot.y)) continue
 			if ((spot.car && !spot.car.gone) || (started && inView(view, spot.x, spot.y, 2))) continue
 			const r = spotHash(spot.seed, 1)
-			const model = pickModel(false, r, true)
+			const model = pickModel(r, { parked: true, hour: now, station: byStation(spot.x, spot.y) })
 			if (!standsClear(world, spot.x, spot.y, spot.angle, model) || occupied(spot.x, spot.y, spot.angle, model)) continue
 			const color = model.colors[Math.floor(spotHash(spot.seed, 2) * model.colors.length)]
 			spot.car = createCar({ x: spot.x, y: spot.y, angle: spot.angle, model, color })
@@ -373,6 +377,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 	}
 
 	function update(dt, player, view, hour = 11, day = 0) {
+		now = hour
 		if (closureVersion !== (world.closureVersion ?? 0)) {
 			closureVersion = world.closureVersion ?? 0
 			for (const e of edges) {
