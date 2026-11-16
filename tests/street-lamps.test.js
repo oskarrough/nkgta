@@ -14,4 +14,5 @@ test('the default map stands its street lamps where OSM maps them', () => {
 	const real = lamps.filter((l) => mapped.has(`${l.x},${l.y}`)).length
 	expect(real).toBeGreaterThanOrEqual(world.lamps.length / 2)
 	expect(real).toBeGreaterThan(lamps.length / 2)
-})
+	// A whole-map scan: the build machine takes over 5 s.
+}, 30_000)
