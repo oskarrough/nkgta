@@ -1,7 +1,7 @@
 # Settings for arbe-inkast-to-issues and arbe-autobot.
 repo = "oskarrough/nkgta"
 inbox = { inkast = "n3fnd6j6", key = "~/.config/inkast/nkgta.env", label = "player-feedback" }
-bb = { project = "proj_frgr3hhnmj", machine = "office-linux" }
+bb = { project = "proj_frgr3hhnmj", machine = "hetzner" }
 orchestrator = "pi openai-codex/gpt-6.1-sol low"
 fix = "claude-code claude-opus-5-5 medium"
 verify = "claude-code claude-opus-5-5 medium"
