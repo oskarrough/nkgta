@@ -43,8 +43,8 @@ export function createPocket({ turnStation }) {
 	const tagOf = {}
 	let home = null
 	let current = null
-	let back = null // where an alert hands the screen back to
-	let alerting = null
+	let back = null // where the alerts hand the screen back to
+	const alerts = [] // apps asking for the screen, the latest last
 	let said = null
 	let shownText = null
 	let first = true
@@ -297,18 +297,20 @@ export function createPocket({ turnStation }) {
 		say(text, t = SAY) {
 			said = { text, t }
 		},
-		// App `id` takes the screen and lights it; `release` hands it back.
+		// App `id` takes the screen and lights it; `release` hands it to the
+		// alert before it, or back to where you were.
 		alert(id) {
-			if (alerting !== id && current?.id !== id) back = current
-			alerting = id
+			if (!alerts.includes(current?.id) && current?.id !== id) back = current
+			if (alerts.includes(id)) alerts.splice(alerts.indexOf(id), 1)
+			alerts.push(id)
 			const typing = current?.live && el.contains(document.activeElement)
 			if (!typing) show(id)
 		},
 		release(id) {
-			if (alerting !== id) return
-			alerting = null
-			if (current?.id === id) show((back ?? home).id)
-			back = null
+			if (!alerts.includes(id)) return
+			alerts.splice(alerts.indexOf(id), 1)
+			if (current?.id === id) show(alerts.at(-1) ?? (back ?? home).id)
+			if (!alerts.length) back = null
 		},
 		// A few characters on the top line, while another app has the screen;
 		// with a `level` from 0 to 1, a battery instead, `text` on hover.
@@ -326,7 +328,7 @@ export function createPocket({ turnStation }) {
 			if (said && (said.t -= dt) <= 0) said = null
 			const now = radio ? { name: radio.name ?? 'Radio aus', title: radio.title } : hearing
 			setTicker(said?.text ?? (muted ? '' : now ? [now.name, now.title].filter(Boolean).join(' · ') : 'Straße'))
-			el.classList.toggle('lit', !!alerting && current?.id === alerting)
+			el.classList.toggle('lit', alerts.includes(current?.id))
 			el.classList.toggle('car', car)
 			el.classList.toggle('muted', muted)
 			knob.style.setProperty('--turn', `${(muted ? 0 : volume) * TURN - TURN / 2}deg`)

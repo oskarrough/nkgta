@@ -39,9 +39,10 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 	let start = null // where a run starts: { x, y, angle, vehicle, car }
 	let result = null
 
-	const hud = createRaceHud({ placeGate, finish, restart, share: () => race && share(race) })
+	const hud = createRaceHud({ placeGate, finish, restart, share: () => race && share(race), pocket })
 	const list = createRaceList({
 		pocket,
+		panel: hud.panel,
 		world,
 		player,
 		races: () => races,
@@ -203,6 +204,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			count,
 			canFinish: !draft && phase !== 'idle',
 			canRestart: !draft && !!race,
+			rival: draft ? null : race?.rival,
 		}
 	}
 

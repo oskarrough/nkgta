@@ -6,46 +6,50 @@ import { sound } from './sound.js'
 
 const SPLIT = 2.5 // seconds a split stays up
 const SHOWN = 6 // places on the finish card
-const CARD = 15 // seconds the finish card stays up
 
 const vehicleIcon = (v) => (v === 'foot' ? 'foot' : RIDES[v] ? `act-${v}` : 'act-car')
 const vehicleName = (v) => (v === 'foot' ? 'zu Fuß' : (RIDES[v]?.name ?? MODELS[v]?.name ?? 'Auto'))
 const vehicleTag = (v) =>
 	`<img class="icon" src="/icons/${vehicleIcon(v)}.png" alt="${vehicleName(v)}" title="${vehicleName(v)}">${MODELS[v] && v !== 'car' ? `<small>${vehicleName(v)}</small>` : ''}`
 
-export function createRaceHud({ placeGate, finish, restart, share }) {
+// The race on the Rennen screen: the gates and what to do next while you
+// drop them, then 3-2-1, and the result until you start again or put it away.
+// The run itself is on the map, its clock on the top line. The countdown and
+// the touch buttons stay in the city.
+export function createRaceHud({ placeGate, finish, restart, share, pocket }) {
 	const el = document.createElement('div')
 	el.id = 'race'
 	el.innerHTML = `
-		<div class="corner">
-		<div class="watch" hidden><div class="gates"></div><b class="time"></b><span class="split"></span><button type="button" class="next-step"></button></div>
 		<div class="race-buttons">
 			<button type="button" class="restart" aria-label="Neustart (Q)" title="Neustart (Q)"><img class="icon" src="/icons/race-restart.png" alt=""><kbd>Q</kbd></button>
 			<button type="button" class="finish" aria-label="Rennen beenden (F)" title="Rennen beenden (F)"><img class="icon" src="/icons/race-finish.png" alt=""><kbd>F</kbd></button>
 		</div>
-		<div class="card" hidden></div>
-		</div>
 		<div class="count" hidden></div>`
 	document.body.append(el)
-	const $ = (s) => el.querySelector(s)
+	const panel = document.createElement('div')
+	panel.className = 'race-now'
+	panel.hidden = true
+	panel.innerHTML = `
+		<div class="watch" hidden><div class="gates"></div><b class="time"></b><span class="split"></span><small class="vs"></small><button type="button" class="next-step"></button></div>
+		<div class="card" hidden></div>`
+	const $ = (s) => el.querySelector(s) ?? panel.querySelector(s)
 	const watch = $('.watch')
 	const gatesEl = $('.gates')
 	const time = $('.time')
 	const split = $('.split')
+	const vsEl = $('.vs')
 	const count = $('.count')
 	const card = $('.card')
 	const nextStep = $('.next-step')
-	nextStep.addEventListener('pointerdown', (e) => {
-		e.preventDefault()
-		e.stopPropagation()
+	panel.addEventListener('click', (e) => {
+		const button = e.target.closest('button')
+		if (!button) return
 		sound.start()
-		;(nextStep.dataset.step === 'finish' ? finish : placeGate)()
-	})
-	card.addEventListener('pointerdown', (e) => {
-		if (!e.target.closest('.share')) return
-		e.preventDefault()
-		e.stopPropagation()
-		share()
+		if (button === nextStep) (nextStep.dataset.step === 'finish' ? finish : placeGate)()
+		else if (button.classList.contains('share')) share()
+		else if (button.classList.contains('again')) restart()
+		else if (button.classList.contains('done')) finish()
+		button.blur()
 	})
 	const buttons = { finish: $('.finish'), restart: $('.restart') }
 	const press = { finish, restart }
@@ -61,7 +65,6 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 
 	let shown = {}
 	let splitFor = 0
-	let cardFor = 0
 	let beat = null // what the countdown shows
 	let goFor = 0
 	function pop(text) {
@@ -78,15 +81,23 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 	}
 
 	return {
+		panel,
 		// `view`: { mode: 'idle' | 'draft' | 'countdown' | 'running' | 'done',
-		// gates, next, t, count, canFinish, canRestart }.
+		// gates, next, t, count, canFinish, canRestart, rival }.
 		update(view, dt) {
 			const { mode } = view
-			set('watch', mode !== 'idle', (on) => (watch.hidden = !on))
-			set('mode', mode, (m) => {
-				el.dataset.mode = m
-				if (m === 'countdown') split.className = 'split'
+			const shows = mode === 'done' ? (card.hidden ? 'idle' : 'card') : mode === 'idle' ? 'idle' : 'watch'
+			set('shows', shows, (s) => {
+				panel.hidden = s === 'idle'
+				watch.hidden = s !== 'watch'
+				card.hidden = s !== 'card'
 			})
+			set('mode', mode, (m) => {
+				if (m === 'draft' || m === 'countdown') split.className = 'split'
+				if (m === 'draft' || m === 'countdown' || (m === 'done' && !card.hidden)) pocket.alert('race')
+				else pocket.release('race')
+			})
+			set('rival', view.rival, (r) => (vsEl.textContent = r ? `gegen ${r.name || 'Geist'} · ${clock(r.time)}` : ''))
 			set('badges', `${mode}:${view.gates}:${view.next}`, () => {
 				const badges = Array.from({ length: view.gates }, (_, i) => {
 					const last = mode === 'draft' && i === view.gates - 1 && i > 0 ? ' last' : ''
@@ -105,8 +116,9 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 						? '<img class="icon" src="/icons/race-gate.png" alt=""><span>Nächstes Tor</span><kbd>G</kbd>'
 						: '<img class="icon" src="/icons/race-finish.png" alt=""><span>Letztes Tor = Ziel</span><kbd>F</kbd>'
 			})
-			const t = mode === 'draft' ? '' : clock(view.t)
+			const t = mode === 'draft' ? '' : mode === 'countdown' ? String(Math.ceil(view.count)) : clock(view.t)
 			set('time', t, (v) => (time.textContent = v))
+			pocket.tag('race', mode === 'running' ? clock(view.t).slice(0, -1) : '')
 			set('restart', view.canRestart, (on) => buttons.restart.classList.toggle('can', on))
 			set('finish', view.canFinish, (on) => buttons.finish.classList.toggle('can', on))
 			if (mode === 'countdown') {
@@ -126,14 +138,16 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 				count.hidden = true
 			}
 			if (splitFor > 0 && (splitFor -= dt) <= 0) split.className = 'split'
-			if ((mode !== 'done' || (cardFor -= dt) < 0) && !card.hidden) card.hidden = true
 		},
 
 		split({ time: t, delta, finish: last }) {
 			split.textContent = delta === null ? clock(t) : gap(delta)
 			split.className = `split on ${delta === null ? '' : delta < 0 ? 'ahead' : 'behind'}`
 			splitFor = SPLIT
-			if (!last) chime([880, 1320])
+			if (!last) {
+				if (pocket.current() !== 'race') pocket.say(split.textContent, SPLIT)
+				chime([880, 1320])
+			}
 		},
 
 		result({ time: t, best, place, times, previous, rival }) {
@@ -148,9 +162,8 @@ export function createRaceHud({ placeGate, finish, restart, share }) {
 			const vs = !rival
 				? ''
 				: `<small class="vs ${t < rival.time ? 'ahead' : 'behind'}">${t < rival.time ? 'Schneller' : 'Langsamer'} als ${rival.name || 'der Geist'}: ${gap(t - rival.time)}</small>`
-			card.innerHTML = `<b class="final">${clock(t)}</b>${head}${vs}<ol>${rows}</ol><button type="button" class="share">${rival && t < rival.time ? 'Link zurückschicken' : 'Link teilen'}</button><p><img class="icon" src="/icons/race-restart.png" alt="Nochmal"><kbd>Q</kbd></p>`
+			card.innerHTML = `<b class="final">${clock(t)}</b>${head}${vs}<ol>${rows}</ol><p><button type="button" class="share">${rival && t < rival.time ? 'Zurückschicken' : 'Teilen'}</button><button type="button" class="again">Nochmal<kbd>Q</kbd></button><button type="button" class="done">Fertig<kbd>F</kbd></button></p>`
 			card.hidden = false
-			cardFor = CARD
 			chime(best ? [880, 1109, 1319, 1760] : [880, 1109, 1319])
 		},
 

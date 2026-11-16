@@ -125,3 +125,149 @@
 body.touch #pocket .app-races kbd {
 	display: none;
 }
+
+/* The race on now, in place of the list. */
+#pocket .app-races .list {
+	display: contents;
+}
+#pocket .app-races:has(> .race-now:not([hidden])) > .list {
+	display: none;
+}
+#pocket .race-now [hidden] {
+	display: none !important;
+}
+#pocket .race-now {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: none;
+	font-family: ui-monospace, monospace;
+	font-variant-numeric: tabular-nums;
+}
+#pocket .race-now .gates {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.15rem;
+}
+#pocket .race-now .gates i {
+	display: grid;
+	place-items: center;
+	width: 0.95rem;
+	height: 0.95rem;
+	border: 1px solid var(--lcd-ink);
+	border-radius: 50%;
+	box-sizing: border-box;
+	font:
+		900 0.55rem / 1 system-ui,
+		sans-serif;
+	font-style: normal;
+}
+#pocket .race-now .gates i.taken {
+	opacity: 0.35;
+}
+#pocket .race-now .gates i.next,
+#pocket .race-now .gates i.set {
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+}
+#pocket .race-now .gates i.add {
+	border-style: dashed;
+	opacity: 0.6;
+}
+#pocket .race-now .gates i.last {
+	background: repeating-conic-gradient(var(--lcd-ink) 0 25%, transparent 0 50%) 0 0 / 0.3rem 0.3rem;
+	color: transparent;
+}
+#pocket .race-now .time {
+	display: block;
+	font-size: 1.6rem;
+	line-height: 1.1;
+}
+#pocket .race-now .time:empty,
+#pocket .race-now .split:not(.on),
+#pocket .race-now .vs:empty {
+	display: none;
+}
+#pocket .race-now .split {
+	padding: 0 0.25rem;
+	border: 1px solid var(--lcd-ink);
+	font-weight: 800;
+}
+#pocket .race-now .split.behind {
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+}
+#pocket .race-now .vs {
+	display: block;
+	overflow-wrap: anywhere;
+}
+#pocket .race-now .next-step {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	width: 100%;
+	margin-top: 0.2rem;
+}
+#pocket .race-now .next-step img {
+	width: 16px;
+	height: 16px;
+	image-rendering: pixelated;
+}
+#pocket .race-now .next-step kbd {
+	margin-left: auto;
+}
+#pocket .race-now .card {
+	text-align: center;
+}
+#pocket .race-now .final {
+	display: block;
+	font-size: 1.3rem;
+}
+#pocket .race-now .card em {
+	padding: 0 0.25rem;
+	font-weight: 900;
+	font-style: normal;
+	text-transform: uppercase;
+}
+#pocket .race-now .card em.best {
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+}
+#pocket .race-now .card ol {
+	flex: none;
+	overflow: visible;
+}
+#pocket .race-now .card li {
+	gap: 0.3rem;
+	padding: 0;
+	border: 0;
+	flex-wrap: nowrap;
+}
+#pocket .race-now .card li.you {
+	background: var(--lcd-ink);
+	color: var(--lcd-lit);
+}
+#pocket .race-now .card li .icon {
+	width: 12px;
+	height: 12px;
+}
+#pocket .race-now .card li b {
+	margin-left: auto;
+}
+#pocket .race-now .card li small {
+	font-size: 0.5rem;
+	text-transform: uppercase;
+}
+#pocket .race-now .card p {
+	display: flex;
+	gap: 0.2rem;
+	margin: 0.2rem 0 0;
+}
+#pocket .race-now .card p button {
+	flex: 1;
+	white-space: nowrap;
+}
+#pocket .race-now .card p kbd {
+	margin-left: 0.2rem;
+}

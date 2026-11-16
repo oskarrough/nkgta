@@ -20,10 +20,14 @@ const pixels = (name) =>
 		.join('')}</svg>`
 
 // The race app on the pocket device: every race here, ▶ takes you to its
-// start, tap one for sharing it (under your ghost name) and the bin.
-export function createRaceList({ world, player, races, start, remove, create, share, name, pocket }) {
+// start, tap one for sharing it (under your ghost name) and the bin. While a
+// race is on, `panel` shows it here instead.
+export function createRaceList({ world, player, races, start, remove, create, share, name, pocket, panel }) {
 	const page = document.createElement('div')
 	page.className = 'app-races scroll'
+	const list = document.createElement('div')
+	list.className = 'list'
+	page.append(list, panel)
 	let picked = null // the race whose row is open
 	let armed = null // the race whose cross was tapped once
 	pocket.add({
@@ -66,12 +70,12 @@ export function createRaceList({ world, player, races, start, remove, create, sh
 				</li>`
 			})
 			.join('')
-		page.innerHTML = `
+		list.innerHTML = `
 			${rows ? `<ol>${rows}</ol>` : '<p class="empty">Noch keine Rennen hier.</p>'}
 			<button type="button" class="new"><img src="/icons/race-gate.png" alt=""><span>Neues Rennen</span><kbd>G</kbd></button>`
 	}
 
-	page.addEventListener('click', (e) => {
+	list.addEventListener('click', (e) => {
 		const target = e.target.closest('button, .route')
 		if (!target) return
 		const r = races()[Number(target.dataset.i)]

@@ -37,6 +37,8 @@ Oskar values speed over certainty. Verify once and stop: one check that the chan
 
 PLEASE, do not verify and visually screenshot everything single thing.
 
+- Pocket screens can be checked without the city: a throwaway `*.html` in the repo root that imports `src/pocket.js` and the feature (e.g. `src/racing.js` with a stub `world` and `new THREE.Scene()`) loads in seconds even on hetzner. Drive it from a module script, read `pocket.current()`, delete the page before committing.
+
 - Force soaked rain with `?weather=rain&hour=11` (or `hour=22`); `nkgta.weather.setMode('rain')` instead wets gradually. Road nodes include curve points, so only the first and last node of a road should interrupt gutter puddles at junctions.
 - Warm fill on instanced people must multiply their diffuse colour; flat emissive light overwhelms skin and clothing at night.
 - For Weserstraße nightlife, use `?weser&hour=23&day=4&weather=dry`; `bun run perf` takes the phone ride through its bars too. Busy-place `room.step` can shorten the normal one-tile dodge on narrow pavements.
