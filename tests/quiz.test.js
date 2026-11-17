@@ -22,6 +22,14 @@ test('five different streets, each with the right answer and its three nearest a
 	expect(quizRounds(new Map([...streets].slice(0, 4)))).toEqual([])
 })
 
+test('equally near alternatives go to the street listed first', () => {
+	const at = (street, x, y) => [street, [{ street, x, y }]]
+	const streets = new Map([at('A', 50, 0), at('B', 0, 0), at('C', 0, 50), at('D', -50, 0), at('E', 0, -50), at('F', 100, 100)])
+	const round = quizRounds(streets, () => 0)[0]
+	expect(round.street).toBe('B')
+	expect(round.choices.sort()).toEqual(['A', 'B', 'C', 'D'])
+})
+
 test('quiz starts on named streets, never buildings or map edges', () => {
 	const world = { W: 5, H: 5, tileAt: (x) => (x === 2 ? T.ROAD : T.BUILDING), streetAt: (_, y) => (y === 2 ? 'Karl-Marx-Straße' : '') }
 	expect([...quizSpots(world).values()].flat()).toEqual([{ x: 2.5, y: 2.5, street: 'Karl-Marx-Straße' }])
