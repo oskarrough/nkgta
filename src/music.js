@@ -1,3 +1,4 @@
+import { isSameheads } from './sameheads.js'
 import { shuffled } from './random.js'
 import { compile, parse } from 'jukebox/score'
 import { AHEAD, HEAR, KINDS, begin, end, feed, reach, shape as soundAt, synthFor, tune } from 'jukebox/player'
@@ -61,7 +62,11 @@ export function placeSources(world, shops, homes = {}) {
 	const sources = []
 	for (const [i, shop] of shops.entries()) {
 		const [kind, every] = SHOPS[shop.kind] ?? []
-		if (kind && hash(1000 + i) * every < 1)
+		if (isSameheads(shop)) {
+			const src = source(world, homes, 'bar', shop.x, shop.y, 1000 + i, shop.kind)
+			const clubSongs = PLACE_SCORES.filter((name) => homes[name]?.at?.includes('bar'))
+			sources.push({ ...src, score: clubSongs[0] ?? src.score, place: shop.name, shop })
+		} else if (kind && hash(1000 + i) * every < 1)
 			sources.push({ ...source(world, homes, kind, shop.x, shop.y, 1000 + i, shop.kind), place: shop.name })
 	}
 	for (const [i, b] of world.buildings.entries()) {
@@ -244,7 +249,7 @@ export function nearest(sources, x, y) {
 		.map((n) => n.s)
 }
 
-export function createMusic(world, shops, rand = Math.random) {
+export function createMusic(world, shops, opening, rand = Math.random) {
 	const songs = new Map()
 	const fieldNear = openField(world)
 	const field = { kind: 'field', x: 0, y: 0, score: null, since: 0 }
@@ -276,6 +281,12 @@ export function createMusic(world, shops, rand = Math.random) {
 	// A song says where it belongs, so sources are placed once every song is in.
 	const homes = Object.fromEntries([...songs].map(([name, song]) => [name, { street: song.street, at: song.at }]))
 	const fixed = placeSources(world, shops, homes)
+	const club = fixed.find((src) => isSameheads(src.shop))
+	let audibleFixed = fixed
+	if (club && opening) {
+		const closed = fixed.filter((src) => src !== club)
+		opening.watch(club.shop.place, (open) => (audibleFixed = open ? fixed : closed))
+	}
 
 	function stop(p, context) {
 		playing.delete(p.src)
@@ -352,9 +363,9 @@ export function createMusic(world, shops, rand = Math.random) {
 		return [convoy]
 	}
 
-	function update(audio, cars, listener, view, { inCar = false, inside = false, down = false } = {}) {
+	function update(audio, cars, listener, view, { inCar = false, inside = false, shop = null, down = false } = {}) {
 		if (!audio || audio.muted) {
-			heard = fixed
+			heard = audibleFixed
 			loudest = null
 			if (audio) for (const p of playing.values()) stop(p, audio.context)
 			return
@@ -384,7 +395,7 @@ export function createMusic(world, shops, rand = Math.random) {
 		const own = stationIn(listener.car, now)
 		if (inCar && (!own.length || songs.has(own[0].score))) announce(now)
 		else if (!inCar) onAir = null
-		const sources = fixed.concat(
+		const sources = audibleFixed.concat(
 			cars
 				.filter((c) => c.ai && !c.convoy && c !== listener.car)
 				.map(radioOf)
@@ -394,26 +405,35 @@ export function createMusic(world, shops, rand = Math.random) {
 			[fieldAt(listener.x, listener.y)].filter(Boolean),
 		)
 		heard = sources
-		const want = nearest(sources, listener.x, listener.y).filter((src) => songs.has(src.score))
+		const inClub = club && shop === club.shop
+		const want = (inClub ? [club] : nearest(sources, listener.x, listener.y)).filter((src) => songs.has(src.score))
 		for (const p of playing.values()) if (!want.includes(p.src) || p.song !== songs.get(p.src.score)) stop(p, context)
 		// A shop's wall already muffles the whole bus; here only the street's walls count.
 		const walled = (src) => (inside || own.includes(src) || src.kind === 'field' ? 0 : muffling(world, src, listener))
-		const shapes = lead(
-			want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar, walled(src))),
-			want.map((src) => src.kind),
-		)
+		const shapes = inClub
+			? [{ level: 1, cutoff: 16000, wet: 0.35 }]
+			: lead(
+					want.map((src) => shape(src.kind, Math.hypot(src.x - listener.x, src.y - listener.y), own.includes(src), inCar, walled(src))),
+					want.map((src) => src.kind),
+				)
 		loudest = loudestOf(want, shapes, own, loudest)
 		for (const [i, src] of want.entries()) {
 			let p = playing.get(src)
 			if (!p) playing.set(src, (p = begin(synth, context, src, songs.get(src.score))))
 			const pan =
-				own.includes(src) || src.kind === 'field' ? 0 : Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
+				inClub || own.includes(src) || src.kind === 'field'
+					? 0
+					: Math.max(-1, Math.min(1, ((src.x - view.x0) / (view.x1 - view.x0)) * 2 - 1))
 			tune(p, shapes[i], pan, now)
 			feed(p, now + AHEAD, now)
 		}
-		const m = mix({ radio: own.length > 0, duck: audio.duck?.() ?? 0, inside, down })
+		const m = mix({ radio: inClub || own.length > 0, duck: audio.duck?.() ?? 0, inside: inside && !inClub, down })
 		bus.gain.gain.setTargetAtTime(m.level, now, 0.12)
 		bus.tone.frequency.setTargetAtTime(m.cutoff, now, down ? 0.25 : 0.15)
+		if (inClub && want.length) {
+			const song = songs.get(club.score)
+			if (!song.errors.length) return ((now + club.since) * song.tempo * Math.PI) / 60
+		}
 	}
 
 	// R: the next station, or off (`step` -1: the one before). Only in a car;

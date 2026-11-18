@@ -5,6 +5,7 @@
 // like the city's, with the room's own origin at its north-west corner.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { DANCE_FLOOR, isSameheads } from './sameheads.js'
 import { T } from './tiles.js'
 import { LABELS } from './places.js'
 import { CREAM, INK, posterText } from './poster.js'
@@ -36,6 +37,11 @@ const FURNITURE = [
 	[WALL, 2, WALL + 0.8, 6.4, 1.2, '#DCE3EA'], // drinks fridges
 	[8.2, 4.5, 11, 5.2, 0.55, '#A9A7A0'], // a shelf island
 	[10.1, 6.2, 11.4, DOOR_Y, 0.5, '#E8C21A'], // crates of drinks
+]
+const BOOTH = [
+	[3.6, 1.4, 8.4, 2.1, 0.65, '#322E40'],
+	[1.4, 1.1, 2.5, 2.1, 1.45, '#201D29'],
+	[9.5, 1.1, 10.6, 2.1, 1.45, '#201D29'],
 ]
 const SOLIDS = FURNITURE.filter(([, , , , h]) => h > 0.3)
 
@@ -79,6 +85,7 @@ export function createInterior(gradient) {
 			toon(PLASTER),
 		),
 	)
+	const fittingsStart = scene.children.length
 	for (const [x0, y0, x1, y1, h, color] of FURNITURE) at(new THREE.Mesh(box(x0, y0, x1, y1, h), toon(color)))
 	const goods = []
 	const colors = ['#C8302A', '#3FA34D', '#E8C21A', '#3D5E82', '#E7E7E5', '#B5603F']
@@ -109,6 +116,22 @@ export function createInterior(gradient) {
 	scene.add(clerk)
 	at(new THREE.Mesh(box(WALL + 0.8, 2.1, WALL + 0.86, 6.3, 1.1), new THREE.MeshBasicMaterial({ color: '#B4C1D0' })), false)
 
+	const shopFittings = scene.children.slice(fittingsStart)
+	const club = new THREE.Group()
+	scene.add(club)
+	club.visible = false
+	for (const [x0, y0, x1, y1, h, color] of BOOTH) club.add(new THREE.Mesh(box(x0, y0, x1, y1, h), toon(color)))
+	const floor = DANCE_FLOOR
+	const panels = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.98, floor.depth / 4 - 0.02), new THREE.MeshBasicMaterial(), 32)
+	const glow = ['#62334F', '#9D5480', '#51508B', '#437480']
+	for (let i = 0; i < panels.count; i++) {
+		const col = i % 8
+		const row = Math.floor(i / 8)
+		panels.setMatrixAt(i, new THREE.Matrix4().makeTranslation(floor.x + col + 0.5, -(floor.y + ((row + 0.5) * floor.depth) / 4), 0.008))
+		panels.setColorAt(i, new THREE.Color(glow[(col + row) % glow.length]))
+	}
+	club.add(panels)
+
 	const poster = document.createElement('canvas')
 	poster.width = 2048
 	poster.height = 456
@@ -136,7 +159,10 @@ export function createInterior(gradient) {
 	scene.add(lamp, lamp.target)
 
 	function setShop(shop) {
+		club.visible = isSameheads(shop)
+		for (const mesh of shopFittings) mesh.visible = !club.visible
 		clerk.visible = shop.kind === 'doener'
+		lamp.shadow.needsUpdate = true
 		const g = poster.getContext('2d')
 		const { width: w, height: h } = poster
 		g.fillStyle = BOARDS[shop.kind] ?? '#3D5E82'
@@ -149,14 +175,17 @@ export function createInterior(gradient) {
 		g.font = `800 52px system-ui, sans-serif`
 		g.textAlign = 'center'
 		g.textBaseline = 'middle'
-		const sub = shop.kind === 'spaeti' ? 'Späti · Pfand hier' : LABELS[shop.kind]
+		const sub = club.visible ? 'Tanzfläche' : shop.kind === 'spaeti' ? 'Späti · Pfand hier' : LABELS[shop.kind]
 		g.fillText(sub.toUpperCase().split('').join(' '), w / 2, h * 0.82)
 		posterTex.needsUpdate = true
 	}
 
 	const inRect = (x, y, [x0, y0, x1, y1], pad = 0) => x > x0 - pad && x < x1 + pad && y > y0 - pad && y < y1 + pad
 	const world = {
-		tileAt: (x, y) => (x < WALL || y < WALL || x > W - WALL || y > DOOR_Y || SOLIDS.some((r) => inRect(x, y, r)) ? T.BUILDING : T.GROUND),
+		tileAt: (x, y) =>
+			x < WALL || y < WALL || x > W - WALL || y > DOOR_Y || (club.visible ? BOOTH : SOLIDS).some((r) => inRect(x, y, r))
+				? T.BUILDING
+				: T.GROUND,
 	}
 
 	return {

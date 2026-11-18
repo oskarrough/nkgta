@@ -427,6 +427,33 @@ export const sound = {
 	engine,
 	street,
 	siren,
+	bark(level, pan) {
+		if (!context || muted) return
+		for (const delay of [0, 0.27]) {
+			const t = context.currentTime + delay
+			const voice = context.createOscillator()
+			voice.type = 'sawtooth'
+			voice.frequency.setValueAtTime(155, t)
+			voice.frequency.exponentialRampToValueAtTime(310, t + 0.035)
+			voice.frequency.exponentialRampToValueAtTime(98, t + 0.15)
+			const filter = context.createBiquadFilter()
+			filter.type = 'bandpass'
+			filter.frequency.value = 840
+			const gain = context.createGain()
+			gain.gain.setValueAtTime(0.0001, t)
+			gain.gain.linearRampToValueAtTime(0.22 * level, t + 0.018)
+			gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+			const stereo = context.createStereoPanner()
+			stereo.pan.value = pan
+			voice.connect(filter).connect(gain).connect(stereo)
+			out(stereo)
+			voice.start(t)
+			voice.stop(t + 0.17)
+			voice.onended = () => {
+				for (const node of [voice, filter, gain, stereo]) node.disconnect()
+			}
+		}
+	},
 	async door() {
 		if (!context || muted) return
 		const [open, close] = await Promise.all([load('door-open'), load('door-close')])

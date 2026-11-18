@@ -1,3 +1,4 @@
+import { isSameheads, onDanceFloor } from './sameheads.js'
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
@@ -87,6 +88,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 	}
 
 	function startWarp() {
+		player.dancing = false
 		going = false
 		warp = { t: 0, from: { x: player.x, y: player.y } }
 		player.speed = 0
@@ -176,6 +178,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 			}
 			const pushing = (n) => -(axis.x * n.x + axis.y * n.y) > 0.3
 			if (inside) {
+				player.dancing = isSameheads(shop) && onDanceFloor(player.x, player.y) && Math.hypot(axis.x, axis.y) < 0.1
 				const atCounter = interior.atCounter(player.x, player.y)
 				doener.update(shop.kind === 'doener' && atCounter)
 				bikePaint.update(shop.kind === 'bikeshop' && atCounter ? shop : null)
@@ -227,6 +230,8 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				if (doener.active() || bikePaint.active()) return null
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y))
 					return pfand.bag.bottles ? null : { note: 'Pfand? Erst sammeln.' }
+				if (isSameheads(shop))
+					return { action: 'exit', note: player.dancing ? 'Du tanzt.' : 'Auf der Tanzfläche stehen bleiben zum Tanzen.' }
 				return { action: 'exit' }
 			}
 			if (player.car || player.onBike) return null

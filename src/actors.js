@@ -287,6 +287,7 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 	const matrix = new THREE.Matrix4()
 	const color = new THREE.Color()
 	let stride = 0
+	let dancePhase = 0
 
 	return {
 		update(player, peds, bottleList, cam, dt, room = null) {
@@ -302,15 +303,18 @@ export function createActors(scene, gradientMap, heightAt = () => 0) {
 			const bob = player.onBike ? (player.rough ?? 0) * 0.05 * Math.sin(stride) : 0
 			const z = ground + (player.onBike && !player.down ? 0.15 + bob : 0)
 			const grow = cam.third ? 1 : OVERHEAD
+			const dancing = room && player.dancing
+			if (dancing) dancePhase = player.dancePhase ?? dancePhase + dt * Math.PI * 2
+			const sway = dancing ? Math.sin(dancePhase) : 0
 			pose(
 				you,
 				0,
 				PLAYER_LOOK,
-				player.x,
+				player.x + 0.14 * sway,
 				player.y,
-				z,
-				player.dir,
-				player.speed > 0.01 && !player.down ? stride : 0,
+				z + 0.12 * sway ** 2,
+				player.dir + 0.65 * sway,
+				dancing ? dancePhase : player.speed > 0.01 && !player.down ? stride : 0,
 				grow,
 				player.down ? 1 : 0,
 			)

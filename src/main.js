@@ -19,6 +19,7 @@ import { createHud, useAction, useHint } from './hud.js'
 import { frameEnd, frameStart, phase, PERF } from './perf.js'
 import { shopsOf } from './shops.js'
 import { createVisit } from './visit.js'
+import { createLostDog } from './lost-dog.js'
 import { createActors } from './actors.js'
 import { createBusyPlaces } from './busy-places.js'
 import { createTrafficLights } from './traffic-lights.js'
@@ -52,13 +53,13 @@ const world = createWorld(map)
 phase('createWorld')
 loading.textContent = 'Baue die Welt…'
 const URL_PARAMS = new URLSearchParams(location.search)
-const start = URL_PARAMS.has('weser')
-	? { lat: 52.48784, lon: 13.4304, dir: 0.52 }
-	: URL_PARAMS.has('maybach')
-		? { lat: 52.49525, lon: 13.4227, dir: 0.5 }
-		: URL_PARAMS.has('feld')
-			? { lat: 52.47572, lon: 13.4174, dir: Math.PI }
-			: START
+const starts = {
+	weser: { lat: 52.48784, lon: 13.4304, dir: 0.52 },
+	maybach: { lat: 52.49525, lon: 13.4227, dir: 0.5 },
+	feld: { lat: 52.47572, lon: 13.4174, dir: Math.PI },
+	sameheads: { lat: 52.4779364, lon: 13.4395873, dir: 2.23 },
+}
+const start = starts[Object.keys(starts).find((place) => URL_PARAMS.has(place))] ?? START
 const player = createPlayer(world.startPoint(start))
 const pfand = createPfand(world)
 const camera = createCamera(world)
@@ -76,6 +77,7 @@ const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
 loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
+const lostDog = createLostDog(world, shops, player, hud.say, sound.bark)
 const chatter = createChatter(world, shops)
 const busy = createBusyPlaces(world, pfand, (p, line) => {
 	chatter.shout(p)
@@ -90,7 +92,7 @@ const traffic = createTraffic(
 const signals = traffic.lights()
 city3d.weather.setSignals(signals)
 const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, signals)
-const music = createMusic(world, shops)
+const music = createMusic(world, shops, opening)
 phase('overlay, hud, traffic')
 const pocket = createPocket({
 	turnStation(step) {
@@ -296,7 +298,9 @@ menu.add('area', { run: actions.pickArea })
 if (URL_PARAMS.has('tune')) menu.showDebug(true)
 
 function use() {
-	if (wasted.active() || police.active() || visit.use()) return
+	if (wasted.active() || police.active()) return
+	if (!visit.busy() && !quiz.active() && lostDog.use()) return
+	if (visit.use()) return
 	if (player.car) {
 		leaveCar(player, world)
 		sound.door()
@@ -396,8 +400,15 @@ function frame(now) {
 	sound.listen(world, street.x, street.y, inside)
 	busy.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside, clock.day, city3d.weather.temperature)
 	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, busy.people)
-	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: state.down || state.busted })
-	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
+	player.dancePhase = music.update(sound.audio(), traffic.cars, street, streetView, {
+		inCar: !!player.car,
+		inside,
+		shop: visit.shop(),
+		down: state.down || state.busted,
+	})
+	lostDog.update(dt, !state.busy && !state.quiz && !state.down && !state.busted, cam.third)
+	const peds = lostDog.owner && !inside ? [...traffic.peds, lostDog.owner] : traffic.peds
+	actors.update(player, peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
 	city3d.weather.update(dt, player, inside)
@@ -417,7 +428,8 @@ function frame(now) {
 		cars: indoors ? [] : traffic.cars,
 	})
 	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
-	const door = visit.hint()
+	const dogHint = !state.busy && !state.quiz && !state.down && !state.busted && lostDog.hint()
+	const door = dogHint || visit.hint()
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car || skating(player))
@@ -472,6 +484,7 @@ if (import.meta.env.DEV)
 		player,
 		shops,
 		visit,
+		lostDog,
 		pfand,
 		camera,
 		traffic,
