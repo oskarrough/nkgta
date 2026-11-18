@@ -9,7 +9,7 @@ import { badgeMaterial, throb } from './badge.js'
 const POST = { height: 1.5, width: 0.12 }
 const FLAG = { every: 0.32, width: 0.22, drop: 0.28 }
 const BUNTING = ['#e23b2e', '#e8c21a', '#e7e7e5', '#115d91', '#2f6b3c']
-const BADGE = { size: 1.5, next: 2.2, lift: 0.9 }
+const BADGE = { size: 0.85, next: 1.05, gap: 0.18 }
 const COLORS = { next: '#e8c21a', later: '#e7e7e5', start: '#e8c21a' }
 const GHOST = { color: '#8fe3ff', rival: '#ffb25c', opacity: 0.5 }
 const NAME = { width: 4, lift: 1.6 }
@@ -92,8 +92,10 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		group.add(rope, line, bunting(ax, ay, bx, by, top))
 		const sprite = new THREE.Sprite(badge(label, state))
 		sprite.renderOrder = 10
-		sprite.position.set(mid[0], -mid[1], z + POST.height + BADGE.lift)
 		const size = state === 'later' ? BADGE.size : BADGE.next
+		const [px, py] = ay <= by ? posts[0] : posts[1]
+		const offset = (size / 2 + BADGE.gap) / (span / 2)
+		sprite.position.set(px + (px - mid[0]) * offset, -(py + (py - mid[1]) * offset), z + POST.height)
 		sprite.scale.set(size, size, 1)
 		group.add(sprite)
 		root.add(group)

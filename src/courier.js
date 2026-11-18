@@ -68,13 +68,14 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 			next()
 		},
 
-		update(dt, { inside = false, busy = false, down = false } = {}) {
+		update(dt, { busy, quiz, down } = {}, racing = false) {
+			const hidden = busy || quiz
 			if ((hintIn -= dt) <= 0) {
 				hintIn = Infinity
 				remember('hinted', true)
 				pocket.say('Schalter „Kurier“ an, dann gibt’s Jobs', 5)
 			}
-			if (mode === 'idle' && kurier.on && !inside && !busy && !down && (wait -= dt) <= 0) {
+			if (mode === 'idle' && kurier.on && !hidden && !racing && !down && (wait -= dt) <= 0) {
 				job = offerJob(shops, doors, player.x, player.y)
 				if (job) {
 					mode = 'offer'
@@ -87,7 +88,7 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 					setOnline(false)
 					pocket.say('Kurier: offline, du warst nicht da', 4)
 				} else pocket.say('Angebot verpasst', 3)
-			} else if (mode === 'pickup' && !inside && stoppedAt(job.from)) {
+			} else if (mode === 'pickup' && !hidden && stoppedAt(job.from)) {
 				mode = 'deliver'
 				t = 0
 				bumps = 0
@@ -102,12 +103,12 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 				const speed = Math.abs(player.speed)
 				const drop = lastSpeed - speed
 				calm -= dt
-				if (!inside && dt > 0 && drop > KNOCK.drop && drop / dt > KNOCK.rate && calm <= 0) {
+				if (!hidden && dt > 0 && drop > KNOCK.drop && drop / dt > KNOCK.rate && calm <= 0) {
 					calm = KNOCK.calm
 					if (bumps < job.items.length) hud.bump()
 					bumps++
 				}
-				if (!inside && stoppedAt(job.to)) {
+				if (!hidden && stoppedAt(job.to)) {
 					const pay = payout(job, t, bumps)
 					pfand.bag.cents += pay.total
 					hud.paid(pay)
@@ -116,7 +117,7 @@ export function createCourier({ world, shops, player, scene, pfand, pocket, onli
 			}
 			lastSpeed = Math.abs(player.speed)
 			marks.show(mode === 'pickup' ? job.from : null, street)
-			marks.update(dt, player, inside)
+			marks.update(dt, player, hidden)
 			hud.update({ mode, job, fuse: fuse / OFFER, left: job ? job.limit - t : 0, spilt: Math.min(bumps, job?.items.length ?? 0) }, dt)
 		},
 

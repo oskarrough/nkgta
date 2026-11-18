@@ -148,8 +148,9 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 		callOff()
 	}
 
-	// `hidden`: inside a shop or otherwise off the street, where nobody can see you.
-	function update(dt, view, hidden = false) {
+	function update(dt, view, state = {}) {
+		if (state.down) return
+		const hidden = state.inside || state.warping || state.quiz
 		clock += dt
 		const nicked = bust.shown()
 		bust.update(dt)

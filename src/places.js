@@ -52,10 +52,10 @@ export const placeName = (p) => p.name || LABELS[p.kind]
 // Closest place to (x, y) within `within` tiles, optionally of one kind.
 export function nearestPlace(pois, x, y, within, kind) {
 	let best = null
-	let bestD = within
+	let bestD = Math.max(0, within) ** 2
 	for (const p of pois) {
 		if (kind && p.kind !== kind) continue
-		const d = Math.hypot(p.x - x, p.y - y)
+		const d = (p.x - x) ** 2 + (p.y - y) ** 2
 		if (d < bestD) {
 			best = p
 			bestD = d

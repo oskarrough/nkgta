@@ -1,20 +1,10 @@
-import { T, SOLID } from './tiles.js'
+import { nearestTile, T, SOLID } from './tiles.js'
+
+import { nearestPlace } from './places.js'
 
 const REACH = 8 // tiles out from the campus edge to look for pavement
 
-export function nearestHospital(pois, x, y) {
-	let best = null
-	let bestD = Infinity
-	for (const p of pois) {
-		if (p.kind !== 'hospital') continue
-		const d = (p.x - x) ** 2 + (p.y - y) ** 2
-		if (d < bestD) {
-			best = p
-			bestD = d
-		}
-	}
-	return best
-}
+export const nearestHospital = (pois, x, y) => nearestPlace(pois, x, y, Infinity, 'hospital')
 
 export function hospitalDoor(ring, tileAt) {
 	if (!ring?.length) return null
@@ -61,16 +51,11 @@ export function hospitalDoor(ring, tileAt) {
 }
 
 function walkableNear(x, y, tileAt, fallback) {
-	for (let r = 0; r < 40; r++) {
-		for (let dy = -r; dy <= r; dy++) {
-			for (let dx = -r; dx <= r; dx++) {
-				const px = (x | 0) + dx + 0.5
-				const py = (y | 0) + dy + 0.5
-				if (!SOLID.has(tileAt(px, py))) return { x: px, y: py, dir: Math.atan2(y - py, x - px) }
-			}
-		}
-	}
-	return fallback
+	return (
+		nearestTile((x | 0) + 0.5, (y | 0) + 0.5, 39, (px, py) =>
+			SOLID.has(tileAt(px, py)) ? null : { x: px, y: py, dir: Math.atan2(y - py, x - px) },
+		) ?? fallback
+	)
 }
 
 export function hospitalWake(pois, x, y, tileAt) {

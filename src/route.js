@@ -22,7 +22,7 @@ export function findRoute(world, from, to, step = 3) {
 	const start = at(from.x, from.y)
 	const goal = at(to.x, to.y)
 
-	const cost = new Float32Array(w * h).fill(Infinity)
+	const cost = new Float64Array(w * h).fill(Infinity)
 	const parent = new Int32Array(w * h).fill(-1)
 	const open = createHeap()
 	const gx = Math.floor(to.x) - x0
@@ -33,14 +33,21 @@ export function findRoute(world, from, to, step = 3) {
 		return dx + dy - 0.586 * Math.min(dx, dy)
 	}
 	// The goal and the start may stand on a wall's edge (a door); everything between may not.
-	const walkable = (i, x, y) => i === goal || (x >= 0 && y >= 0 && x < w && y < h && !SOLID.has(world.tileAt(x0 + x, y0 + y)))
-	const price = (x, y) => COST[world.tileAt(x0 + x, y0 + y)] ?? 1
+	const prices = new Float32Array(w * h)
+	function price(i, x, y) {
+		if (prices[i]) return prices[i]
+		const tile = world.tileAt(x0 + x, y0 + y)
+		return (prices[i] = i !== goal && SOLID.has(tile) ? Infinity : (COST[tile] ?? 1))
+	}
 
 	cost[start] = 0
 	open.push(estimate(start), start)
 	for (let n = 0; open.size() && n < EXPANSIONS; n++) {
 		const i = open.pop()
 		if (i === goal) return thin(unwind(parent, i, w, x0, y0), step)
+		const current = cost[i]
+		if (current === -Infinity) continue
+		cost[i] = -Infinity
 		const x = i % w
 		const y = (i / w) | 0
 		for (let dy = -1; dy <= 1; dy++) {
@@ -49,10 +56,10 @@ export function findRoute(world, from, to, step = 3) {
 				const nx = x + dx
 				const ny = y + dy
 				const j = ny * w + nx
-				if (nx < 0 || ny < 0 || nx >= w || ny >= h || !walkable(j, nx, ny)) continue
-				if (dx && dy && (!walkable(y * w + nx, nx, y) || !walkable(ny * w + x, x, ny))) continue
-				const c = cost[i] + (dx && dy ? 1.414 : 1) * price(nx, ny)
+				if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+				const c = current + (dx && dy ? 1.414 : 1) * price(j, nx, ny)
 				if (c >= cost[j]) continue
+				if (dx && dy && (price(y * w + nx, nx, y) === Infinity || price(ny * w + x, x, ny) === Infinity)) continue
 				cost[j] = c
 				parent[j] = i
 				open.push(c + estimate(j), j)

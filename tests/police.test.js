@@ -84,7 +84,7 @@ test('going indoors breaks sight and lets the search expire', () => {
 	const { police } = setup()
 	police.steal()
 	police.update(0.1)
-	for (let t = 0; t < 9; t += 0.1) police.update(0.1, null, true)
+	for (let t = 0; t < 9; t += 0.1) police.update(0.1, null, { inside: true })
 	expect(police.heat()).toBe(0)
 })
 

@@ -240,7 +240,9 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 		},
 
 		// After the player has moved this frame from `from`.
-		update(dt, from, { inside = false, down = false } = {}) {
+		update(dt, from, state = {}) {
+			const hidden = state.busy || state.quiz
+			const canRace = !hidden && !state.down && !state.busted
 			const to = { x: player.x, y: player.y }
 			const jumped = Math.hypot(to.x - from.x, to.y - from.y) > TELEPORT
 			if (phase === 'countdown') {
@@ -249,7 +251,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 					count = 0
 					phase = 'running'
 				}
-			} else if (phase === 'running' && !jumped && !inside && !down) {
+			} else if (phase === 'running' && !jumped && canRace) {
 				const event = stepRun(run, from, to, dt, pose())
 				if (event) hud.split(event)
 				if (event?.finish) {
@@ -261,7 +263,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 					phase = 'done'
 				}
 			} else if (phase === 'running') run.t += dt
-			if (!draft && phase !== 'countdown' && phase !== 'running' && !jumped && !inside && !down) {
+			if (!draft && phase !== 'countdown' && phase !== 'running' && !jumped && canRace) {
 				const next = races.find((r) => crosses(r.gates[0], from, to))
 				if (next) begin(next)
 			}
@@ -270,7 +272,7 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			gates3d.ghost(race?.best?.ghost && riding ? ghostAt(race.best.ghost, at) : null)
 			gates3d.rival(race?.rival?.ghost && riding ? ghostAt(race.rival.ghost, at) : null, race?.rival?.name || 'Geist')
 			gates3d.show(shownGates())
-			gates3d.update(dt, inside)
+			gates3d.update(dt, hidden)
 			hud.update(view(), dt)
 		},
 

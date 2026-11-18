@@ -29,3 +29,16 @@ export const KERB = '#c9c1b2'
 export const MARK = '#f4f1e7'
 
 export const SOLID = new Set([T.BUILDING, T.WATER])
+
+// Scan each square ring in row order so ties keep the same street or pavement.
+export function nearestTile(x, y, radius, match) {
+	for (let r = 0; r <= radius; r++) {
+		for (let dy = -r; dy <= r; dy++) {
+			const step = Math.abs(dy) === r ? 1 : 2 * r
+			for (let dx = -r; dx <= r; dx += step) {
+				const hit = match(x + dx, y + dy)
+				if (hit) return hit
+			}
+		}
+	}
+}

@@ -87,8 +87,9 @@ const traffic = createTraffic(
 	(text) => hud.say(text),
 	(p) => chatter.shout(p),
 )
-city3d.weather.setSignals(traffic.lights())
-const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, traffic.lights())
+const signals = traffic.lights()
+city3d.weather.setSignals(signals)
+const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, signals)
 const music = createMusic(world, shops)
 phase('overlay, hud, traffic')
 const pocket = createPocket({
@@ -355,32 +356,47 @@ function frame(now) {
 	frameStart()
 	const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
 	busy.prepare(clock.hour, clock.day)
-	camera.suspend(visit.busy())
+	const busyBeforeMove = visit.busy()
+	const downBeforeMove = wasted.active()
+	const bustedBeforeMove = police.active()
+	camera.suspend(busyBeforeMove)
 	const from = { x: player.x, y: player.y }
-	if (player.car || player.onBike || visit.busy() || wasted.active() || police.active()) spray.lower()
+	if (player.car || player.onBike || busyBeforeMove || downBeforeMove || bustedBeforeMove) spray.lower()
 	if (spray.active()) spray.update(dt, input.push(), input.brake())
-	else if (!wasted.active() && !police.active() && !visit.warping())
+	else if (!downBeforeMove && !bustedBeforeMove && !visit.warping())
 		updatePlayer(player, input, visit.world(world), dt, city3d.weather.wind)
 	if (quiz.active()) quiz.tick(now, from)
 	else visit.update(dt, heading())
 	wasted.update(dt)
 	const inside = visit.inside()
 	const indoors = visit.indoors()
-	camera.suspend(visit.busy())
+	const state = {
+		inside,
+		busy: visit.busy(),
+		warping: visit.warping(),
+		quiz: quiz.active(),
+		down: wasted.active(),
+		busted: bustedBeforeMove,
+	}
+	camera.suspend(state.busy)
 	const cam = camera.update(visit.focus(dt), canvas, dt, city3d.pixelGrid(), visit.closer())
 	// Inside a shop, the street carries on round its door.
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
 	const hit = traffic.update(dt, street, streetView, clock.hour, clock.day)
-	if (!wasted.active()) police.update(dt, streetView, inside || visit.warping() || quiz.active())
-	if (!quiz.active() && !inside && !visit.warping() && !police.active()) wasted.hit(hit)
-	if (!quiz.active() && !inside && !player.car && !wasted.active()) pfand.update(player)
+	police.update(dt, streetView, state)
+	if (!state.down) state.busted = police.active()
+	if (!state.quiz && !inside && !state.warping && !state.busted) {
+		wasted.hit(hit)
+		state.down = wasted.active()
+	}
+	if (!state.quiz && !inside && !player.car && !state.down) pfand.update(player)
 	sound.engine(player.car)
 	sound.street(traffic.cars, street, streetView, dt)
 	sound.listen(world, street.x, street.y, inside)
 	busy.update(dt, street, streetView, clock.hour, city3d.weather.wetness, !!cam.third, inside, clock.day, city3d.weather.temperature)
 	chatter.update(sound.audio(), traffic.peds, street, streetView, { inside }, busy.people)
-	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: wasted.active() || police.active() })
+	music.update(sound.audio(), traffic.cars, street, streetView, { inCar: !!player.car, inside, down: state.down || state.busted })
 	actors.update(player, traffic.peds, pfand.bottles, cam, dt, visit.room())
 	trafficLights.update()
 	if (Number.isNaN(frozenHour)) clock.tick(dt)
@@ -405,16 +421,18 @@ function frame(now) {
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
 	input.setDriving(!!player.car || skating(player))
-	racing.update(dt, from, { inside: visit.busy() || quiz.active(), down: wasted.active() || police.active() })
+	if (state.busy) state.busy = visit.busy() // Rendering can finish closing the portal.
+	racing.update(dt, from, state)
+	const gate = racing.target()
 	pocketMap.follow({
 		at: street,
 		heading: player.car?.angle ?? player.dir,
 		chase: !!cam.third,
-		gate: racing.target(),
+		gate,
 		job: courier.target(),
 	})
 	pocket.update({ radio: music.radio(), hearing: music.hearing(), car: !!player.car, hour: clock.hour }, dt)
-	courier.update(dt, { inside: visit.busy() || quiz.active(), busy: !!racing.target(), down: wasted.active() })
+	courier.update(dt, state, !!gate)
 	hud.update(
 		{
 			player,

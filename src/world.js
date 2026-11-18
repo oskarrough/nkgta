@@ -1,23 +1,11 @@
-import { T } from './tiles.js'
+import { nearestTile, T } from './tiles.js'
 import { createTerrain } from './terrain.js'
 
 export function createWorld(map) {
 	const { w: W, h: H, tiles, streetOf, bbox, tileM } = map
 	const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? T.BUILDING : tiles[(y | 0) * W + (x | 0)])
-	const streetAt = (x, y) => map.streets[streetOf[(y | 0) * W + (x | 0)]] || ''
-	function nearestStreet(x, y, maxR = 12) {
-		const ix = x | 0
-		const iy = y | 0
-		for (let r = 0; r <= maxR; r++) {
-			for (let dy = -r; dy <= r; dy++) {
-				for (let dx = -r; dx <= r; dx++) {
-					const name = streetAt(ix + dx, iy + dy)
-					if (name) return name
-				}
-			}
-		}
-		return ''
-	}
+	const streetAt = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? map.streets[streetOf[(y | 0) * W + (x | 0)]] || '' : '')
+	const nearestStreet = (x, y, radius = 12) => nearestTile(Math.floor(x), Math.floor(y), radius, streetAt) ?? ''
 
 	const lonM = 111320 * Math.cos((((bbox.north + bbox.south) / 2) * Math.PI) / 180)
 	const fromLatLon = ({ lat, lon }) => ({
@@ -26,20 +14,11 @@ export function createWorld(map) {
 	})
 	const contains = ({ lat, lon }) => lat > bbox.south && lat < bbox.north && lon > bbox.west && lon < bbox.east
 
-	function nearestOf(type, { x, y }) {
-		for (let r = 0; r < 100; r++) {
-			for (let dy = -r; dy <= r; dy++) {
-				for (let dx = -r; dx <= r; dx++) {
-					if (tileAt(x + dx, y + dy) === type) return { x: (x | 0) + dx + 0.5, y: (y | 0) + dy + 0.5 }
-				}
-			}
-		}
-		return { x, y }
-	}
-
 	function startPoint(preferred) {
-		const at = contains(preferred) ? fromLatLon(preferred) : { x: W / 2, y: H / 2 }
-		return { ...nearestOf(T.SIDEWALK, at), dir: contains(preferred) ? (preferred.dir ?? 0) : 0 }
+		const inArea = contains(preferred)
+		const at = inArea ? fromLatLon(preferred) : { x: W / 2, y: H / 2 }
+		const pavement = nearestTile(at.x | 0, at.y | 0, 99, (x, y) => tileAt(x, y) === T.SIDEWALK && { x: x + 0.5, y: y + 0.5 })
+		return { ...(pavement ?? at), dir: inArea ? (preferred.dir ?? 0) : 0 }
 	}
 
 	// Ground height in tiles, and its rise per tile along x and y.
