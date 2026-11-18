@@ -1,8 +1,45 @@
 import { copy } from './copy.js'
 import { quizShareText, seeded } from './daily.js'
-import { quizLine, quizRounds, streetSpots } from './quiz-rules.js'
-import { COLORS } from './tiles.js'
+import { guessRelation, quizLine, quizRounds, streetSpots } from './quiz-rules.js'
+import { COLORS, T } from './tiles.js'
 import './quiz.css'
+
+function revealMap(world, spot, closest) {
+	const map = document.createElement('canvas')
+	map.width = 360
+	map.height = 180
+	map.setAttribute('role', 'img')
+	map.setAttribute('aria-label', 'Ortskarte mit Standort (●) und Tipp (×), Norden oben')
+	const ctx = map.getContext('2d')
+	const scale = Math.min(8, 300 / (Math.abs(spot.x - closest.x) + 1), 126 / (Math.abs(spot.y - closest.y) + 1))
+	const left = (spot.x + closest.x) / 2 - map.width / (2 * scale)
+	const top = (spot.y + closest.y) / 2 - map.height / (2 * scale)
+	const step = Math.max(1, Math.floor(1 / scale))
+	for (let y = Math.floor(top); y < top + map.height / scale; y += step) {
+		for (let x = Math.floor(left); x < left + map.width / scale; x += step) {
+			const tile = world.tileAt(x, y)
+			const street = tile === T.ROAD || tile === T.SIDEWALK ? world.streetAt(x, y) : ''
+			ctx.fillStyle = street === spot.street ? '#ffe369' : street === closest.street ? '#72dcff' : COLORS[tile]
+			ctx.fillRect(Math.floor((x - left) * scale), Math.floor((y - top) * scale), Math.ceil(step * scale), Math.ceil(step * scale))
+		}
+	}
+	ctx.font = 'bold 16px system-ui'
+	ctx.textAlign = 'center'
+	ctx.textBaseline = 'middle'
+	ctx.lineWidth = 3
+	ctx.strokeStyle = '#192321'
+	for (const [p, mark, color] of [
+		[spot, '●', '#ffe369'],
+		[closest, '×', '#72dcff'],
+	]) {
+		const x = (p.x - left) * scale,
+			y = (p.y - top) * scale
+		ctx.strokeText(mark, x, y)
+		ctx.fillStyle = color
+		ctx.fillText(mark, x, y)
+	}
+	return map
+}
 
 export function createQuiz({ world, player, camera, city3d, area, prepare, restore, say, finished }) {
 	const root = document.createElement('section')
@@ -95,6 +132,22 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 				if (!res.ok) reportSendFailure()
 			})
 			.catch(reportSendFailure)
+		if (name && name !== spot.street) {
+			phase = 'reveal'
+			root.replaceChildren()
+			title(`● Du warst hier: ${spot.street}`)
+			const { closest, metres, direction } = guessRelation(spot, streetSpots(world).get(name), world.tileM)
+			const detail = document.createElement('p')
+			detail.textContent = `× Dein Tipp: ${name} · ca. ${metres} m ${direction} von hier`
+			const panel = document.createElement('div')
+			panel.className = 'quiz-reveal'
+			panel.append(root.firstChild, detail, revealMap(world, spot, closest), button(answers.length < 5 ? 'Weiter' : 'Ergebnis', advance))
+			root.append(panel)
+			selected = 0
+			select(0)
+		} else advance()
+	}
+	function advance() {
 		if (answers.length < 5) next()
 		else recap()
 	}
@@ -197,7 +250,7 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 			return
 		}
 		if (phase === 'look') camera.look((pad?.axes[2] ?? 0) * 35, (pad?.axes[3] ?? 0) * 20)
-		else if (phase === 'answer' || phase === 'done') {
+		else if (phase === 'answer' || phase === 'reveal' || phase === 'done') {
 			if (fired(12) || fired(14)) select(-1)
 			if (fired(13) || fired(15)) select(1)
 			if (fired(0)) root.querySelectorAll('button')[selected]?.click()

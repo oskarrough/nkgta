@@ -1,6 +1,6 @@
 import { defaultMap } from './default-map.js'
 import { expect, test } from 'bun:test'
-import { quizLine, quizRounds, quizSpots } from '../src/quiz-rules.js'
+import { guessRelation, quizLine, quizRounds, quizSpots } from '../src/quiz-rules.js'
 import { T } from '../src/tiles.js'
 
 test('five different streets, each with the right answer and its three nearest alternatives', () => {
@@ -47,4 +47,13 @@ test('the shipped map can provide a full quiz', async () => {
 	const rounds = quizRounds(quizSpots(world))
 	expect(rounds).toHaveLength(5)
 	for (const spot of rounds) expect(world.streetAt(spot.x, spot.y)).toBe(spot.street)
+})
+
+test('wrong guess measures to the nearest mapped part of the guessed street, with north up', () => {
+	const near = { x: 12, y: 8 }
+	expect(guessRelation({ x: 10, y: 10 }, [{ x: 5, y: 15 }, near, { x: 40, y: 10 }], 4)).toEqual({
+		closest: near,
+		direction: 'nordöstlich',
+		metres: 11,
+	})
 })

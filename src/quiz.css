@@ -69,3 +69,21 @@ body.quizzing :is(.hud, #pocket, #race, #touch-actions, #menu-button, #menu, #de
 #quiz li {
 	padding: 3px 0;
 }
+.quiz-reveal {
+	display: grid;
+	justify-items: center;
+	gap: 8px;
+	padding: 12px;
+	background: #192321f5;
+	border-radius: 8px;
+}
+#quiz .quiz-reveal h2 {
+	margin: 0;
+	color: #ffe369;
+	font-size: 20px;
+}
+#quiz .quiz-reveal p {
+	margin: 0;
+	color: #72dcff;
+	font-size: 15px;
+}

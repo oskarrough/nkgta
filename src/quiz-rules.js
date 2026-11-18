@@ -23,6 +23,18 @@ export function quizSpots(world) {
 	return streets
 }
 
+export function guessRelation(spot, points, tileM) {
+	const closest = points.reduce((best, p) => (distance(p) < distance(best) ? p : best))
+	function distance(p) {
+		return Math.hypot(p.x - spot.x, p.y - spot.y)
+	}
+	const angle = Math.atan2(closest.x - spot.x, spot.y - closest.y)
+	const direction = ['nördlich', 'nordöstlich', 'östlich', 'südöstlich', 'südlich', 'südwestlich', 'westlich', 'nordwestlich'][
+		(Math.round(angle / (Math.PI / 4)) + 8) % 8
+	]
+	return { closest, direction, metres: Math.round(distance(closest) * tileM) }
+}
+
 export function quizRounds(streets, random = Math.random) {
 	if (streets.size < 5) return []
 	const nearest = nearestStreets(streets)
