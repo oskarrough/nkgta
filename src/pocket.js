@@ -1,4 +1,5 @@
 import './pocket.css'
+import { PHONE } from './device.js'
 import { haptic } from './haptic.js'
 import { recall, remember } from './remember.js'
 import { sound } from './sound.js'
@@ -120,6 +121,31 @@ export function createPocket({ turnStation }) {
 	// Where it sits: fractions of the free room across and down, or null for
 	// the default, top right under the money.
 	let spot = recall(STORE)
+	const fold = document.createElement('button')
+	let tucked = PHONE && recall('nk-pocket-tucked', !spot)
+	if (PHONE) {
+		fold.type = 'button'
+		fold.className = 'fold'
+		el.prepend(fold)
+		fold.addEventListener('click', () => {
+			tucked = !tucked
+			remember('nk-pocket-tucked', tucked)
+			updateFold()
+			haptic()
+		})
+	}
+	function updateFold() {
+		if (!PHONE) return
+		const urgent = alerts.length > 0 || Object.values(tagOf).some((tag) => tag?.urgent)
+		const closed = tucked && !urgent
+		fold.hidden = urgent
+		fold.textContent = closed ? 'Pocket ▾' : 'Einklappen ▴'
+		fold.ariaLabel = closed ? 'Pocket öffnen' : 'Pocket einklappen'
+		fold.setAttribute('aria-expanded', String(!closed))
+		el.classList.toggle('tucked', closed)
+		shownText = null
+		place()
+	}
 	function place() {
 		if (!spot) return
 		const free = room()
@@ -139,7 +165,8 @@ export function createPocket({ turnStation }) {
 		if (nearest >= 2 && Math.min(x, 1 - x) < CORNER) x = x < 0.5 ? 0 : 1
 		return { x, y }
 	}
-	place()
+	if (PHONE) updateFold()
+	else place()
 	addEventListener('resize', place)
 
 	// Down to zero is mute; a tick in the hand at every tenth on the way.
@@ -171,7 +198,7 @@ export function createPocket({ turnStation }) {
 	el.addEventListener('pointerdown', (e) => {
 		if (e.button > 0) return
 		sound.start()
-		if (onScreen(e.target) || e.target.closest('.screen button')) return
+		if (e.target === fold || onScreen(e.target) || e.target.closest('.screen button')) return
 		const r = el.getBoundingClientRect()
 		gesture = {
 			id: e.pointerId,
@@ -267,6 +294,11 @@ export function createPocket({ turnStation }) {
 	return {
 		add,
 		show(id) {
+			if (PHONE && tucked) {
+				tucked = false
+				remember('nk-pocket-tucked', false)
+				updateFold()
+			}
 			back = null
 			show(id)
 		},
@@ -303,7 +335,8 @@ export function createPocket({ turnStation }) {
 			if (!alerts.includes(current?.id) && current?.id !== id) back = current
 			if (alerts.includes(id)) alerts.splice(alerts.indexOf(id), 1)
 			alerts.push(id)
-			const typing = current?.live && el.contains(document.activeElement)
+			const typing = current?.live && screen.contains(document.activeElement)
+			updateFold()
 			if (!typing) show(id)
 		},
 		release(id) {
@@ -311,6 +344,7 @@ export function createPocket({ turnStation }) {
 			alerts.splice(alerts.indexOf(id), 1)
 			if (current?.id === id) show(alerts.at(-1) ?? (back ?? home).id)
 			if (!alerts.length) back = null
+			updateFold()
 		},
 		// A few characters on the top line, while another app has the screen;
 		// with a `level` from 0 to 1, a battery instead, `text` on hover.
@@ -318,6 +352,7 @@ export function createPocket({ turnStation }) {
 			const tag = tagOf[id]
 			if (tag?.text === text && tag?.urgent === urgent && tag?.level === level) return
 			tagOf[id] = { text, urgent, level }
+			if (Boolean(tag?.urgent) !== urgent) updateFold()
 			showTags()
 		},
 		// `radio`: the car radio's { name, title }, or null out of a car;

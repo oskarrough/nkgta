@@ -38,6 +38,26 @@ body.touch #pocket {
 		width: 10.6rem;
 	}
 }
+#pocket .fold {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	background: transparent;
+	color: #39382e;
+	font:
+		800 0.75rem / 1 system-ui,
+		sans-serif;
+}
+#pocket .fold[hidden],
+#pocket.tucked > :not(.fold) {
+	display: none;
+}
+body #pocket.tucked {
+	width: auto;
+	min-width: 5rem;
+	padding: 0 0.5rem;
+	border-radius: 0.6rem;
+}
 #pocket.asleep {
 	opacity: 0;
 	visibility: hidden;
