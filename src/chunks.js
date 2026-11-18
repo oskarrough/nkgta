@@ -30,6 +30,8 @@ const BUDGET = (PHONE ? 16 : 128) * 2 ** 20 // bytes of chunk textures beyond th
 // BUILD_MS a frame while something is. One slice can overrun by a step.
 const BUILD_SHARE = 0.25
 const BUILD_MS = 8
+// No new build step once the frame is this share of the way to the next, so drawing still fits.
+const FRAME_SHARE = 0.6
 const UPLOAD_BYTES = 8 * 2 ** 20 // texture bytes sent to the GPU per frame, at least one texture
 const MAX_PX = 8192 // texture size every GPU takes
 const KINDS = ['ground', 'roofs']
@@ -192,6 +194,7 @@ export function createChunks(world, renderer, build) {
 			entry.state = 'ready'
 			if (!entry.pinned) bytes += entry.bytes
 			sent += entry.bytes
+			note('uploadMB', entry.bytes / 2 ** 20)
 		}
 	}
 
@@ -270,9 +273,11 @@ export function createChunks(world, renderer, build) {
 		c.parts.group.updateWorldMatrix(true, true)
 		c.bounds = new THREE.Box3().setFromObject(c.parts.group)
 		c.parts.group.updateMatrixWorld = () => {}
-		// Its shaders compile now, alongside the game, rather than stalling
-		// the frame it first shows up in.
-		if (group.parent) renderer.compileAsync(c.parts.group, probe, group.parent)
+		// It stays hidden until its shaders have compiled alongside the game,
+		// rather than compiling them in the frame it first shows up in.
+		const parts = c.parts
+		parts.compiled = !group.parent
+		if (group.parent) renderer.compileAsync(parts.group, probe, group.parent).finally(() => (parts.compiled = true))
 	}
 
 	// `rush` while the game is still loading: the first view builds whole.
@@ -297,7 +302,10 @@ export function createChunks(world, renderer, build) {
 			}
 		}
 		const missing = order.some(([d, c]) => d === 0 && !c.parts)
-		const until = t + (rush ? Infinity : missing ? BUILD_MS : Math.min(BUILD_MS, between * BUILD_SHARE))
+		const slice = missing ? BUILD_MS : Math.min(BUILD_MS, between * BUILD_SHARE)
+		const deadline = (globalThis.document?.timeline?.currentTime ?? t) + between * FRAME_SHARE
+		// At least one step a frame, so a busy frame can't starve the build.
+		const until = rush ? Infinity : Math.max(t + 1, Math.min(t + slice, deadline))
 		for (const [d, c] of order) {
 			if (c.parts) continue
 			if ((PHONE && d > MARGIN) || performance.now() >= until || (rush && d > 0)) break
@@ -382,7 +390,7 @@ export function createChunks(world, renderer, build) {
 			camera.updateMatrixWorld()
 			frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
 			for (const c of chunks) {
-				if (c.parts) c.parts.group.visible = frustum.intersectsBox(c.bounds) || !!shadow?.intersectsBox(c.bounds)
+				if (c.parts) c.parts.group.visible = c.parts.compiled && (frustum.intersectsBox(c.bounds) || !!shadow?.intersectsBox(c.bounds))
 			}
 		},
 		ready(view, scale) {
@@ -391,7 +399,8 @@ export function createChunks(world, renderer, build) {
 				const check = () => {
 					update(view, scale, true)
 					const done = chunks.every(
-						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown?.[k]),
+						(c) =>
+							distance(c, view) > 0 || (c.parts?.compiled && KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown?.[k])),
 					)
 					if (done || performance.now() - start > 15000) resolve()
 					else setTimeout(check, 30)

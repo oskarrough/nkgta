@@ -20,6 +20,8 @@ const screenshot = flag('screenshot')
 const shots = flag('shots')
 const only = flag('cam')
 const cpuProfile = flag('profile')
+const dump = flag('frames')
+const ride = args.includes('--ride') && args.splice(args.indexOf('--ride'), 1)
 const seconds = Number(flag('seconds', 10))
 const settle = Number(flag('settle', 3))
 const extra = args.join('&')
@@ -129,6 +131,18 @@ try {
 		}
 		await sleep(settle * 1000)
 		await run('perf.frames.length = 0')
+		// The phone pass's default route at its pace, ~10 m/s, so chunks stream in.
+		if (ride)
+			await run(`(() => {
+				const points = [{ lat: 52.4764, lon: 13.4397 }, { lat: 52.4784, lon: 13.4379 }, { lat: 52.481, lon: 13.4347 }].map(p => game.world.startPoint(p))
+				const start = performance.now()
+				clearInterval(globalThis.perfRide)
+				globalThis.perfRide = setInterval(() => {
+					const f = Math.min(1, (performance.now() - start) / 60000) * 2
+					const i = Math.min(1, Math.floor(f)), t = f - i, a = points[i], b = points[i + 1]
+					Object.assign(game.player, { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, dir: Math.atan2(b.y - a.y, b.x - a.x), onBike: true })
+				}, 16)
+			})()`)
 		if (cpuProfile) {
 			await send('Profiler.enable')
 			await send('Profiler.start')
@@ -143,8 +157,9 @@ try {
 			writeFileSync(`${shots}-${cam}.png`, Buffer.from(shot.data, 'base64'))
 		}
 		const frames = await run(
-			'perf.frames.map(f => ({ interval: f.interval, total: f.total, shadow: f.shadow, color: f.color, ink: f.ink, blit: f.blit, cpu: f.cpu }))',
+			'perf.frames.map(f => ({ interval: f.interval, total: f.total, shadow: f.shadow, color: f.color, ink: f.ink, blit: f.blit, cpu: f.cpu, build: f.build, upload: f.upload, chunks: f.chunks, uploadMB: f.uploadMB }))',
 		)
+		if (dump) writeFileSync(`${dump}-${cam}.json`, JSON.stringify(frames))
 		const gaps = frames.map((f) => f.interval)
 		const work = frames.map((f) => f.total)
 		const passes = PASSES.map((p) => {
