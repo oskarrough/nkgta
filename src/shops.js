@@ -1,3 +1,4 @@
+import { boxGrid } from './box-grid.js'
 import { SOLID, T } from './tiles.js'
 import { placeName } from './places.js'
 import { isCutCorner } from './corners.js'
@@ -188,7 +189,19 @@ function straight([ax, ay, bx, by], x, y) {
 	return lu > 0 && lv > 0 && (ux * vx + uy * vy) / (lu * lv) > 0.99
 }
 
-export function shopAt(shops, x, y) {
+export function createShopLookup(shops) {
+	const near = boxGrid(
+		shops,
+		({ stand, out }) => {
+			const r = Math.max(out + 0.1, AT_DOOR.out) + AT_DOOR.along
+			return [stand.x - r, stand.y - r, stand.x + r, stand.y + r]
+		},
+		4,
+	)
+	return (x, y) => shopAt(near(x, y), x, y)
+}
+
+function shopAt(shops, x, y) {
 	let best = null
 	let bestD = Infinity
 	for (const s of shops) {

@@ -1,3 +1,4 @@
+import { boxGrid } from './box-grid.js'
 // Berlin corner houses have their corner cut off at an angle, the
 // Eckabschrägung, usually with the Späti or the Eckkneipe in it. OSM mostly
 // maps the corner square, so where a tall house stands on a street corner,
@@ -28,7 +29,7 @@ export function cornerCutter(roads, others, tileM) {
 			})
 		}
 	}
-	const near = grid(segs)
+	const near = boxGrid(segs, (seg) => seg.box)
 	const onStreet = (p) => near(p.x, p.y).some((s) => distance(p, s.a, s.b) < s.reach)
 
 	return function cut(rings, h, seed) {
@@ -117,20 +118,4 @@ function insideRings(p, rings) {
 		}
 	}
 	return hit
-}
-
-// Road segments filed in a grid, so a point only checks the ones near it.
-function grid(items, size = 16) {
-	const cells = new Map()
-	for (const it of items) {
-		const [x0, y0, x1, y1] = it.box
-		for (let y = Math.floor(y0 / size); y <= Math.floor(y1 / size); y++) {
-			for (let x = Math.floor(x0 / size); x <= Math.floor(x1 / size); x++) {
-				const key = y * 65536 + x
-				if (!cells.has(key)) cells.set(key, [])
-				cells.get(key).push(it)
-			}
-		}
-	}
-	return (x, y) => cells.get(Math.floor(y / size) * 65536 + Math.floor(x / size)) ?? []
 }

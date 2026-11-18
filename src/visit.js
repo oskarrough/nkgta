@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
-import { shopAt } from './shops.js'
+import { createShopLookup } from './shops.js'
 import { createDoener } from './doener.js'
 import { createBikePaintScreen } from './bike-paint-screen.js'
 
@@ -18,6 +18,7 @@ const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
 export function createVisit({ city3d, shops, player, pfand, pocket, say, heightAt = () => 0, opening }) {
+	const shopAt = createShopLookup(shops)
 	const interior = createInterior(city3d.gradient)
 	const doener = createDoener(pfand.bag, say)
 	const bikePaint = createBikePaintScreen({ player, pocket })
@@ -144,7 +145,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				return true
 			}
 			if (player.car || player.onBike) return false
-			const s = shopAt(shops, player.x, player.y)
+			const s = shopAt(player.x, player.y)
 			if (!s) return false
 			if (!opening.isOpen(s.place)) {
 				say(`${s.name} ist geschlossen.`)
@@ -190,7 +191,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				going = false
 				portal.collapse()
 			}
-			const at = !player.car && !player.onBike && shopAt(shops, player.x, player.y)
+			const at = !player.car && !player.onBike && shopAt(player.x, player.y)
 			const walking = at && opening.isOpen(at.place) && pushing({ x: at.nx, y: at.ny }) && armed
 			if (!at || !pushing({ x: at.nx, y: at.ny })) armed = true
 			if (walking && (at !== shop || !portal.isOpen)) open(at)
@@ -229,7 +230,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				return { action: 'exit' }
 			}
 			if (player.car || player.onBike) return null
-			const s = shopAt(shops, player.x, player.y)
+			const s = shopAt(player.x, player.y)
 			if (!s || !opening.isOpen(s.place)) return null
 			return { action: 'shop' }
 		},
