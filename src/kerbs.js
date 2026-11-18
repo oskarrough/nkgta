@@ -246,7 +246,16 @@ export const spotHash = (seed, k) => hash(seed * 31 + k)
 // where nobody parks. Nothing in a junction, a driveway or a tree.
 const LAMP = { main: 11, side: 9, inset: 0.45 } // tiles apart, and in from the kerb
 const BOLLARD = { step: 1.6, inset: 0.3, road: 5 } // and only along roads this wide by class
+// Kept per box, since lamps and their pools of light both ask for a chunk's.
+const furnished = new WeakMap()
 export function furnitureIn(world, box, mainRoad) {
+	if (!furnished.has(box)) furnished.set(box, new Map())
+	const kept = furnished.get(box)
+	if (!kept.has(mainRoad)) kept.set(mainRoad, placeFurniture(world, box, mainRoad))
+	return kept.get(mainRoad)
+}
+
+function placeFurniture(world, box, mainRoad) {
 	const { roads = [], roadNodes } = world
 	const lamps = []
 	const bollards = []

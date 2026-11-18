@@ -84,7 +84,7 @@ const overlaps = (a, b, pad = 0) => a[0] - pad < b[2] && a[2] + pad > b[0] && a[
 
 // The parapets of the decks whose middle lies in `area` ({ x, y, w, h } in
 // tiles), as one mesh, or null if there are none.
-function createBridges(world, area, gradient) {
+function* createBridges(world, area, gradient) {
 	const box = [area.x, area.y, area.x + area.w, area.y + area.h]
 	const all = sort(world.shapes)
 	const waters = all.waters.filter((s) => overlaps(boxOf(s), box, 10))
@@ -93,6 +93,7 @@ function createBridges(world, area, gradient) {
 	const spans = []
 	for (const s of all.decks) {
 		if (!overlaps(boxOf(s), box, 8) || !wbox.some((w) => overlaps(w, boxOf(s)))) continue
+		yield
 		const half = deckWidth(s) / 2
 		const l = s.line
 		for (let i = 0; i + 3 < l.length; i += 2) {
@@ -155,7 +156,7 @@ function createBridges(world, area, gradient) {
 }
 
 // As a chunk feature: the parapets in the chunk.
-export function build({ world, chunk, gradient }) {
-	const group = createBridges(world, chunk, gradient)
+export function* build({ world, chunk, gradient }) {
+	const group = yield* createBridges(world, chunk, gradient)
 	return group && { meshes: [group] }
 }

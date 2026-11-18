@@ -235,7 +235,7 @@ const tarPaper = `
 	diffuseColor.rgb *= 1.0 - step(${TAR.ventShare.toFixed(2)}, tarHash(vcell + 8.8)) * step(length(vd), ${TAR.vent.toFixed(2)}) * 0.6 * fine;
 `
 
-export function build({ world, houses, gradient }) {
+export function* build({ world, houses, gradient }) {
 	const byIndex = []
 	const spots = []
 	const lids = []
@@ -243,6 +243,7 @@ export function build({ world, houses, gradient }) {
 		byIndex[h.n] = h
 		spots.push(...roofSpots(world.buildings[h.n], h.n).filter((s) => s.chimney))
 		lids.push(...roofHatches(world.buildings[h.n], h.n, h.roof))
+		yield
 	}
 	const meshes = [spots.length && chimneys(spots, byIndex, gradient), lids.length && hatches(lids, byIndex, gradient)].filter(Boolean)
 	for (const mesh of meshes) {

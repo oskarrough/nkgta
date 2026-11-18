@@ -198,8 +198,9 @@ function scootersBy(lamps) {
 	return out
 }
 
-export function build({ world, chunk, gradient, sky, weather, ground }) {
+export function* build({ world, chunk, gradient, sky, weather, ground }) {
 	const furniture = createFurniture(world, gradient, chunk, sky.night)
+	yield
 	weather.ground(ground, chunk, furniture.lamps)
 	return { meshes: furniture.meshes, zoom: furniture.zoom }
 }

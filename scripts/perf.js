@@ -62,7 +62,8 @@ try {
 			'--headless=new',
 			'--enable-gpu',
 			'--ignore-gpu-blocklist',
-			'--use-angle=gl',
+			'--use-angle=vulkan',
+			'--enable-features=Vulkan',
 			'--window-size=1280,800',
 			`--remote-debugging-port=${debugPort}`,
 			`--user-data-dir=${profile}`,
@@ -151,7 +152,9 @@ try {
 			return `${p} ${ms(median(samples))} (${samples.length})`
 		}).join(', ')
 		const label = cam === 'chase' ? 'chase   ' : 'overhead'
-		console.log(`${label}  frame ${ms(median(gaps))} / ${ms(median(gaps, 0.95))} ms (median / p95), ${frames.length} frames`)
+		console.log(
+			`${label}  frame ${ms(median(gaps))} / ${ms(median(gaps, 0.95))} / ${ms(median(gaps, 0.99))} ms (median / p95 / p99), worst ${ms(Math.max(...gaps))}, ${gaps.filter((g) => g > 25).length} over 25 ms in ${frames.length} frames`,
+		)
 		console.log(`          work ${ms(median(work))} / ${ms(median(work, 0.95))} ms; GPU ms (exclusive, sample count): ${passes}`)
 	}
 } finally {
@@ -167,6 +170,7 @@ const phone = Bun.spawn(
 		'--params',
 		extra,
 		...(screenshot ? ['--screenshot', screenshot] : []),
+		...(cpuProfile ? ['--profile', cpuProfile] : []),
 	],
 	{
 		stdout: 'inherit',

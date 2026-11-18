@@ -106,7 +106,9 @@ function harness(run) {
 		const sky = Object.fromEntries(['sun', 'shade', 'deck', 'toSun', 'night', 'home'].map((key) => [key, { value: 0 }]))
 		const weather = createWeather(world, [], sky.night, '')
 		const city = createCity(world, renderer, { sky, gradient: null, time: { value: 0 }, wallLook: new THREE.MeshBasicMaterial(), weather })
-		city.update(view, 1.5)
+		// Meshes build in slices across frames.
+		do city.update(view, 1.5)
+		while (!city.stats().built)
 		// Workers retain their asynchronous boundary; their actual painters run here.
 		while (workers.some((worker) => worker.pending)) {
 			for (const worker of workers) {

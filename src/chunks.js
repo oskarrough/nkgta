@@ -25,10 +25,11 @@ const UNDERSAMPLE = 0.75
 const GUTTER = 4
 const MARGIN = 32 // tiles round the view that count as in view, so textures are ready before they show
 const BUDGET = (PHONE ? 16 : 128) * 2 ** 20 // bytes of chunk textures beyond the coarse ones, mipmaps included
-// Share of the time between frames spent building chunk meshes that
-// aren't needed yet, and the most per frame, in ms.
+// Chunk meshes build in slices between frames, nearest first: this share of
+// the time between frames while nothing on screen is missing, and at most
+// BUILD_MS a frame while something is. One slice can overrun by a step.
 const BUILD_SHARE = 0.25
-const BUILD_MS = 12
+const BUILD_MS = 8
 const UPLOAD_BYTES = 8 * 2 ** 20 // texture bytes sent to the GPU per frame, at least one texture
 const MAX_PX = 8192 // texture size every GPU takes
 const KINDS = ['ground', 'roofs']
@@ -274,10 +275,11 @@ export function createChunks(world, renderer, build) {
 		if (group.parent) renderer.compileAsync(c.parts.group, probe, group.parent)
 	}
 
-	function update(view, scale) {
+	// `rush` while the game is still loading: the first view builds whole.
+	function update(view, scale, rush = false) {
 		frame++
 		const t = performance.now()
-		const spare = Math.min(BUILD_MS, (t - (lastUpdate ?? t)) * BUILD_SHARE)
+		const between = t - (lastUpdate ?? t)
 		lastUpdate = t
 		const level = levelFor(scale)
 		const order = chunks.map((c) => [distance(c, view), c]).sort((a, b) => a[0] - b[0])
@@ -294,12 +296,12 @@ export function createChunks(world, renderer, build) {
 				c.scale = undefined
 			}
 		}
+		const missing = order.some(([d, c]) => d === 0 && !c.parts)
+		const until = t + (rush ? Infinity : missing ? BUILD_MS : Math.min(BUILD_MS, between * BUILD_SHARE))
 		for (const [d, c] of order) {
 			if (c.parts) continue
-			if (PHONE && d > MARGIN) break
-			if (d === 0) buildChunk(c)
-			else if (performance.now() - t < spare) buildChunk(c, t + spare)
-			else break
+			if ((PHONE && d > MARGIN) || performance.now() >= until || (rush && d > 0)) break
+			buildChunk(c, until)
 		}
 		note('build', performance.now() - t)
 
@@ -387,7 +389,7 @@ export function createChunks(world, renderer, build) {
 			return new Promise((resolve) => {
 				const start = performance.now()
 				const check = () => {
-					update(view, scale)
+					update(view, scale, true)
 					const done = chunks.every(
 						(c) => distance(c, view) > 0 || KINDS.every((k) => (k === 'roofs' && !c.buildings.length) || c.shown?.[k]),
 					)

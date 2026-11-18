@@ -16,6 +16,7 @@ const MiB = 2 ** 20
 const BUDGET = { cpu: 450 * MiB, gpu: 256 * MiB, total: 650 * MiB }
 const base = flag('url')
 const screenshot = flag('screenshot')
+const cpuProfile = flag('profile')
 const params = new URLSearchParams(flag('params', ''))
 params.set('perf', '')
 if (!params.has('hour')) params.set('hour', '11')
@@ -58,7 +59,8 @@ try {
 			'--enable-gpu',
 			'--disable-extensions',
 			'--ignore-gpu-blocklist',
-			'--use-angle=gl',
+			'--use-angle=vulkan',
+			'--enable-features=Vulkan',
 			'--window-size=1280,800',
 			`--remote-debugging-port=${debugPort}`,
 			`--user-data-dir=${profile}`,
@@ -169,7 +171,12 @@ try {
 	console.log('phone    390×844 @ DPR 3, sampling a 60-second ride…')
 	// A fixed 60-second bicycle-speed route through the selected area. The
 	// position is driven so random traffic cannot change texture coverage.
+	if (cpuProfile) {
+		await send('Profiler.enable')
+		await send('Profiler.start')
+	}
 	await run(`(() => {
+		perf.frames.length = 0
 		const points = ${JSON.stringify(
 			params.has('weser')
 				? [
@@ -208,6 +215,9 @@ try {
 		await sample()
 	}
 	await run('clearInterval(memoryRide)')
+	if (cpuProfile) writeFileSync(`${cpuProfile}-ride.cpuprofile`, JSON.stringify((await send('Profiler.stop')).profile))
+	const gaps = (await run('perf.frames.map((f) => f.interval)')).filter(Number.isFinite).toSorted((a, b) => a - b)
+	const at = (p) => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))]?.toFixed(1)
 	if (screenshot)
 		await send('Page.captureScreenshot', { format: 'png' }).then((r) => writeFileSync(screenshot, Buffer.from(r.data, 'base64')))
 	const end = samples.at(-1)
@@ -233,6 +243,9 @@ try {
 	)
 	console.log(
 		`          CPU ${mb(summary.peakCombined)} / ${mb(BUDGET.cpu)} MiB; WebGL estimate ${mb(summary.peakGpu)} / ${mb(BUDGET.gpu)}; combined ${mb(summary.peakTotal)} / ${mb(BUDGET.total)}`,
+	)
+	console.log(
+		`          ride frame ${at(0.5)} / ${at(0.95)} / ${at(0.99)} ms (median / p95 / p99), worst ${gaps.at(-1)?.toFixed(0)}, ${gaps.filter((g) => g > 50).length} over 50 ms in ${gaps.length}`,
 	)
 	console.log(`          samples: ${output}.json`)
 	if (summary.peakCombined > BUDGET.cpu || summary.peakGpu > BUDGET.gpu || summary.peakTotal > BUDGET.total)

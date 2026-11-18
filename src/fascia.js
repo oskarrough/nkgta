@@ -127,7 +127,7 @@ const ATLAS_W = 2048
 const GLOW = 0.8 // how much of its colour a lit board shines at night
 const unpacked = new WeakMap()
 
-function createFascia(world, chunk, gradient, night, opening) {
+function* createFascia(world, chunk, gradient, night, opening) {
 	if (!unpacked.has(world)) unpacked.set(world, frontsOf(world))
 	const mine = unpacked
 		.get(world)
@@ -144,22 +144,26 @@ function createFascia(world, chunk, gradient, night, opening) {
 		const w = Math.max(CELL, Math.min(ATLAS_W, Math.ceil(textW + CELL * 0.8), Math.round(f.half * 2 * PX)))
 		if (x + w > ATLAS_W) [x, y] = [0, y + CELL]
 		if (y + CELL > ATLAS_W) {
-			group.add(boards(world, batch, gradient, night, opening))
+			group.add(yield* boards(world, batch, gradient, night, opening))
 			;[batch, x, y] = [[], 0, 0]
 		}
 		batch.push({ f, look, cell: { x, y, w } })
 		x += w
 	}
-	if (batch.length) group.add(boards(world, batch, gradient, night, opening))
+	if (batch.length) group.add(yield* boards(world, batch, gradient, night, opening))
 	return group
 }
 
-function boards(world, batch, gradient, night, opening) {
+// Yields between boards, so a busy street spreads over a few frames.
+function* boards(world, batch, gradient, night, opening) {
 	const canvas = document.createElement('canvas')
 	canvas.width = ATLAS_W
 	canvas.height = Math.max(...batch.map((b) => b.cell.y)) + CELL
 	const g = canvas.getContext('2d', { willReadFrequently: true })
-	for (const { look, cell } of batch) paint(g, cell, look)
+	for (const [i, { look, cell }] of batch.entries()) {
+		paint(g, cell, look)
+		if (i % 8 === 7) yield
+	}
 
 	const pos = []
 	const uv = []
@@ -213,6 +217,7 @@ function boards(world, batch, gradient, night, opening) {
 		for (let i = k; i < pos.length / 3; i++) {
 			tone.push(avg.r, avg.g, avg.b)
 		}
+		yield
 	}
 
 	const tex = new THREE.CanvasTexture(canvas)
@@ -328,8 +333,8 @@ function hash(s) {
 	return h
 }
 
-export function build({ world, chunk, gradient, sky, opening }) {
-	const group = createFascia(world, chunk, gradient, sky.night, opening)
+export function* build({ world, chunk, gradient, sky, opening }) {
+	const group = yield* createFascia(world, chunk, gradient, sky.night, opening)
 	group.traverse((mesh) => mesh.layers.set(1))
 	return { meshes: [group] }
 }
