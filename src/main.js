@@ -44,14 +44,22 @@ import { recall, remember, storage } from './remember.js'
 const START = { lat: 52.47751, lon: 13.43874, dir: -1.98 } // Pavement at Brot und Brötchen, Karl-Marx-Straße 131
 
 const loading = document.getElementById('loading')
-const map = await loadMap((text) => (loading.textContent = text)).catch((err) => {
+const done = []
+const showLoading = (text) => (loading.textContent = [...done.map((d) => `✓ ${d}`), text].join('\n'))
+// Building is synchronous, so give the browser a frame to paint each finished stage.
+async function loaded(stage, next) {
+	done.push(stage)
+	showLoading(next)
+	if (!document.hidden) await new Promise((r) => requestAnimationFrame(() => setTimeout(r)))
+}
+const map = await loadMap(showLoading).catch((err) => {
 	loading.textContent = `Karte konnte nicht laden: ${err.message}`
 	throw err
 })
+await loaded('Karte geladen', 'Baue die Welt…')
 
 const world = createWorld(map)
 phase('createWorld')
-loading.textContent = 'Baue die Welt…'
 const URL_PARAMS = new URLSearchParams(location.search)
 const starts = {
 	weser: { lat: 52.48784, lon: 13.4304, dir: 0.52 },
@@ -75,7 +83,6 @@ const frozenHour = Number(URL_PARAMS.get('hour') ?? NaN)
 if (!Number.isNaN(frozenHour)) clock.set(frozenHour)
 const actors = createActors(city3d.scene, city3d.gradient, world.heightAt)
 phase('createScene')
-loading.textContent = 'Male die Stadt…'
 const hud = createHud(world)
 const lostDog = createLostDog(world, shops, player, hud.say, sound.bark)
 const chatter = createChatter(world, shops)
@@ -465,6 +472,7 @@ function frame(now) {
 	first = false
 	requestAnimationFrame(frame)
 }
+await loaded('Welt gebaut', 'Male die Stadt…')
 // Hold the loading text until what's on screen is painted.
 await city3d.ready(camera.update(player, canvas, 0, city3d.pixelGrid()))
 phase('first textures')
