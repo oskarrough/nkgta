@@ -9,10 +9,11 @@ import { badgeMaterial, throb } from './badge.js'
 const POST = { height: 1.5, width: 0.12 }
 const FLAG = { every: 0.32, width: 0.22, drop: 0.28 }
 const BUNTING = ['#e23b2e', '#e8c21a', '#e7e7e5', '#115d91', '#2f6b3c']
-const BADGE = { size: 0.85, next: 1.05, gap: 0.18 }
+// Tiles, and at most `px` screen pixels across, so close zoom doesn't bury the line.
+const BADGE = { size: 0.85, next: 1.05, gap: 0.18, px: 48 }
 const COLORS = { next: '#e8c21a', later: '#e7e7e5', start: '#e8c21a' }
 const GHOST = { color: '#8fe3ff', rival: '#ffb25c', opacity: 0.5 }
-const NAME = { width: 4, lift: 1.6 }
+const NAME = { width: 4, lift: 1.6, px: 190 }
 
 const badge = (text, state) =>
 	badgeMaterial(`${text}:${state}`, COLORS[state], (g) => {
@@ -193,19 +194,23 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 				shownName = name
 				if (label) group.remove(label)
 				label = new THREE.Sprite(nameTag(name))
-				label.renderOrder = 10
-				label.scale.set(NAME.width, NAME.width / 4, 1)
+				label.renderOrder = 11 // over the gate badges
 				label.position.set(0, 0, NAME.lift)
 				group.add(label)
 			}
 			group.position.set(pose.x, -pose.y, heightAt(pose.x, pose.y))
 			group.rotation.z = -pose.angle
+			if (label) {
+				const width = Math.min(NAME.width, NAME.px / pixels)
+				label.scale.set(width, width / 4, 1)
+			}
 		}
 	}
 	const showGhost = createGhost(GHOST.color, false)
 	const showRival = createGhost(GHOST.rival, true)
 
 	let pulse = 0
+	let pixels = 0 // screen pixels per tile, 0 when unknown
 	return {
 		// `gates` is [{ gate, label, state }], state 'next', 'later' or 'start'.
 		show(gates) {
@@ -220,11 +225,17 @@ export function createRaceGates(scene, gradientMap, heightAt = () => 0) {
 		// rival's of a shared race, tagged with their name.
 		ghost: showGhost,
 		rival: showRival,
-		update(dt, hidden) {
+		// `pixelsPerTile` on screen, for the overhead camera; omit it in chase.
+		update(dt, hidden, pixelsPerTile = 0) {
 			root.visible = !hidden
+			pixels = pixelsPerTile
 			pulse += dt
 			const k = throb(pulse)
-			for (const item of items) if (item.state !== 'later') item.sprite.scale.set(item.size * k, item.size * k, 1)
+			for (const item of items) {
+				const size = Math.min(item.size, ((item.size / BADGE.next) * BADGE.px) / pixels)
+				const s = item.state === 'later' ? size : size * k
+				item.sprite.scale.set(s, s, 1)
+			}
 		},
 	}
 }

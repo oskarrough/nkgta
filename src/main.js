@@ -442,7 +442,7 @@ function frame(now) {
 	input.setUse(action)
 	input.setDriving(!!player.car || skating(player))
 	if (state.busy) state.busy = visit.busy() // Rendering can finish closing the portal.
-	racing.update(dt, from, state)
+	racing.update(dt, from, state, cam.third ? 0 : cam.scale / devicePixelRatio)
 	const gate = racing.target()
 	pocketMap.follow({
 		at: street,

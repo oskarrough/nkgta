@@ -239,8 +239,8 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			if (phase === 'countdown' || phase === 'running') phase = 'done'
 		},
 
-		// After the player has moved this frame from `from`.
-		update(dt, from, state = {}) {
+		// After the player has moved this frame from `from`; `pixelsPerTile` sizes the gate badges.
+		update(dt, from, state = {}, pixelsPerTile = 0) {
 			const hidden = state.busy || state.quiz
 			const canRace = !hidden && !state.down && !state.busted
 			const to = { x: player.x, y: player.y }
@@ -269,10 +269,10 @@ export function createRacing({ world, player, scene, gradient, area, say, snapCa
 			}
 			const riding = phase === 'running' || phase === 'countdown'
 			const at = phase === 'running' ? run.t : 0
+			gates3d.show(shownGates())
+			gates3d.update(dt, hidden, pixelsPerTile)
 			gates3d.ghost(race?.best?.ghost && riding ? ghostAt(race.best.ghost, at) : null)
 			gates3d.rival(race?.rival?.ghost && riding ? ghostAt(race.rival.ghost, at) : null, race?.rival?.name || 'Geist')
-			gates3d.show(shownGates())
-			gates3d.update(dt, hidden)
 			hud.update(view(), dt)
 		},
 
