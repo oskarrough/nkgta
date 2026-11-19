@@ -59,6 +59,7 @@ export function leaveCar(p, world) {
 		break
 	}
 	p.car = null
+	p.passenger = false
 	p.speed = 0
 }
 
@@ -66,7 +67,7 @@ export function updatePlayer(p, input, world, dt, wind = windAt(0)) {
 	p.wind = wind
 	if (p.car) {
 		const c = p.car
-		driveCar(c, input.drive(c), world, dt)
+		if (!p.passenger) driveCar(c, input.drive(c), world, dt)
 		p.x = c.x
 		p.y = c.y
 		p.dir = c.angle

@@ -4,6 +4,7 @@ import { createWorld } from './world.js'
 import { createInput } from './input.js'
 import { createPlayer, leaveCar, nearBike, toggleBike, updatePlayer } from './player.js'
 import { createTraffic } from './traffic.js'
+import { createBusRide } from './bus.js'
 import { createChatter } from './chatter.js'
 import { createWasted } from './wasted.js'
 import { createPolice } from './police.js'
@@ -97,6 +98,7 @@ const traffic = createTraffic(
 	(text) => hud.say(text),
 	(p) => chatter.shout(p),
 )
+const busRide = createBusRide({ world, traffic, player, say: hud.say })
 const signals = traffic.lights()
 city3d.weather.setSignals(signals)
 const trafficLights = createTrafficLights(city3d.scene, world, city3d.gradient, city3d.night, signals)
@@ -309,6 +311,7 @@ function use() {
 	if (wasted.active() || police.active()) return
 	if (!visit.busy() && !quiz.active() && lostDog.use()) return
 	if (visit.use()) return
+	if (busRide.use()) return
 	if (player.car) {
 		leaveCar(player, world)
 		sound.door()
@@ -396,6 +399,7 @@ function frame(now) {
 	const street = visit.street()
 	const streetView = viewOf(cam, street.x - player.x, street.y - player.y)
 	const hit = traffic.update(dt, street, streetView, clock.hour, clock.day)
+	busRide.update(dt)
 	police.update(dt, streetView, state)
 	if (!state.down) state.busted = police.active()
 	if (!state.quiz && !inside && !state.warping && !state.busted) {
@@ -435,12 +439,12 @@ function frame(now) {
 		people: indoors ? [] : traffic.peds,
 		cars: indoors ? [] : traffic.cars,
 	})
-	const car = !inside && !player.car && !player.onBike && traffic.enterable(player.x, player.y)
+	const car = !inside && !player.car && !player.onBike && (busRide.boardable() || traffic.enterable(player.x, player.y))
 	const dogHint = !state.busy && !state.quiz && !state.down && !state.busted && lostDog.hint()
 	const door = dogHint || visit.hint()
 	const action = useAction(door, useHint(player, car))
 	input.setUse(action)
-	input.setDriving(!!player.car || skating(player))
+	input.setDriving((!!player.car && !player.passenger) || skating(player))
 	if (state.busy) state.busy = visit.busy() // Rendering can finish closing the portal.
 	racing.update(dt, from, state, cam.third ? 0 : cam.scale / devicePixelRatio)
 	const gate = racing.target()

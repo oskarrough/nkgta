@@ -186,3 +186,31 @@ describe('occupied parking spots', () => {
 		})
 	}
 })
+
+describe('the bus you wait for', () => {
+	test('comes from out of sight and opens its doors at your stop', () => {
+		const stop = { kind: 'bus', name: 'Rathaus', lines: ['M41'], x: 150, y: 50.5 }
+		const world = {
+			W: 200,
+			H: 100,
+			roadNodes: [2, 50, 120, 50, 120, 20, 198, 50],
+			roads: [
+				{ nodes: [0, 1, 3], w: 5, oneway: 1 },
+				{ nodes: [2, 1], w: 3, oneway: 1 },
+			],
+			transit: [stop],
+			tileAt: () => T.ROAD,
+		}
+		const traffic = createTraffic(world)
+		const player = { x: stop.x, y: stop.y + 2, dir: 0, speed: 0 } // on the pavement by the pole
+		const view = { x0: 140, y0: 45, x1: 160, y1: 55 }
+		traffic.update(0, player, view)
+		traffic.cars.length = 0
+		const bus = traffic.callBus(stop)
+		expect(bus.line).toBe('M41')
+		expect(bus.x).toBeLessThan(view.x0)
+		for (let t = 0; t < 60 && !(bus.ai.dwell > 0); t += 1 / 30) traffic.update(1 / 30, player, view)
+		expect(bus.ai.served).toBe(stop)
+		expect(Math.abs(bus.x - stop.x)).toBeLessThan(3)
+	})
+})

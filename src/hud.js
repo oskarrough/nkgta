@@ -9,7 +9,7 @@ export function useHint(player, car) {
 	if (player.car) return 'aussteigen'
 	if (player.onBike) return 'absteigen'
 	if (nearBike(player)) return rideKind(player) === 'bike' ? 'aufs Fahrrad' : `auf ${RIDES[rideKind(player)].name}`
-	if (car) return car.ai ? 'Auto klauen' : 'einsteigen'
+	if (car) return car.ai && !(car.ai.dwell > 0) ? 'Auto klauen' : 'einsteigen'
 	return null
 }
 

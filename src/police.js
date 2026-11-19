@@ -159,7 +159,8 @@ export function createPolice({ world, traffic, player, bag, say = () => {}, fade
 			return
 		}
 		// Someone under your wheels. Each one counts once.
-		if (!hidden && player.car && speedOf(player.car) > 1) for (const p of traffic.peds) if (p.under === player.car) hit(p)
+		if (!hidden && player.car && !player.passenger && speedOf(player.car) > 1)
+			for (const p of traffic.peds) if (p.under === player.car) hit(p)
 		if (!heat) {
 			sound.siren(0, 0)
 			return
@@ -280,7 +281,7 @@ export function lineOfSight(world, x0, y0, x1, y1) {
 }
 
 // The nearest pavement within a few tiles, to stand on afterwards.
-function nearestPavement(world, x, y) {
+export function nearestPavement(world, x, y) {
 	let best = null
 	for (let ty = Math.floor(y) - 4; ty <= Math.floor(y) + 4; ty++) {
 		for (let tx = Math.floor(x) - 4; tx <= Math.floor(x) + 4; tx++) {

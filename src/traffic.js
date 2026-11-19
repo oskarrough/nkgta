@@ -18,6 +18,9 @@ const SHOUTS = ['Ey! Mein {}!', 'Hilfe! Polizei!', 'Alter, was soll das?', 'Mein
 const DIVE_SHOUTS = ['Ey!', 'Alter!', 'Spinnst du?']
 const SHOUT_RANGE = 12 // tiles: further than this you wouldn't hear it
 const BIG_ROAD = 4 // tiles wide: buses keep to these
+// Tiles beside a lane, + on the kerb side, where a stop counts as on it: many
+// stops are mapped on the road's centre line and serve both ways.
+const STOP_SIDE = { min: -1.5, max: 3.5 }
 const STATION = 12 // tiles from a U-Bahn entrance that taxis wait within
 const CONVOY = { gap: 2.4, colors: ['#f4f3ee', '#f4f3ee', '#111214', '#e8e8e4', '#b8bcc2'] }
 // Dodging the player: seconds ahead a driver sees it coming, seconds it keeps
@@ -99,7 +102,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			const model = wanted ?? pickModel(Math.random(), { bigRoad: edge.rank >= BIG_ROAD, hour: now, station: byStation(p.x, p.y) })
 			if (!fits(p.x, p.y, p.dir, model)) continue
 			const car = createCar({ x: p.x, y: p.y, angle: p.dir, model, speed: edge.speed * 0.8 })
-			if (model === MODELS.bus && busLines.length) car.line = busLines[Math.floor(Math.random() * busLines.length)]
+			if (model === MODELS.bus) car.line = lineOf(busLines)
 			car.ai = { edge, next: nextEdge(edge, model), s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
 			cars.push(car)
 			return car
@@ -117,6 +120,13 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			car.ai.next = nextEdge(car.ai.edge, model, null, toward)
 		}
 		return car
+	}
+
+	// A line to show on a bus: Berlin's N lines run only at night.
+	function lineOf(lines) {
+		const fit = lines.filter((l) => l.startsWith('N') === now < 5)
+		const pool = fit.length ? fit : lines
+		return pool[Math.floor(Math.random() * pool.length)]
 	}
 
 	// Back onto the nearest lane, for a car that's been driven off the roads.
@@ -204,7 +214,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 		if (ai.s > ai.edge.len - 0.3) {
 			if (!ai.next) return null
 			ai.edge = ai.next
-			ai.next = nextEdge(ai.edge, c.model, c.convoy, c.hunt)
+			ai.next = nextEdge(ai.edge, c.model, c.convoy ?? c.route, c.hunt)
 			ai.s = project(ai.edge.lane, c.x, c.y)
 		}
 		const fwd = forwardSpeed(c)
@@ -342,7 +352,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 		for (const stop of busStops) {
 			if (stop === ai.served || Math.abs(stop.x - c.x) > 6 || Math.abs(stop.y - c.y) > 6) continue
 			const [ox, oy] = local(stop.x, stop.y)
-			if (ox < -0.5 || ox > 6 || oy < 0 || oy > 3.5) continue
+			if (ox < -0.5 || ox > 6 || oy < STOP_SIDE.min || oy > STOP_SIDE.max) continue
 			if (ox < 0.6 && speedOf(c) < 0.3) {
 				ai.dwell = 4
 				ai.served = stop
@@ -350,6 +360,52 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			return ox - 0.3
 		}
 		return Infinity
+	}
+
+	// A bus for someone waiting at `stop`: on a lane that serves it, as far
+	// back as the streets around the player reach and out of sight, with its
+	// turns set until it gets there.
+	function callBus(stop) {
+		if (!scene) return null
+		let best = null
+		for (const e of edges) {
+			if (e.closed || Math.hypot(e.mid.x - stop.x, e.mid.y - stop.y) > e.len / 2 + 4) continue
+			const s = project(e.lane, stop.x, stop.y)
+			const p = pointAt(e.lane, s)
+			const side = -(stop.x - p.x) * Math.sin(p.dir) + (stop.y - p.y) * Math.cos(p.dir)
+			const d = Math.hypot(stop.x - p.x, stop.y - p.y)
+			if (side >= STOP_SIDE.min && side <= STOP_SIDE.max && (!best || d < best.d)) best = { edge: e, s, d }
+		}
+		if (!best) return null
+		const { ring, view } = scene
+		const route = new Map()
+		let { edge, s } = best
+		let found = null
+		for (let back = 0; back < ring.max * 3; back += 2) {
+			s -= 2
+			while (s < 0) {
+				const into = edge.from.in.filter((e) => e !== edge.twin && !e.closed)
+				const big = into.filter((e) => e.rank >= BIG_ROAD)
+				const prev = (big.length ? big : into)[Math.floor(Math.random() * (big.length || into.length))]
+				if (!prev) break
+				route.set(prev, edge)
+				edge = prev
+				s += edge.len
+			}
+			if (s < 0) break
+			const p = pointAt(edge.lane, s)
+			if (Math.hypot(p.x - ring.x, p.y - ring.y) > ring.max) continue
+			if (back > 6 && !inView(view, p.x, p.y, 4) && fits(p.x, p.y, p.dir, MODELS.bus)) found = { edge, s, p, route: new Map(route) }
+		}
+		if (!found) return null
+		const { p } = found
+		const car = createCar({ x: p.x, y: p.y, angle: p.dir, model: MODELS.bus, speed: found.edge.speed * 0.8 })
+		car.line = lineOf(stop.lines.length ? stop.lines : busLines)
+		car.route = found.route
+		const next = nextEdge(found.edge, MODELS.bus, car.route)
+		car.ai = { edge: found.edge, next, s: found.s, stuck: 0, reversing: 0, blocked: 0, ignore: 0, dwell: 0, ...CALM }
+		cars.push(car)
+		return car
 	}
 
 	// Lanes running into the edge of the map lead nowhere, and buses keep to
@@ -426,11 +482,11 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 			convoyIn = spawnConvoy(near, ring, view) ? 60 + Math.random() * 90 : 5
 		started = true
 		junctions.update(cars, dt)
-		mover = moverOf(player)
+		mover = player.passenger ? null : moverOf(player)
 
 		for (let i = cars.length - 1; i >= 0; i--) {
 			const c = cars[i]
-			if (c === player.car || c.chase) continue
+			if ((c === player.car && !player.passenger) || c.chase) continue
 			if (c.ai) {
 				const controls = aiControls(c, player, dt)
 				if (controls) driveCar(c, controls, world, dt)
@@ -517,7 +573,7 @@ export function createTraffic(world, say = () => {}, voice = () => {}) {
 
 	const convoy = () => (convoyIn = 0)
 
-	return { cars, peds, update, enterable, steal, convoy, summon, attach, lights: junctions.lights }
+	return { cars, peds, update, enterable, steal, convoy, summon, callBus, attach, lights: junctions.lights }
 }
 
 // The Intelligent Driver Model (Treiber, 2000) decides how hard to press gas
