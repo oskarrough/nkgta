@@ -71,6 +71,8 @@ export function createHud(world) {
 			set('bag', bag.bottles ? String(bag.bottles) : '')
 			set('heat', '★'.repeat(heat))
 			if (inside) {
+				// The way out may be somewhere else entirely: the U-Bahn.
+				street = ''
 				set('street', '')
 				set('wasted', '')
 				set('place', toast?.text ?? note ?? '')

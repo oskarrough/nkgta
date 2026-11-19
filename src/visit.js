@@ -2,6 +2,7 @@ import { isSameheads, onDanceFloor } from './sameheads.js'
 import * as THREE from 'three'
 import { createPortal } from './portal.js'
 import { createInterior, DOOR, ENTRY, MIDDLE } from './interior.js'
+import { createUbahn, entranceLookup, stationsOf } from './ubahn.js'
 import { createShopLookup } from './shops.js'
 import { createDoener } from './doener.js'
 import { createBikePaintScreen } from './bike-paint-screen.js'
@@ -18,9 +19,13 @@ const smooth = (t) => t * t * (3 - 2 * t)
 const angleOf = (n) => Math.atan2(n.y, n.x)
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
-export function createVisit({ city3d, shops, player, pfand, pocket, say, heightAt = () => 0, opening }) {
+export function createVisit({ city3d, world, shops, player, pfand, pocket, say, heightAt = () => 0, opening }) {
 	const shopAt = createShopLookup(shops)
-	const interior = createInterior(city3d.gradient)
+	const interior = { ...createInterior(city3d.gradient), DOOR, ENTRY, MIDDLE }
+	const subway = createUbahn(city3d.gradient)
+	const entranceAt = entranceLookup(stationsOf(world))
+	const isOpen = (s) => s.kind === 'ubahn' || opening.isOpen(s.place)
+	let room = interior
 	const doener = createDoener(pfand.bag, say)
 	const bikePaint = createBikePaintScreen({ player, pocket })
 	const portal = createPortal(city3d.renderer, {
@@ -31,8 +36,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		level: true,
 		samples: 0,
 		sparkSize: 5,
-		draw: (target, far) =>
-			inside ? city3d.render(frame.cam, frame.cars, { view: far, target }) : city3d.draw(interior.scene, far, target),
+		draw: (target, far) => (inside ? city3d.render(frame.cam, frame.cars, { view: far, target }) : city3d.draw(room.scene, far, target)),
 	})
 	const overlay = new THREE.Scene().add(portal.object)
 	const frame = { cam: null, cars: [], view: null }
@@ -65,7 +69,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 	// round (`swing` 0 to 1) until it's upright, as you'll stand in it.
 	function near() {
 		return inside
-			? { anchor: DOOR, n: { x: DOOR.nx, y: DOOR.ny }, out: DOOR.out }
+			? { anchor: room.DOOR, n: { x: room.DOOR.nx, y: room.DOOR.ny }, out: room.DOOR.out }
 			: { anchor: shop.stand, n: { x: shop.nx, y: shop.ny }, out: shop.out }
 	}
 	function aim(swing) {
@@ -73,15 +77,16 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		portal.place(...tear(here.anchor, here.n, here.out, inside ? 0 : heightAt(shop.stand.x, shop.stand.y)))
 		// The far door faces the way you'd come out of it, turning to face
 		// the way you're going in, which leaves the far side upright.
-		const real = inside ? { x: -shop.nx, y: -shop.ny } : { x: -DOOR.nx, y: -DOOR.ny }
+		const real = inside ? { x: -shop.nx, y: -shop.ny } : { x: -room.DOOR.nx, y: -room.DOOR.ny }
 		const a = turn(angleOf(here.n) - angleOf(real)) * smooth(swing)
-		portal.exit(...tear(inside ? shop.stand : ENTRY, rotated(real, a), here.out, inside ? heightAt(shop.stand.x, shop.stand.y) : 0))
+		portal.exit(...tear(inside ? shop.stand : room.ENTRY, rotated(real, a), here.out, inside ? heightAt(shop.stand.x, shop.stand.y) : 0))
 	}
 
 	function open(s) {
 		if (s !== shop || portal.phase === 'closed') {
 			shop = s
-			interior.setShop(s)
+			room = s.kind === 'ubahn' ? subway : interior
+			room.setShop(s)
 			aim(0)
 		}
 		portal.open()
@@ -98,7 +103,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		portal.object.scale.setScalar(1)
 		if (!inside) {
 			inside = true
-			Object.assign(player, { x: ENTRY.x, y: ENTRY.y, speed: 0, dir: -Math.PI / 2 })
+			Object.assign(player, { x: room.ENTRY.x, y: room.ENTRY.y, speed: 0, dir: -Math.PI / 2 })
 			armed = false
 			Object.assign(standIn, shop.stand, { dir: angleOf({ x: shop.nx, y: shop.ny }), speed: 0 })
 			aim(0)
@@ -121,8 +126,8 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		shop: () => (inside ? shop : null),
 		choose: (i) => bikePaint.choose(i) || doener.choose(i),
 		shiftChoice: (n) => bikePaint.shift(n) || doener.shift(n),
-		room: () => (inside ? interior.scene : null),
-		world: (city) => (inside ? interior.world : city),
+		room: () => (inside ? room.scene : null),
+		world: (city) => (inside ? room.world : city),
 		street: () => (inside ? standIn : player),
 		closer: () => (inside ? CLOSER : 1),
 		// What the camera follows: you, but inside drawn towards the middle of
@@ -133,8 +138,8 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 			settle += Math.sign(want - settle) * Math.min(Math.abs(want - settle), dt / SETTLE)
 			if (warp && inside) settle *= 1 - Math.min(1, warp.t * 2)
 			if (!settle) return player
-			focus.x = player.x + (MIDDLE.x - player.x) * settle
-			focus.y = player.y + (MIDDLE.y - player.y) * settle
+			focus.x = player.x + (room.MIDDLE.x - player.x) * settle
+			focus.y = player.y + (room.MIDDLE.y - player.y) * settle
 			focus.speed = player.speed
 			return focus
 		},
@@ -142,14 +147,16 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		use() {
 			if (warp) return true
 			if (inside) {
+				// No getting out between stations, or from the carriage.
+				if (room === subway && subway.aboard(player)) return true
 				if (bikePaint.use() || doener.use()) return true
 				startWarp()
 				return true
 			}
 			if (player.car || player.onBike) return false
-			const s = shopAt(player.x, player.y)
+			const s = shopAt(player.x, player.y) ?? entranceAt(player.x, player.y)
 			if (!s) return false
-			if (!opening.isOpen(s.place)) {
+			if (!isOpen(s)) {
 				say(`${s.name} ist geschlossen.`)
 				return true
 			}
@@ -177,20 +184,26 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				return
 			}
 			const pushing = (n) => -(axis.x * n.x + axis.y * n.y) > 0.3
-			if (inside) {
+			if (inside && room === subway) {
+				subway.update(dt, player)
+				shop = subway.exit()
+				Object.assign(standIn, subway.where())
+			} else if (inside) {
 				player.dancing = isSameheads(shop) && onDanceFloor(player.x, player.y) && Math.hypot(axis.x, axis.y) < 0.1
 				const atCounter = interior.atCounter(player.x, player.y)
 				doener.update(shop.kind === 'doener' && atCounter)
 				bikePaint.update(shop.kind === 'bikeshop' && atCounter ? shop : null)
-				const out = pushing({ x: DOOR.nx, y: DOOR.ny })
-				if (!out) armed = true
-				const dx = player.x - DOOR.x
-				const dy = player.y - DOOR.y
-				if (armed && out && Math.abs(dx) < 0.9 && dy > -0.6) startWarp()
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y)) pfand.cashIn(shop.name, say)
+			}
+			if (inside) {
+				const out = pushing({ x: room.DOOR.nx, y: room.DOOR.ny })
+				if (!out) armed = true
+				const dx = player.x - room.DOOR.x
+				const dy = player.y - room.DOOR.y
+				if (armed && out && Math.abs(dx) < 0.9 && dy > -0.6) startWarp()
 				return
 			}
-			if (shop && !opening.isOpen(shop.place) && portal.phase !== 'closed') {
+			if (shop && !isOpen(shop) && portal.phase !== 'closed') {
 				going = false
 				portal.collapse()
 			}
@@ -214,7 +227,7 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 			const view = (frame.view = city3d.aim(inside ? { ...cam, ground: 0 } : cam))
 			const active = portal.phase !== 'closed'
 			if (active) portal.update(dt, view)
-			if (inside) city3d.draw(interior.scene, view)
+			if (inside) city3d.draw(room.scene, view)
 			else city3d.render(cam, cars, { view })
 			if (!active) return
 			const renderer = city3d.renderer
@@ -226,6 +239,10 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 		// What E does at a shop door, { action: 'shop' | 'exit' }, or a { note } to read instead.
 		hint() {
 			if (warp) return null
+			if (inside && room === subway) {
+				const note = subway.note(player)
+				return subway.aboard(player) ? { note } : { action: 'exit', note }
+			}
 			if (inside) {
 				if (doener.active() || bikePaint.active()) return null
 				if (shop.kind === 'spaeti' && interior.atCounter(player.x, player.y))
@@ -235,8 +252,8 @@ export function createVisit({ city3d, shops, player, pfand, pocket, say, heightA
 				return { action: 'exit' }
 			}
 			if (player.car || player.onBike) return null
-			const s = shopAt(player.x, player.y)
-			if (!s || !opening.isOpen(s.place)) return null
+			const s = shopAt(player.x, player.y) ?? entranceAt(player.x, player.y)
+			if (!s || !isOpen(s)) return null
 			return { action: 'shop' }
 		},
 	}

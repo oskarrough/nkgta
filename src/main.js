@@ -110,7 +110,7 @@ const pocket = createPocket({
 })
 const pocketMap = createPocketMap({ world, pocket })
 const draw = createRenderer(canvas, world, shops)
-const visit = createVisit({ city3d, shops, player, pfand, pocket, say: hud.say, heightAt: world.heightAt, opening })
+const visit = createVisit({ city3d, world, shops, player, pfand, pocket, say: hud.say, heightAt: world.heightAt, opening })
 const veil = document.getElementById('veil')
 const wasted = createWasted({
 	player,
