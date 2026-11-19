@@ -18,6 +18,8 @@ export const LOOKS = {
 
 export const DEFAULT_LOOK = 'default'
 
+export const LOOK_NAMES = { default: 'Normal', pixel: 'Pixel', raw: 'Roh' }
+
 export const nextLook = (name) => {
 	const names = Object.keys(LOOKS)
 	return names[(names.indexOf(name) + 1) % names.length]

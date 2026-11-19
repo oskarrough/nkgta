@@ -40,6 +40,7 @@ import { dailyQuizResult, dateKey, saveDailyQuiz } from './daily.js'
 import { createQuiz } from './quiz.js'
 import { areaFromUrl } from './area-url.js'
 import { recall, remember, storage } from './remember.js'
+import { LOOK_NAMES } from './looks.js'
 
 const START = { lat: 52.47751, lon: 13.43874, dir: -1.98 } // Pavement at Brot und Brötchen, Karl-Marx-Straße 131
 
@@ -293,7 +294,7 @@ menu.add('quiz', { run: () => quiz.start() })
 menu.add('streets', { run: actions.toggleStreetNames, on: () => showStreetNames })
 menu.add('transit', { run: actions.toggleTransit, on: () => showTransit })
 menu.add('walls', { run: actions.toggleWalls, on: () => showWalls })
-menu.add('look', { run: actions.cycleLook, paint: (el) => (el.title = `Look: ${city3d.look()} (P)`) })
+menu.add('look', { run: actions.cycleLook, paint: (el) => (el.title = `Stil: ${LOOK_NAMES[city3d.look()]} (P)`) })
 menu.add('camera', { run: actions.toggleCamera, on: () => camera.selected() })
 menu.add('music', { run: actions.toggleMusicDebug, on: () => showMusic })
 menu.add('sound', {
