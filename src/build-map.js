@@ -395,6 +395,12 @@ export function buildMap(osm, bbox, tileM) {
 
 	shapes.sort((a, b) => a.layer - b.layer)
 	const map = { w: W, h: H, tileM, bbox, shapes, buildings, tiles, streetOf, streets, labels, pois, transit, trees, murals }
+	// OSM names some gates as their street plus "Tor 1": no one could tell them from the street in a quiz.
+	const real = new Set(roadWays.filter((w) => roadClass(w.tags.highway) !== 'service').map((w) => w.tags.name))
+	map.quizExcludedStreets = streets.filter((name) => {
+		const gate = name.match(/^(.+) - Tor \d+$/)
+		return gate && real.has(gate[1]) && !real.has(name)
+	})
 	// Where the doors are depends only on the map, so it's worked out here, once.
 	const world = createWorld(map)
 	return {

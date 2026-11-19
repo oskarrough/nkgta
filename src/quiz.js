@@ -1,6 +1,6 @@
 import { copy } from './copy.js'
 import { quizShareText, seeded } from './daily.js'
-import { guessRelation, quizLine, quizRounds, streetSpots } from './quiz-rules.js'
+import { guessRelation, quizRounds, streetSpots } from './quiz-rules.js'
 import { COLORS, T } from './tiles.js'
 import './quiz.css'
 
@@ -57,7 +57,6 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 	let daily = null // today's date while playing the round everyone gets
 	let previousButtons = []
 	let lastSecond = -1
-	let sendFailed = false
 	const active = () => phase !== 'idle'
 	const button = (text, action) => {
 		const b = document.createElement('button')
@@ -125,13 +124,7 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 	function answer(name) {
 		if (phase !== 'answer') return
 		const spot = rounds[answers.length]
-		const seconds = (performance.now() - started) / 1000
 		answers.push({ ...spot, answer: name })
-		fetch('https://inkast.0sk.ar/n3fnd6j6', { method: 'POST', body: quizLine(spot, name, seconds, area) })
-			.then((res) => {
-				if (!res.ok) reportSendFailure()
-			})
-			.catch(reportSendFailure)
 		if (name && name !== spot.street) {
 			phase = 'reveal'
 			root.replaceChildren()
@@ -150,16 +143,6 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 	function advance() {
 		if (answers.length < 5) next()
 		else recap()
-	}
-	function reportSendFailure() {
-		sendFailed = true
-		if (!active()) say('Antwort ging nicht raus.')
-		else if (phase === 'done' && !root.querySelector('[role=status]')) {
-			const notice = document.createElement('p')
-			notice.setAttribute('role', 'status')
-			notice.textContent = 'Ein paar Antworten gingen nicht raus.'
-			root.append(notice)
-		}
 	}
 	function recap() {
 		phase = 'done'
@@ -213,7 +196,6 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 			)
 		}
 		root.append(button('Zurück ins Spiel', close))
-		if (sendFailed) reportSendFailure()
 		selected = 0
 		select(0)
 	}
@@ -289,7 +271,6 @@ export function createQuiz({ world, player, camera, city3d, area, prepare, resto
 			}
 			saved = { player: { ...player }, camera: camera.selected() }
 			answers = []
-			sendFailed = false
 			previousButtons = Array.from(
 				[...(navigator.getGamepads?.() ?? [])].find((p) => p?.connected && p.mapping === 'standard')?.buttons ?? [],
 				(b) => b.pressed,

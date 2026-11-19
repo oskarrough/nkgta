@@ -1,6 +1,6 @@
 import { defaultMap } from './default-map.js'
 import { expect, test } from 'bun:test'
-import { guessRelation, quizLine, quizRounds, quizSpots } from '../src/quiz-rules.js'
+import { guessRelation, quizRounds, quizSpots } from '../src/quiz-rules.js'
 import { T } from '../src/tiles.js'
 
 test('five different streets, each with the right answer and its three nearest alternatives', () => {
@@ -35,12 +35,6 @@ test('quiz starts on named streets, never buildings or map edges', () => {
 	expect([...quizSpots(world).values()].flat()).toEqual([{ x: 2.5, y: 2.5, street: 'Karl-Marx-Straße' }])
 })
 
-test('feedback is exactly one plain line, including skips and picked areas', () => {
-	expect(quizLine({ street: 'Weserstraße', x: 20.5, y: 31.5 }, null, 12.34, '1,2,3,4')).toBe(
-		'quiz: Weserstraße | answer skip | 12.3 s | area 1,2,3,4 | 20.5,31.5',
-	)
-})
-
 test('the shipped map can provide a full quiz', async () => {
 	const { createWorld } = await import('../src/world.js')
 	const world = createWorld(await defaultMap())
@@ -56,4 +50,32 @@ test('wrong guess measures to the nearest mapped part of the guessed street, wit
 		direction: 'nordöstlich',
 		metres: 11,
 	})
+})
+
+test('gate entrances named after their street stay out of the quiz, service-only and mixed streets stay in', async () => {
+	const { buildMap } = await import('../src/build-map.js')
+	const { createWorld } = await import('../src/world.js')
+	let id = 0
+	const way = (name, highway, lat) => ({
+		type: 'way',
+		id: ++id,
+		tags: { name, highway },
+		nodes: [id * 10, id * 10 + 1],
+		geometry: [
+			{ lat, lon: 13.4 },
+			{ lat, lon: 13.402 },
+		],
+	})
+	const osm = {
+		elements: [
+			way('Thiemannstraße', 'residential', 52.4997),
+			way('Thiemannstraße - Tor 1', 'service', 52.4995),
+			way('Thiemannstraße - Tor 4', 'service', 52.4993),
+			way('Rütlistraße', 'service', 52.4991),
+			way('Weserstraße', 'service', 52.4989),
+			way('Weserstraße', 'residential', 52.4987),
+		],
+	}
+	const world = createWorld(buildMap(osm, { north: 52.5, south: 52.4984, west: 13.4, east: 13.402 }, 3))
+	expect([...quizSpots(world).keys()].sort()).toEqual(['Rütlistraße', 'Thiemannstraße', 'Weserstraße'])
 })

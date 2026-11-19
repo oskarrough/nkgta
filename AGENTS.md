@@ -62,6 +62,7 @@ Songs are composed in oskarrough/jukebox (its compose-song skill), not here; `sr
 - When `src/build-map.js` or `src/map-codec.js` changes, bump `BUILD_VERSION` in `src/load-map.js` so cached picked areas rebuild.
 - `public/map.json` conflicts whenever two changes rebuild it: after a rebase, rerun `bun run build-map` instead of merging it by hand.
 - Overpass is a shared public service. Fetch once and work from `data/osm.json`; never call it in a loop. A worktree can copy the main checkout’s `data/osm.json` when its own is missing. In bb worktrees it is often a symlink to that shared copy: replace the link with a real copy before writing to it.
+- On a machine without `data/osm.json`, ask the lead for a private single-file transfer of another machine's cache (bb file read refuses files over 25 MB); never refetch Overpass to work around absent local data.
 
 ## Ground height
 

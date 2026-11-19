@@ -9,12 +9,13 @@ export const streetSpots = (world) => {
 }
 
 export function quizSpots(world) {
+	const excluded = new Set(world.quizExcludedStreets)
 	const streets = new Map()
 	for (let y = 1; y < world.H - 1; y++) {
 		for (let x = 1; x < world.W - 1; x++) {
 			if (![T.ROAD, T.SIDEWALK].includes(world.tileAt(x, y))) continue
 			const street = world.streetAt(x, y)
-			if (!street) continue
+			if (!street || excluded.has(street)) continue
 			const spots = streets.get(street) ?? []
 			spots.push({ x: x + 0.5, y: y + 0.5, street })
 			streets.set(street, spots)
@@ -100,6 +101,3 @@ function nearestStreets(streets) {
 	nearestCache.set(streets, nearest)
 	return nearest
 }
-
-export const quizLine = (spot, answer, seconds, area) =>
-	`quiz: ${spot.street} | answer ${answer ?? 'skip'} | ${seconds.toFixed(1)} s | area ${area} | ${spot.x.toFixed(1)},${spot.y.toFixed(1)}`

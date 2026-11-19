@@ -8,7 +8,7 @@ import { applyMeasuredRoofs } from './measured-roofs.js'
 import { applyMeasuredTrees } from './measured-trees.js'
 
 // Bump when build-map.js or map-codec.js changes, so cached areas get rebuilt.
-const BUILD_VERSION = 17
+const BUILD_VERSION = 18
 
 export async function loadMap(onStatus) {
 	const bbox = areaFromUrl()
